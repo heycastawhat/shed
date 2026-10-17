@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Byline from '#lib/components/Byline.svelte';
 	import Icon from './Icon.svelte';
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
@@ -202,7 +203,7 @@
 {#snippet commentCards(list: LineComment[])}
 	{#each list as c (c.id)}
 		<div class="comment">
-			<div class="who"><img src={c.user.avatar_url} alt="" /><strong>{c.user.login}</strong>{#if c.agent}<span class="agent" title="Written by an agent through forge">{c.agent}</span>{/if} {ago(c.date)}</div>
+			<div class="who"><img src={c.user.avatar_url} alt="" /><Byline bold login={c.user.login} agent={c.agent} /> {ago(c.date)}</div>
 			<article class="markdown">{@html c.html}</article>
 		</div>
 	{/each}
@@ -616,7 +617,7 @@
 		color: var(--muted);
 		font-size: 0.8rem;
 	}
-	.comment .who strong {
+	.comment .who :global(strong) {
 		color: var(--fg);
 	}
 	.comment img {

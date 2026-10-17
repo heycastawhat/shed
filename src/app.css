@@ -95,7 +95,6 @@ textarea {
 }
 
 .agent {
-	margin-left: 0.4rem;
 	font-size: 0.75rem;
 	color: var(--accent);
 	border: 1px solid var(--accent);

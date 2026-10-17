@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import Byline from './Byline.svelte';
+	import { commitAgent } from '#lib/sign.js';
 	import { ago } from '#lib/time.js';
 
 	type Commit = {
@@ -32,7 +34,7 @@
 				</div>
 				<div class="meta">
 					{#if c.author}<img src={c.author.avatar_url} alt="" />{:else}<span class="initial">{c.commit.author.name[0]?.toUpperCase()}</span>{/if}
-					<span>{c.author?.login ?? c.commit.author.name}</span>
+					<span><Byline login={c.author?.login ?? c.commit.author.name} agent={commitAgent(c.commit.message)} /></span>
 					<span title={c.commit.author.date}>{ago(c.commit.author.date)}</span>
 					<a href="/{repo}/commit/{c.sha}"><code>{c.sha.slice(0, 8)}</code></a>
 				</div>
