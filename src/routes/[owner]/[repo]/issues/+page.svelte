@@ -3,20 +3,26 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import IssueState from '#lib/components/IssueState.svelte';
 	import LabelChip from '#lib/components/LabelChip.svelte';
-	import LabelFilter, { listQuery } from '#lib/components/LabelFilter.svelte';
+	import ListFilters from '#lib/components/ListFilters.svelte';
+	import Assignees from '#lib/components/Assignees.svelte';
+	import Pager from '#lib/components/Pager.svelte';
+	import { page } from '$app/state';
+	import { listQuery } from '#lib/list-query.js';
 	import { bodyAgent } from '#lib/sign.js';
 	import { ago } from '#lib/time.js';
 
 	let { data } = $props();
+	const q = (set: Record<string, string | null>) => listQuery(page.url, set);
+	const filtered = $derived(!!(data.label || data.milestone || data.assignee));
 </script>
 
 <div class="top">
 	<div class="left">
 		<div class="filters">
-			<a href={listQuery('open', data.label)} class:on={data.state === 'open'}><Icon name="issue" size={14} />Open</a>
-			<a href={listQuery('closed', data.label)} class:on={data.state === 'closed'}><Icon name="check" size={14} />Closed</a>
+			<a href={q({ state: 'open' })} class:on={data.state === 'open'}><Icon name="issue" size={14} />Open</a>
+			<a href={q({ state: 'closed' })} class:on={data.state === 'closed'}><Icon name="check" size={14} />Closed</a>
 		</div>
-		<LabelFilter labels={data.labels} active={data.label} state={data.state} />
+		<ListFilters labels={data.labels} milestones={data.milestones} label={data.label} milestone={data.milestone} assignee={data.assignee} me={data.user?.login} />
 	</div>
 	<a class="button primary" href="/{data.repo.full_name}/issues/new"><Icon name="plus" size={14} />New issue</a>
 </div>
@@ -27,23 +33,27 @@
 			<IssueState state={i.state} />
 			<div>
 				<a href="/{data.repo.full_name}/issues/{i.number}"><strong>{i.title}</strong></a>
-				{#each i.labels as l (l.id)}<a class="chip" href={listQuery(data.state, l.name)} title="Show only {l.name}"><LabelChip label={l} /></a>{/each}
+				{#each i.labels as l (l.id)}<a class="chip" href={q({ labels: l.name })} title="Show only {l.name}"><LabelChip label={l} /></a>{/each}
 				<div class="meta">
 					#{i.number} by <Byline login={i.user.login} agent={bodyAgent(i.body)} /> · {ago(i.created_at)}
+					{#if i.milestone}· <a class="ms" href={q({ milestone: i.milestone.title })} title="Show only {i.milestone.title}"><Icon name="milestone" size={13} />{i.milestone.title}</a>{/if}
 					{#if i.comments}· <span class="comments"><Icon name="message" size={13} />{i.comments}</span>{/if}
 				</div>
 			</div>
+			<Assignees users={i.assignees} />
 		</li>
 	{:else}
 		<li class="empty">
 			<Icon name="issue" size={28} />
-			<strong>No {data.state} issues{data.label ? ` labelled ${data.label}` : ''}</strong>
+			<strong>No {data.state} issues{filtered ? ' match these filters' : ''}</strong>
 			<span class="muted">
-				{#if data.label}<a href={listQuery(data.state)}>Clear the filter</a>{:else}{data.state === 'open' ? 'Nothing to do. Open one to track a bug or an idea.' : 'Closed issues show up here.'}{/if}
+				{#if filtered}<a href={q({ labels: null, milestone: null, assignee: null })}>Clear the filters</a>{:else}{data.state === 'open' ? 'Nothing to do. Open one to track a bug or an idea.' : 'Closed issues show up here.'}{/if}
 			</span>
 		</li>
 	{/each}
 </ul>
+
+<Pager page={data.page} total={data.total} size={data.size} />
 
 <style>
 	.top {
@@ -142,6 +152,16 @@
 		align-items: center;
 		gap: 0.2rem;
 		vertical-align: bottom;
+	}
+	.ms {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2rem;
+		color: var(--muted);
+		vertical-align: bottom;
+	}
+	.ms:hover {
+		color: var(--fg);
 	}
 	.meta {
 		font-size: 0.85rem;

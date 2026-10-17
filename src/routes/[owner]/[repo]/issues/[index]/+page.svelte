@@ -4,7 +4,7 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import IssueState from '#lib/components/IssueState.svelte';
 	import LabelChip from '#lib/components/LabelChip.svelte';
-	import LabelPicker from '#lib/components/LabelPicker.svelte';
+	import Triage from '#lib/components/Triage.svelte';
 	import EditTitle from '#lib/components/EditTitle.svelte';
 	import Description from '#lib/components/Description.svelte';
 	import { ago } from '#lib/time.js';
@@ -44,12 +44,14 @@
 					</li>
 				{:else}
 					<li class="event">
-						<span class="dot {e.type}"><Icon name={e.type === 'close' ? 'done' : e.type === 'reopen' ? 'issue' : e.type === 'label' ? 'tag' : 'message'} size={e.type === 'close' || e.type === 'reopen' ? 16 : 14} /></span>
+						<span class="dot {e.type}"><Icon name={{ close: 'done', reopen: 'issue', label: 'tag', assignees: 'user', milestone: 'milestone' }[e.type] ?? 'pencil'} size={e.type === 'close' || e.type === 'reopen' ? 16 : 14} /></span>
 						<p>
 							<strong>{e.user.login}</strong>
 							{#if e.type === 'close'}closed this
 							{:else if e.type === 'reopen'}reopened this
 							{:else if e.type === 'label' && e.label}{e.added ? 'added' : 'removed'} <LabelChip label={e.label} />
+							{:else if e.type === 'assignees'}{#if e.assignee === e.user.login}{e.unassigned ? 'removed their assignment' : 'self-assigned this'}{:else}{e.unassigned ? 'unassigned' : 'assigned'} <strong>{e.assignee}</strong>{/if}
+							{:else if e.milestone}{#if e.milestone.to && e.milestone.from}moved this from <strong>{e.milestone.from}</strong> to <strong>{e.milestone.to}</strong>{:else if e.milestone.to}added this to <strong>{e.milestone.to}</strong>{:else}removed this from <strong>{e.milestone.from}</strong>{/if}
 							{:else if e.title}changed the title from <s>{e.title.from}</s> to <strong>{e.title.to}</strong>{/if}
 							{ago(e.date)}
 						</p>
@@ -94,7 +96,7 @@
 		</form>
 	</div>
 
-	<aside><LabelPicker labels={data.labels} current={i.labels} can={data.repo.permissions.push} /></aside>
+	<aside><Triage item={i} options={data.options} can={data.repo.permissions.push} list="/{data.repo.full_name}/issues" /></aside>
 </div>
 
 <style>

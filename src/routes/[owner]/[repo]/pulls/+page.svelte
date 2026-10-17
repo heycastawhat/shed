@@ -5,17 +5,23 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import PrState from '#lib/components/PrState.svelte';
 	import LabelChip from '#lib/components/LabelChip.svelte';
-	import LabelFilter, { listQuery } from '#lib/components/LabelFilter.svelte';
+	import ListFilters from '#lib/components/ListFilters.svelte';
+	import Assignees from '#lib/components/Assignees.svelte';
+	import Pager from '#lib/components/Pager.svelte';
+	import { page } from '$app/state';
+	import { listQuery } from '#lib/list-query.js';
 
 	let { data } = $props();
+	const q = (set: Record<string, string | null>) => listQuery(page.url, set);
+	const filtered = $derived(!!(data.label || data.milestone || data.assignee));
 </script>
 
 <div class="top">
 	<div class="filters">
-		<a href={listQuery('open', data.label)} class:on={data.state === 'open'}><Icon name="changes" size={14} />Open</a>
-		<a href={listQuery('closed', data.label)} class:on={data.state === 'closed'}><Icon name="check" size={14} />Closed</a>
+		<a href={q({ state: 'open' })} class:on={data.state === 'open'}><Icon name="changes" size={14} />Open</a>
+		<a href={q({ state: 'closed' })} class:on={data.state === 'closed'}><Icon name="check" size={14} />Closed</a>
 	</div>
-	<LabelFilter labels={data.labels} active={data.label} state={data.state} />
+	<ListFilters labels={data.labels} milestones={data.milestones} label={data.label} milestone={data.milestone} assignee={data.assignee} me={data.user?.login} />
 </div>
 
 <ul class="pulls">
@@ -24,23 +30,27 @@
 			<PrState pull={p} />
 			<div>
 				<a href="/{data.repo.full_name}/pulls/{p.number}"><strong>{p.title}</strong></a>
-				{#each p.labels as l (l.id)}<a class="chip" href={listQuery(data.state, l.name)} title="Show only {l.name}"><LabelChip label={l} /></a>{/each}
+				{#each p.labels as l (l.id)}<a class="chip" href={q({ labels: l.name })} title="Show only {l.name}"><LabelChip label={l} /></a>{/each}
 				<div class="meta">
 					#{p.number} by <Byline login={p.user.login} agent={bodyAgent(p.body)} /> · {ago(p.created_at)} · <code>{p.head.label}</code> → <code>{p.base.ref}</code>
+					{#if p.milestone}· <a class="ms" href={q({ milestone: p.milestone.title })} title="Show only {p.milestone.title}"><Icon name="milestone" size={13} />{p.milestone.title}</a>{/if}
 					{#if p.comments}· {p.comments} comment{p.comments === 1 ? '' : 's'}{/if}
 				</div>
 			</div>
+			<Assignees users={p.assignees} />
 		</li>
 	{:else}
 		<li class="empty">
 			<Icon name="changes" size={28} />
-			<strong>No {data.state} pull requests{data.label ? ` labelled ${data.label}` : ''}</strong>
+			<strong>No {data.state} pull requests{filtered ? ' match these filters' : ''}</strong>
 			<span class="muted">
-				{#if data.label}<a href={listQuery(data.state)}>Clear the filter</a>{:else}{data.state === 'open' ? 'Push a branch and open one, or let an agent do it.' : 'Merged and closed pull requests show up here.'}{/if}
+				{#if filtered}<a href={q({ labels: null, milestone: null, assignee: null })}>Clear the filters</a>{:else}{data.state === 'open' ? 'Push a branch and open one, or let an agent do it.' : 'Merged and closed pull requests show up here.'}{/if}
 			</span>
 		</li>
 	{/each}
 </ul>
+
+<Pager page={data.page} total={data.total} size={data.size} />
 
 <style>
 	.top {
@@ -116,6 +126,16 @@
 	}
 	strong {
 		font-weight: 500;
+	}
+	.ms {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2rem;
+		color: var(--muted);
+		vertical-align: bottom;
+	}
+	.ms:hover {
+		color: var(--fg);
 	}
 	.meta {
 		font-size: 0.85rem;

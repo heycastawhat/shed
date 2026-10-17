@@ -4,7 +4,7 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import Byline from '#lib/components/Byline.svelte';
 	import Description from '#lib/components/Description.svelte';
-	import LabelPicker from '#lib/components/LabelPicker.svelte';
+	import Triage from '#lib/components/Triage.svelte';
 	import { ago } from '#lib/time.js';
 
 	let { data, form } = $props();
@@ -187,7 +187,7 @@
 </form>
 </div>
 
-<aside><LabelPicker labels={data.labels} current={data.pull.labels} can={data.repo.permissions.push} /></aside>
+<aside><Triage item={data.pull} options={data.options} can={data.repo.permissions.push} list="/{data.repo.full_name}/pulls" /></aside>
 </div>
 
 <svelte:window

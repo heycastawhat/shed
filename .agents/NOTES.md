@@ -67,6 +67,7 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
 - `main` has `.forgejo/workflows/ci.yml`: `lint` (instant) and `test` (sleeps 20s) on `pull_request`, and on `push` to main only. Any PR gets two checks. For a quick throwaway PR, use the API with basic auth `ada:<admin password>` (the `dev/.git-credentials` token works for git only and gets 401 from the API), then close it and delete its branch.
 - Don't merge #5 or #6 from tests. Merging can't be undone, and a merged test PR has to be replaced with a new branch.
 - Release `v0.1.0` (on main, notes plus one asset `sample-0.1.0.txt`) and a lightweight tag `v0.0.1` (on `feature/retry-jitter`) are test data for the releases page. PR #34 is a closed throwaway from the branches page.
+- Milestones `v0.2` (due 30 Nov 2026; issues #27, #29) and `Backlog` (#28). #27 is assigned to ada, #28 and #30 to reviewer; #30 and #31 have assign/milestone events in their timelines. PR #35 is a closed throwaway from the triage tests.
 
 ## Gotchas (each one cost time)
 
@@ -174,8 +175,8 @@ Done:
    Quirks: the list needs `type=issues` or PRs come back too; `/issues/N` for a PR redirects to `/pulls/N` (`pull_request` is set); `/issues/N/timeline` returns `null`, not `[]`, when empty;
    label colours come back without `#`; a `label` timeline event has `body` `"1"` for added and `"0"` for removed. Test issues #27–#31 and labels bug/enhancement/docs/good first issue are in `ada/sample`.
 
-16. Labels and editing on issues and PRs. `LabelPicker.svelte` (sidebar on the issue page and the PR Conversation tab; the other PR tabs show chips in the header), chips on the PR list and Changes.
-   `LabelFilter.svelte` is the label dropdown next to Open/Closed; list chips link to the same `?state=&labels=<name>` filter (`listQuery`), with × to clear.
+16. Labels and editing on issues and PRs. The label picker (now in `Triage.svelte`, see 18) is in the sidebar on the issue page and the PR Conversation tab; the other PR tabs show chips in the header; chips on the PR list and Changes.
+   The label dropdown next to Open/Closed is in `ListFilters.svelte` (see 18); list chips link to the same `?labels=<name>` filter, with × to clear.
    `EditTitle.svelte` (pencil, Enter saves, Esc cancels) and `Description.svelte` (Edit swaps the first card to a textarea) are allowed for push access or the author.
    Actions live in `src/lib/server/issue.ts` (`issueActions` = label/edit, spread into both pages; PRs use the `/issues/N` endpoints). The PR layout's title form posts to `<pr>?/edit`, so it works from the Files and Commits tabs too.
    Editing a body unsigns it first and re-appends the original forge footer on save, so agent attribution survives. ("Generated with Claude Code" is ordinary body text and stays editable.)
@@ -185,6 +186,13 @@ Done:
    `/[owner]/[repo]/branches`: default first, then by latest commit; last commit with `Byline`; behind/ahead vs the default branch for the 20 newest (two `compare` calls each, which return full commits and files, hence the cap);
    the open PR (matched on `head.ref`) or "New pull request" (`?/openPr` → `openPush` from `home.ts`, drafted title, straight to the PR); delete with a confirm for push users, never the default or a protected branch (re-checked server-side).
    `/[owner]/[repo]/releases`: Releases/Tags switch (`?tags`, and Tags when there are no releases); notes via `renderMarkdown(…, { ref: tag, dir: '' })`; assets and source archives link straight to Forgejo (so a private repo needs a Forgejo browser session).
+18. Triage: `Triage.svelte` is the issue/PR sidebar (Labels, Assignees, Milestone), each a `SidePicker.svelte` (generic toggle list of forms posting to `?/<action>`).
+   `issueActions` gained `assign` (toggles one login against the *current* assignees, fetched server-side, so quick clicks on a stale page don't undo each other) and `milestone` (`PATCH milestone: id`, `0` clears); `triageOptions()` loads labels, `/assignees` and open milestones.
+   Lists: `ListFilters.svelte` (Label and Milestone dropdowns, "Assigned to me" toggle; it replaced `LabelFilter.svelte`), assignee avatars (`Assignees.svelte`) and the milestone on each row, and `Pager.svelte` (25 per page, `x-total-count`).
+   All list links go through `listQuery(url, { key: value | null })` in `src/lib/list-query.ts`, which keeps the other params and drops `page`. URL params: `state`, `labels` (name), `milestone` (title), `assignee` (login), `page`; `listFilters()` in `issue.ts` parses them.
+   The issue timeline shows `assignees` events (`assignee` + `removed_assignee`; self-assign reads "self-assigned this") and `milestone` events (`milestone`/`old_milestone`, null on the cleared side).
+   Quirks: the pulls list has no assignee filter, so with `assignee` set the PR list pages through `/issues?type=pulls&assigned_by=` and fetches each `/pulls/N` for its branches. It filters milestones by id (`milestone=`), the issues list by `milestones=` (names or ids).
+   An unknown label or milestone name makes Forgejo **ignore** the filter and return everything, so `listFilters` flags it and the list is emptied by hand; an unknown `assigned_by` user is a 404.
 
 Next, in the order discussed:
 1. Deploy to `/opt/stacks` on server. (The session cookie is now an opaque id, so that blocker is gone. Persist `FORGE_DATA` and keep `FORGE_SECRET` stable, or everyone has to log in again and all keys die.)

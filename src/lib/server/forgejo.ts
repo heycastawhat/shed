@@ -106,6 +106,8 @@ export type Pull = {
 	draft: boolean;
 	user: User;
 	labels: Label[];
+	assignees: User[] | null;
+	milestone: Milestone | null;
 	head: { ref: string; label: string; sha: string };
 	base: { ref: string };
 	created_at: string;
@@ -129,6 +131,7 @@ export type FoundPull = {
 	pull_request?: { merged: boolean; draft: boolean };
 };
 export type Label = { id: number; name: string; color: string; description: string };
+export type Milestone = { id: number; title: string; description: string; state: 'open' | 'closed'; open_issues: number; closed_issues: number; due_on: string | null };
 export type Issue = {
 	number: number;
 	title: string;
@@ -136,6 +139,8 @@ export type Issue = {
 	state: 'open' | 'closed';
 	user: User;
 	labels: Label[];
+	assignees: User[] | null;
+	milestone: Milestone | null;
 	comments: number;
 	created_at: string;
 	closed_at: string | null;

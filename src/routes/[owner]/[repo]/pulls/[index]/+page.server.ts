@@ -3,8 +3,8 @@ import { FORGEJO_URL } from '$app/env/private';
 import { parseDiff } from '#lib/diff.js';
 import { unsign } from '#lib/sign.js';
 import { fixWithAgent } from '#lib/server/fix.js';
-import { issueActions } from '#lib/server/issue.js';
-import { api, isResolved, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type Label, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
+import { issueActions, triageOptions } from '#lib/server/issue.js';
+import { api, isResolved, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
 
 export async function load({ locals, params, parent }) {
 	const repo = `${params.owner}/${params.repo}`;
@@ -13,11 +13,11 @@ export async function load({ locals, params, parent }) {
 		api<Comment[]>(locals.token, `/repos/${repo}/issues/${params.index}/comments`),
 		api<Review[]>(locals.token, `/repos/${repo}/pulls/${params.index}/reviews`)
 	]);
-	const [status, diff, events, labels] = await Promise.all([
+	const [status, diff, events, options] = await Promise.all([
 		api<CombinedStatus>(locals.token, `/repos/${repo}/commits/${pull.head.sha}/status`),
 		request(locals.token, `/repos/${repo}/pulls/${params.index}.diff`).then((res) => res.text()),
 		api<{ type: string; user: { login: string } }[]>(locals.token, `/repos/${repo}/issues/${params.index}/timeline`),
-		api<Label[]>(locals.token, `/repos/${repo}/labels?limit=100`)
+		triageOptions(locals.token, repo)
 	]);
 	// The API has no auto-merge field; the latest schedule/cancel event in the timeline is the only record of it.
 	const schedule = events.findLast((e) => e.type === 'pull_scheduled_merge' || e.type === 'pull_cancel_scheduled_merge');
@@ -86,7 +86,7 @@ export async function load({ locals, params, parent }) {
 	const mine = reviews.findLast((v) => v.user.id === user?.id && !v.dismissed && (v.state === 'APPROVED' || v.state === 'REQUEST_CHANGES'));
 	return {
 		body: description.html,
-		labels,
+		options,
 		timeline,
 		mergeStyles: mergeStyles(r),
 		checks: {

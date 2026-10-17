@@ -1,18 +1,31 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { issueActions, send } from '#lib/server/issue.js';
+import { issueActions, send, triageOptions } from '#lib/server/issue.js';
 import { unsign } from '#lib/sign.js';
-import { api, renderMarkdown, type Issue, type Label, type User } from '#lib/server/forgejo.js';
+import { api, renderMarkdown, type Issue, type Label, type Milestone, type User } from '#lib/server/forgejo.js';
 
-type Event = { id: number; type: string; user: User; body: string; created_at: string; label?: Label; old_title?: string; new_title?: string };
-const SHOWN = ['comment', 'close', 'reopen', 'label', 'change_title'];
+type Event = {
+	id: number;
+	type: string;
+	user: User;
+	body: string;
+	created_at: string;
+	label?: Label;
+	old_title?: string;
+	new_title?: string;
+	assignee?: User | null;
+	removed_assignee?: boolean;
+	milestone?: Milestone | null;
+	old_milestone?: Milestone | null;
+};
+const SHOWN = ['comment', 'close', 'reopen', 'label', 'change_title', 'assignees', 'milestone'];
 
 export async function load({ locals, params }) {
 	const repo = `${params.owner}/${params.repo}`;
 	const path = `/repos/${repo}/issues/${params.index}`;
-	const [issue, events, labels] = await Promise.all([
+	const [issue, events, options] = await Promise.all([
 		api<Issue>(locals.token, path),
 		api<Event[] | null>(locals.token, `${path}/timeline?limit=100`),
-		api<Label[]>(locals.token, `/repos/${repo}/labels?limit=100`)
+		triageOptions(locals.token, repo)
 	]);
 	// Pull requests are issues too in Forgejo's numbering, so /issues/N can be a PR.
 	if (issue.pull_request) redirect(303, `/${repo}/pulls/${params.index}`);
@@ -22,12 +35,12 @@ export async function load({ locals, params }) {
 	};
 	return {
 		issue,
-		labels,
+		options,
 		description: await md(issue.body),
 		timeline: await Promise.all(
 			// An issue with no activity gets `null` rather than an empty list.
 			(events ?? [])
-				.filter((e) => SHOWN.includes(e.type) && (e.type !== 'label' || e.label))
+				.filter((e) => SHOWN.includes(e.type) && (e.type !== 'label' || e.label) && (e.type !== 'assignees' || e.assignee))
 				.map(async (e) => ({
 					id: e.id,
 					type: e.type,
@@ -36,6 +49,9 @@ export async function load({ locals, params }) {
 					label: e.label,
 					added: e.body === '1',
 					title: e.type === 'change_title' ? { from: e.old_title, to: e.new_title } : undefined,
+					assignee: e.assignee?.login,
+					unassigned: !!e.removed_assignee,
+					milestone: e.type === 'milestone' ? { from: e.old_milestone?.title, to: e.milestone?.title } : undefined,
 					...(e.type === 'comment' ? await md(e.body) : { html: '', agent: undefined })
 				}))
 		)

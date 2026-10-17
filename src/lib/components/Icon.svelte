@@ -10,6 +10,8 @@
 	import IInbox from '@mingcute/svelte/core-regular/inbox';
 	import IChat1 from '@mingcute/svelte/core-regular/chat-1';
 	import ILock from '@mingcute/svelte/core-regular/lock';
+	import IUser3 from '@mingcute/svelte/core-regular/user-3';
+	import IFlag2 from '@mingcute/svelte/core-regular/flag-2';
 	import IComputer from '@mingcute/svelte/core-regular/computer';
 	import IMoon from '@mingcute/svelte/core-regular/moon';
 	import IPalette from '@mingcute/svelte/core-regular/palette';
@@ -51,6 +53,8 @@
 		inbox: IInbox,
 		message: IChat1,
 		lock: ILock,
+		user: IUser3,
+		milestone: IFlag2,
 		monitor: IComputer,
 		moon: IMoon,
 		palette: IPalette,
