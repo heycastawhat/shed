@@ -46,21 +46,25 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
 ## Running locally
 
 1. `cd dev/forgejo && ./forgejo web`. This is Forgejo 17.0.0 on SQLite, at http://localhost:3000, with SSH on :2222. Config is in `custom/conf/app.ini`.
+   Its browser session lasts 30 days (remember-me 365) and OAuth access tokens 24h, so forge's login bounce rarely stops at a password prompt.
 2. `bun run dev --port 5173 --strictPort` → http://localhost:5173. The OAuth redirect URI is registered for exactly this port.
-3. Check with `bun run check`. Smoke test: `.agents/scripts/login.sh && .agents/scripts/smoke.sh`.
+3. Optional, for CI: `cd dev/runner && ./forgejo-runner daemon` (forgejo-runner 13.2.0, registered as `laptop-host` with label `host`, so jobs say `runs-on: host` and run **directly on this machine**, one at a time).
+   Re-register with a token from `dev/forgejo/forgejo forgejo-cli actions generate-runner-token` if `.runner` is lost.
+4. Check with `bun run check`. Smoke test: `.agents/scripts/login.sh && .agents/scripts/smoke.sh`.
 
 - Admin login: user `ada`, password in `dev/forgejo/.admin-password`. OAuth client ID and secret are in `.env` (see `.env.example`).
 - The owner's real instance is **git.example.com** (Forgejo 15.0.5) and is offered for use. Point `FORGEJO_URL` at it and register an OAuth app there.
   Ask first, because it's outward-facing.
-- No Docker on this machine, so there's no Actions runner yet. `forgejo-runner` in host mode is the plan when CI work starts.
+- No Docker on this machine, hence the host-mode runner.
 
 ### Test data (`ada/sample` on the local Forgejo)
 - PR #1 is merged (it has a review with an inline comment on `auth.ts`). PR #2 and PR #3 are merged; #2's comments are throwaway. PR #4 is closed.
-- PR #6 is merged. **PR #7** (`feature/greeting`) is open, by ada; its one thread was fixed by an agent via Fix with agent.
-- **PR #5** is open, by the second user `reviewer` (password in `dev/forgejo/.reviewer-password`, write access to the repo).
-  Use it for Approve / Request changes, since Forgejo won't let you approve your own PR. ada has already approved it once.
+- Org `kiwi` ("Kiwi Test Org", repo `kiwi/website`, ada is a member) exists for testing owner pages.
+- PR #6 is merged. PR #7 (`feature/greeting`, by ada) is merged too; its one thread was fixed by an agent via Fix with agent.
+- **PR #5** (by the second user `reviewer`, password in `dev/forgejo/.reviewer-password`, write access to the repo) was merged by ada on 2026-10-16. For Approve / Request changes tests, open a fresh PR as `reviewer`.
 - Don't litter PR #1 or #6 with test comments, or delete the ones you add afterwards (`DELETE /repos/ada/sample/pulls/N/reviews/ID`).
-- PRs #8–#20 and #22 are closed throwaways from tests; #21 was a throwaway that auto-merged (its file was removed from main afterwards). For a quick throwaway PR, use the API with basic auth `ada:<admin password>` (the `dev/.git-credentials` token works for git only and gets 401 from the API), then close it and delete its branch.
+- PRs #8–#20, #22 and #24 are closed throwaways from tests; #21 and #23 were throwaways that auto-merged (their files were removed from main afterwards).
+- `main` has `.forgejo/workflows/ci.yml`: `lint` (instant) and `test` (sleeps 20s) on `pull_request`, and on `push` to main only. Any PR gets two checks. For a quick throwaway PR, use the API with basic auth `ada:<admin password>` (the `dev/.git-credentials` token works for git only and gets 401 from the API), then close it and delete its branch.
 - Don't merge #5 or #6 from tests. Merging can't be undone, and a merged test PR has to be replaced with a new branch.
 
 ## Gotchas (each one cost time)
@@ -92,7 +96,7 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
   Consequence: if `forge.json` is lost or `FORGE_SECRET` changes, log in again and recreate keys.
 - **The agent sandbox proxy blocks `localhost`** (511). To run the local Forgejo/dev server or curl them, run the terminal command unsandboxed. Another session may already have `forgejo web` and `vite` running on :3000/:5173 (the Forgejo queue DB lock fails a second start), so `mcp.sh` only starts what isn't up.
 - There's no prettier config. A bare `bunx prettier` reformats to spaces and double quotes; the house style is tabs, single quotes, no trailing commas, ~180 columns.
-- Icons are Lucide (`@lucide/svelte`, per-icon imports like `@lucide/svelte/icons/bot`), mapped by name in `Icon.svelte`. After adding a dependency, restart `bun run dev` or SSR fails with "Unknown file extension .svelte".
+- Icons are MingCute Core Regular (`@mingcute/svelte`, per-icon imports like `@mingcute/svelte/core-regular/robot`), mapped by name in `Icon.svelte`. The owner rejected Lucide as too generic. They are filled shapes, so there is no stroke width to set. After adding a dependency, restart `bun run dev` or SSR fails with "Unknown file extension .svelte".
 - Selected rows (sidebar, settings nav, palette) are a flat `color-mix(var(--fg) 9%)` tint, not an accent stripe. The owner found the stripe looked AI-made.
 - Don't name a class `.agent` inside a component: `app.css` has a global `.agent` pill (the agent label), and it leaks in.
 - The user's shell defines `grep` as a function (ugrep). Use `command grep` in scripts.
@@ -135,7 +139,8 @@ Done:
    The local T3 server is the desktop app's, on :3773. `ada/sample` is checked out at `dev/sample` as T3 project "sample".
 
 10. **Agent keys and MCP server** (`.agents/scripts/mcp.sh` tests it end to end). Agents connect *to* forge: Settings → Agents creates a key and shows a `claude mcp add --transport http forge <origin>/mcp --header "Authorization: Bearer fk_…"` line.
-   `/mcp` is a hand-rolled MCP (Streamable HTTP, JSON replies, no SSE) with 8 tools: list/read PRs, diff, `read_file`, comment, reply to thread, resolve thread, open PR. **No merge tool.**
+   `/mcp` is a hand-rolled MCP (Streamable HTTP, JSON replies, no SSE) with list/read PRs, diff, `read_file`, comment, reply to thread, resolve thread, open PR, and an **opt-in** `merge_pull_request` (merge now or `when_checks_pass`).
+   A key can only see or call merge if its owner ticked "Also allow it to: merge a PR" (`AgentKey.allow`; tools marked `optIn` in `tools.ts`). New keys ask before merging by default.
    Keys act as their owner through Forgejo, are scoped to a repo list (`*` = all), and writes are signed "<key name>, an agent acting for @user via forge" and logged (last 500 in `forge.json`, shown on the settings page).
    **Approval queue:** each key has an `ask` list of write tools. A call to one of those is parked in `forge.json` (`approvals`) and the agent gets "queued as request <id>", then polls the `check_request` tool.
    The owner approves or denies on `/settings/agents` ("Waiting on you", header badge, 5s poll). Approve runs the stored call as the owner. Decisions are one-shot (409 on a repeat) and only the owner can decide. New keys ask before `open_pull_request` by default; keys made before this have no `ask` and never ask.
@@ -144,7 +149,7 @@ Done:
    An invalid file **fails closed** (writes refused with a 422; reads still work). The `get_rules` tool lets agents read them first. Lockfiles need `**/*.lock`-style globs; `*` doesn't cross `/`.
    **Agent labels:** writes carry a `<sub>name, an agent acting for @user via forge</sub>` footer (`src/lib/sign.ts`). The PR conversation and Files tab strip it and show a purple pill with the key's name. It's a label, not proof: anyone can type the same text.
    Keys are editable in place (name, repos, ask list) under each key on `/settings/agents`. `comment_on_line` lets an agent start a thread on a diff line (path must be in the PR; it can comment but never approve).
-   Tests: `mcp.sh` (auth, reads, token refresh), `mcp-tools.sh` (open PR, diff, read_file, resolve, comment_on_line), `mcp-approval.sh` (queue), `mcp-rules.sh` (rules); `mcp-clean.sh` revokes their throwaway keys (by name).
+   Tests: `mcp.sh` (auth, reads, token refresh), `mcp-merge.sh` (opt-in merge: hidden/refused, queued, scheduled), `mcp-tools.sh` (open PR, diff, read_file, resolve, comment_on_line), `mcp-approval.sh` (queue), `mcp-rules.sh` (rules); `mcp-clean.sh` revokes their throwaway keys (by name).
    They create and delete branches/PRs in `ada/sample` themselves; `mcp-rules.sh` also commits and removes `.forge/agents.json` on main.
    Not built yet: blame markers for agent lines, a way to edit rules in forge's UI (it's a file in the repo for now), and pushing branches through forge (agents push over git). `FORGE_SECRET` must be set in `.env`.
 
@@ -152,9 +157,33 @@ Done:
    The API has no auto-merge field, so the state is the latest `pull_scheduled_merge`/`pull_cancel_scheduled_merge` in `/issues/N/timeline`.
    Forgejo schedules even with no checks at all and then waits for a status forever, so the button is only offered while checks are pending.
 
+12. CI status: the merge card lists each commit status (job name, description, a Logs link to Forgejo's job page) under the "N of M checks passed" row, and the page re-polls every 5s while checks are pending.
+   Forgejo calls a status's state `status`, not `state` (the old count was always 0). Job logs aren't in the API, hence the link out.
+
+13. Agent attribution: `Byline.svelte` renders "<agent pill> on behalf of <user>" for PR lists, Changes, the PR header, the conversation, line comments and commit lists.
+   Sources (`sign.ts`): forge's own MCP signature; Claude Code's "Generated with [Claude Code]" PR footer (→ "Claude Code"); and the `Co-Authored-By: <name> <noreply@anthropic.com>` commit trailer (→ e.g. "Claude Opus 5.5").
+   A PR counts as agent-made if its body says so or any of its commits has the trailer (the PR layout fetches commits for this). The sidebar/top bar brand is plain "forge" text now; the rail hides it.
+
+14. Small gaps closed: `/[owner]` is a user/org page (profile, org members, `RepoList.svelte` shared with `/repos`; `/users/<name>` works for orgs, and `/orgs/<name>/members` succeeding is how it tells them apart).
+   Markdown files and READMEs render with `renderMarkdown(…, { ref, dir })`: Forgejo gets `<repo>/src/branch/<ref>/<dir>` as context, and that prefix is rewritten to forge's `blob`/`raw` URLs (folder links redirect blob → tree).
+   The tree view shows each entry's last commit subject and age (`last_commit_sha` from the contents API, then one `git/commits/<sha>` per distinct sha).
+
+15. Issues: repo tab "Issues" (open count, hidden if `has_issues` is off). `/[owner]/[repo]/issues` (Open/Closed switch, `LabelChip.svelte`, New issue), `issues/new`, and `issues/[index]`
+   (timeline of comments plus close/reopen/label/title events, composer with Close/Reopen "with comment", Labels sidebar with a toggle picker). `IssueState.svelte` mirrors `PrState`. Open issues are in the palette.
+   Quirks: the list needs `type=issues` or PRs come back too; `/issues/N` for a PR redirects to `/pulls/N` (`pull_request` is set); `/issues/N/timeline` returns `null`, not `[]`, when empty;
+   label colours come back without `#`; a `label` timeline event has `body` `"1"` for added and `"0"` for removed. Test issues #27–#31 and labels bug/enhancement/docs/good first issue are in `ada/sample`.
+
+16. Labels and editing on issues and PRs. `LabelPicker.svelte` (sidebar on the issue page and the PR Conversation tab; the other PR tabs show chips in the header), chips on the PR list and Changes.
+   `LabelFilter.svelte` is the label dropdown next to Open/Closed; list chips link to the same `?state=&labels=<name>` filter (`listQuery`), with × to clear.
+   `EditTitle.svelte` (pencil, Enter saves, Esc cancels) and `Description.svelte` (Edit swaps the first card to a textarea) are allowed for push access or the author.
+   Actions live in `src/lib/server/issue.ts` (`issueActions` = label/edit, spread into both pages; PRs use the `/issues/N` endpoints). The PR layout's title form posts to `<pr>?/edit`, so it works from the Files and Commits tabs too.
+   Editing a body unsigns it first and re-appends the original forge footer on save, so agent attribution survives. ("Generated with Claude Code" is ordinary body text and stays editable.)
+   Quirk: `/issues?labels=` takes label **names**, but `/pulls?labels=` takes label **ids** (a name fails with a `strconv.ParseInt` error), so the PR list maps the name first.
+
 Next, in the order discussed:
-1. CI status in the UI (needs a runner).
-2. Deploy to `/opt/stacks` on server. (The session cookie is now an opaque id, so that blocker is gone. Persist `FORGE_DATA` and keep `FORGE_SECRET` stable, or everyone has to log in again and all keys die.)
+1. Deploy to `/opt/stacks` on server. (The session cookie is now an opaque id, so that blocker is gone. Persist `FORGE_DATA` and keep `FORGE_SECRET` stable, or everyone has to log in again and all keys die.)
+2. Agent attribution, the rest: Fix with agent / T3 task work by agents without a Claude trailer (e.g. Codex) is still unmarked; a forge-side record of which PRs/commits came from which T3 task would cover it.
+   Maybe also a real Forgejo label (`agent/<key name>`) so Forgejo's own UI shows it.
 
 Waiting on the owner (asked, not answered; don't start without a yes):
 - **`@t3code` mentions in PRs.** Design agreed in principle: a comment mentioning the bot starts a T3 task on the PR branch (comment + attached code + PR title as context, mostly reusing `fix.ts`) and forge replies "On it" with a link.
@@ -183,10 +212,7 @@ T3 Code API (from the source, commit 2577baf8; server default port 3773):
 - T3 projects must already exist, so a forge repo needs a matching T3 project (a local checkout).
 
 Known gaps:
-- No user/org pages (`/ada` 404s).
-- README relative links point at Forgejo.
-- No last-commit-per-file info in the tree view.
-- Parser unit tests aren't in the repo yet; they'd need saved diffs to test against.
+- Unit tests: `bun run test` (`bun test` on `src/lib/*.test.ts`; diff fixtures saved from `ada/sample` plus a hand-made `edge.diff` live in `src/lib/fixtures/`). Test files are excluded from svelte-check (no `bun:test` types).
 
 ## Working with the owner
 

@@ -10,7 +10,7 @@
 	let proto = $state<'ssh' | 'https'>('ssh');
 	const url = $derived(proto === 'ssh' ? data.repo.ssh_url : data.repo.clone_url);
 	const section = $derived(
-		page.route.id?.includes('/pulls') ? 'pulls' : page.route.id?.endsWith('/agents') ? 'agents' : /\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code'
+		page.route.id?.includes('/pulls') ? 'pulls' : page.route.id?.includes('/issues') ? 'issues' : page.route.id?.endsWith('/agents') ? 'agents' : /\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code'
 	);
 
 	function switchRef(ref: string) {
@@ -37,8 +37,13 @@
 		<a href="{base}/pulls" class:active={section === 'pulls'}>
 			<Icon name="changes" size={15} />Pull requests{#if data.repo.open_pr_counter}<span class="count">{data.repo.open_pr_counter}</span>{/if}
 		</a>
+		{#if data.repo.has_issues}
+			<a href="{base}/issues" class:active={section === 'issues'}>
+				<Icon name="issue" size={15} />Issues{#if data.repo.open_issues_count}<span class="count">{data.repo.open_issues_count}</span>{/if}
+			</a>
+		{/if}
 		{#if data.agents}<a href="{base}/agents" class:active={section === 'agents'}><Icon name="agents" size={15} />Agents</a>{/if}
-		{#if data.branches.length && section !== 'pulls' && section !== 'agents'}
+		{#if data.branches.length && (section === 'code' || section === 'commits')}
 			<label class="branch">
 				<Icon name="branch" size={14} />
 				<span class="cur">{data.ref}</span>

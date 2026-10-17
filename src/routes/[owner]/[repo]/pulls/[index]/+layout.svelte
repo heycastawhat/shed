@@ -1,4 +1,7 @@
 <script lang="ts">
+	import Byline from '#lib/components/Byline.svelte';
+	import EditTitle from '#lib/components/EditTitle.svelte';
+	import LabelChip from '#lib/components/LabelChip.svelte';
 	import { page } from '$app/state';
 	import { ago } from '#lib/time.js';
 	import Icon from '#lib/components/Icon.svelte';
@@ -11,10 +14,12 @@
 </script>
 
 <div class="head">
-	<h2>{p.title} <span class="muted">#{p.number}</span></h2>
+	<EditTitle title={p.title} number={p.number} can={data.repo.permissions.push || p.user.id === data.user?.id} action="{base}?/edit" />
 	<div class="meta">
 		<PrState pull={p} />
-		<span>{p.user.login} wants to merge <code>{p.head.label}</code> into <code>{p.base.ref}</code> · opened {ago(p.created_at)}</span>
+		<span><Byline login={p.user.login} agent={data.agent} /> wants to merge <code>{p.head.label}</code> into <code>{p.base.ref}</code> · opened {ago(p.created_at)}</span>
+		<!-- The conversation tab has a Labels sidebar, so only the other tabs show them here. -->
+		{#if tab !== '[index]'}{#each p.labels as l (l.id)}<LabelChip label={l} />{/each}{/if}
 	</div>
 	<nav>
 		<a href={base} class:on={tab === '[index]'}><Icon name="message" size={15} />Conversation</a>
@@ -30,14 +35,6 @@
 <style>
 	.head {
 		margin-bottom: 1.25rem;
-	}
-	h2 {
-		margin: 0;
-		font-size: 1.3rem;
-		font-weight: 600;
-	}
-	h2 .muted {
-		font-weight: 400;
 	}
 	.meta {
 		display: flex;

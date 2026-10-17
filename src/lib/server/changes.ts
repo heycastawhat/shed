@@ -1,14 +1,17 @@
-import { apiPage, type FoundPull } from './forgejo.js';
+import { bodyAgent } from '#lib/sign.js';
+import { apiPage, type FoundPull, type Label } from './forgejo.js';
 
 export type Change = {
 	repo: string;
 	number: number;
 	title: string;
 	author: string;
+	agent?: string;
 	avatar: string;
 	updated: string;
 	comments: number;
 	draft: boolean;
+	labels: Label[];
 	href: string;
 };
 
@@ -17,10 +20,12 @@ const shape = (p: FoundPull): Change => ({
 	number: p.number,
 	title: p.title,
 	author: p.user.login,
+	agent: bodyAgent(p.body ?? ''),
 	avatar: p.user.avatar_url,
 	updated: p.updated_at,
 	comments: p.comments,
 	draft: !!p.pull_request?.draft,
+	labels: p.labels ?? [],
 	href: `/${p.repository.full_name}/pulls/${p.number}`
 });
 

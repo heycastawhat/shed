@@ -1,8 +1,10 @@
 import { fail, isHttpError } from '@sveltejs/kit';
+import { FORGEJO_URL } from '$app/env/private';
 import { parseDiff } from '#lib/diff.js';
 import { unsign } from '#lib/sign.js';
 import { fixWithAgent } from '#lib/server/fix.js';
-import { api, isResolved, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
+import { issueActions } from '#lib/server/issue.js';
+import { api, isResolved, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type Label, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
 
 export async function load({ locals, params, parent }) {
 	const repo = `${params.owner}/${params.repo}`;
@@ -11,10 +13,11 @@ export async function load({ locals, params, parent }) {
 		api<Comment[]>(locals.token, `/repos/${repo}/issues/${params.index}/comments`),
 		api<Review[]>(locals.token, `/repos/${repo}/pulls/${params.index}/reviews`)
 	]);
-	const [status, diff, events] = await Promise.all([
+	const [status, diff, events, labels] = await Promise.all([
 		api<CombinedStatus>(locals.token, `/repos/${repo}/commits/${pull.head.sha}/status`),
 		request(locals.token, `/repos/${repo}/pulls/${params.index}.diff`).then((res) => res.text()),
-		api<{ type: string; user: { login: string } }[]>(locals.token, `/repos/${repo}/issues/${params.index}/timeline`)
+		api<{ type: string; user: { login: string } }[]>(locals.token, `/repos/${repo}/issues/${params.index}/timeline`),
+		api<Label[]>(locals.token, `/repos/${repo}/labels?limit=100`)
 	]);
 	// The API has no auto-merge field; the latest schedule/cancel event in the timeline is the only record of it.
 	const schedule = events.findLast((e) => e.type === 'pull_scheduled_merge' || e.type === 'pull_cancel_scheduled_merge');
@@ -83,10 +86,19 @@ export async function load({ locals, params, parent }) {
 	const mine = reviews.findLast((v) => v.user.id === user?.id && !v.dismissed && (v.state === 'APPROVED' || v.state === 'REQUEST_CHANGES'));
 	return {
 		body: description.html,
-		bodyAgent: description.agent,
+		labels,
 		timeline,
 		mergeStyles: mergeStyles(r),
-		checks: { state: status.state, total: status.total_count, passed: status.statuses?.filter((s) => s.state === 'success').length ?? 0 },
+		checks: {
+			state: status.state,
+			list: (status.statuses ?? []).map((s) => ({
+				// Actions names jobs "<workflow> / <job> (<event>)", and an unnamed workflow leaves a bare "/ ".
+				name: s.context.replace(/^\/ /, ''),
+				state: s.status,
+				description: s.description,
+				url: s.target_url && new URL(s.target_url, FORGEJO_URL).href
+			})).sort((a, b) => a.name.localeCompare(b.name))
+		},
 		openThreads: [...threads.values()].filter((t) => !t.closed && !t.resolved).length,
 		autoMerge: schedule?.type === 'pull_scheduled_merge' ? schedule.user.login : null,
 		approved: mine?.state === 'APPROVED' && !mine.stale
@@ -133,5 +145,6 @@ export const actions = {
 		});
 	},
 	cancelAutoMerge: async ({ locals, params }) =>
-		post('merge', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}/merge`, undefined, 'DELETE')
+		post('merge', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}/merge`, undefined, 'DELETE'),
+	...issueActions
 };

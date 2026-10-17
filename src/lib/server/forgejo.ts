@@ -19,13 +19,19 @@ export async function apiPage<T>(token: string | undefined, path: string) {
 	return { items: (await res.json()) as T[], total: Number(res.headers.get('x-total-count') ?? 0) };
 }
 
-export async function renderMarkdown(token: string | undefined, text: string, repo: string) {
+// For a file in the repo, pass `at` (its ref and folder) so relative links and images resolve to forge's own pages.
+export async function renderMarkdown(token: string | undefined, text: string, repo: string, at?: { ref: string; dir: string }) {
+	// Forgejo resolves relative paths against the context, so a context of <repo>/src/branch/<ref>/<dir> brings every file link back under one prefix to rewrite.
+	const base = at && `${FORGEJO_URL}/${repo}/src/branch/${encodeURIComponent(at.ref)}/`;
 	const res = await request(token, '/markdown', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ Text: text, Mode: 'gfm', Context: `${FORGEJO_URL}/${repo}` })
+		body: JSON.stringify({ Text: text, Mode: 'gfm', Context: base ? base + encodePath(at!.dir) : `${FORGEJO_URL}/${repo}` })
 	});
-	return res.text();
+	const html = await res.text();
+	if (!base) return html;
+	const ref = encodeURIComponent(at!.ref);
+	return html.replaceAll(`src="${base}`, `src="/${repo}/raw/${ref}/`).replaceAll(`href="${base}`, `href="/${repo}/blob/${ref}/`);
 }
 
 // Forgejo's API can't resolve conversations, so a reaction on the thread's first comment stands in for it.
@@ -60,6 +66,8 @@ export type Repo = {
 	ssh_url: string;
 	empty: boolean;
 	open_pr_counter: number;
+	open_issues_count: number;
+	has_issues: boolean;
 	permissions: { admin: boolean; push: boolean; pull: boolean };
 	default_merge_style: MergeStyle;
 	default_delete_branch_after_merge: boolean;
@@ -76,6 +84,7 @@ export type Entry = {
 	path: string;
 	type: 'file' | 'dir' | 'symlink' | 'submodule';
 	size: number;
+	last_commit_sha?: string;
 	content?: string | null;
 };
 export type Commit = {
@@ -96,6 +105,7 @@ export type Pull = {
 	closed_at: string | null;
 	draft: boolean;
 	user: User;
+	labels: Label[];
 	head: { ref: string; label: string; sha: string };
 	base: { ref: string };
 	created_at: string;
@@ -110,13 +120,28 @@ export type FoundPull = {
 	title: string;
 	state: 'open' | 'closed';
 	user: User;
+	body: string;
 	repository: { full_name: string };
 	created_at: string;
 	updated_at: string;
 	comments: number;
+	labels: Label[];
 	pull_request?: { merged: boolean; draft: boolean };
+};
+export type Label = { id: number; name: string; color: string; description: string };
+export type Issue = {
+	number: number;
+	title: string;
+	body: string;
+	state: 'open' | 'closed';
+	user: User;
+	labels: Label[];
+	comments: number;
+	created_at: string;
+	closed_at: string | null;
+	pull_request: unknown;
 };
 export type Comment = { id: number; body: string; user: User; created_at: string };
 export type ReviewComment = Comment & { path: string; position: number; original_position: number; diff_hunk: string; resolver: User | null; pull_request_review_id: number };
 export type Review = { id: number; body: string; user: User; state: string; submitted_at: string; stale: boolean; dismissed: boolean };
-export type CombinedStatus = { state: string; total_count: number; statuses: { state: string }[] | null };
+export type CombinedStatus = { state: string; total_count: number; statuses: { status: string; context: string; description: string; target_url: string }[] | null };

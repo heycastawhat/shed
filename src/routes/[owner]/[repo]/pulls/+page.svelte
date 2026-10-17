@@ -1,14 +1,21 @@
 <script lang="ts">
+	import Byline from '#lib/components/Byline.svelte';
+	import { bodyAgent } from '#lib/sign.js';
 	import { ago } from '#lib/time.js';
 	import Icon from '#lib/components/Icon.svelte';
 	import PrState from '#lib/components/PrState.svelte';
+	import LabelChip from '#lib/components/LabelChip.svelte';
+	import LabelFilter, { listQuery } from '#lib/components/LabelFilter.svelte';
 
 	let { data } = $props();
 </script>
 
-<div class="filters">
-	<a href="?state=open" class:on={data.state === 'open'}><Icon name="changes" size={14} />Open</a>
-	<a href="?state=closed" class:on={data.state === 'closed'}><Icon name="check" size={14} />Closed</a>
+<div class="top">
+	<div class="filters">
+		<a href={listQuery('open', data.label)} class:on={data.state === 'open'}><Icon name="changes" size={14} />Open</a>
+		<a href={listQuery('closed', data.label)} class:on={data.state === 'closed'}><Icon name="check" size={14} />Closed</a>
+	</div>
+	<LabelFilter labels={data.labels} active={data.label} state={data.state} />
 </div>
 
 <ul class="pulls">
@@ -17,8 +24,9 @@
 			<PrState pull={p} />
 			<div>
 				<a href="/{data.repo.full_name}/pulls/{p.number}"><strong>{p.title}</strong></a>
+				{#each p.labels as l (l.id)}<a class="chip" href={listQuery(data.state, l.name)} title="Show only {l.name}"><LabelChip label={l} /></a>{/each}
 				<div class="meta">
-					#{p.number} by {p.user.login} · {ago(p.created_at)} · <code>{p.head.label}</code> → <code>{p.base.ref}</code>
+					#{p.number} by <Byline login={p.user.login} agent={bodyAgent(p.body)} /> · {ago(p.created_at)} · <code>{p.head.label}</code> → <code>{p.base.ref}</code>
 					{#if p.comments}· {p.comments} comment{p.comments === 1 ? '' : 's'}{/if}
 				</div>
 			</div>
@@ -26,17 +34,24 @@
 	{:else}
 		<li class="empty">
 			<Icon name="changes" size={28} />
-			<strong>No {data.state} pull requests</strong>
-			<span class="muted">{data.state === 'open' ? 'Push a branch and open one, or let an agent do it.' : 'Merged and closed pull requests show up here.'}</span>
+			<strong>No {data.state} pull requests{data.label ? ` labelled ${data.label}` : ''}</strong>
+			<span class="muted">
+				{#if data.label}<a href={listQuery(data.state)}>Clear the filter</a>{:else}{data.state === 'open' ? 'Push a branch and open one, or let an agent do it.' : 'Merged and closed pull requests show up here.'}{/if}
+			</span>
 		</li>
 	{/each}
 </ul>
 
 <style>
+	.top {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+	}
 	.filters {
 		display: inline-flex;
 		gap: 0.2rem;
-		margin-bottom: 0.75rem;
 		padding: 0.2rem;
 		border: 1px solid var(--border);
 		border-radius: 8px;
@@ -71,6 +86,9 @@
 	.empty strong {
 		color: var(--fg);
 	}
+	.empty a {
+		color: var(--accent);
+	}
 	li:not(.empty):hover {
 		background: var(--surface);
 	}
@@ -92,6 +110,9 @@
 	}
 	li a {
 		color: var(--fg);
+	}
+	.chip {
+		margin-left: 0.35rem;
 	}
 	strong {
 		font-weight: 500;

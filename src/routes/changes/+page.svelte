@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Byline from '#lib/components/Byline.svelte';
+	import LabelChip from '#lib/components/LabelChip.svelte';
 	import { ago } from '#lib/time.js';
 
 	let { data } = $props();
@@ -20,7 +22,8 @@
 					<div class="main">
 						<span class="title">{c.title}</span>
 						{#if c.draft}<span class="tag">draft</span>{/if}
-						<div class="muted meta">{c.repo} #{c.number} · {c.author} · updated {ago(c.updated)}{#if c.comments} · {c.comments} comment{c.comments === 1 ? '' : 's'}{/if}</div>
+						{#each c.labels as l (l.id)}<span class="chip"><LabelChip label={l} /></span>{/each}
+						<div class="muted meta">{c.repo} #{c.number} · <Byline login={c.author} agent={c.agent} /> · updated {ago(c.updated)}{#if c.comments} · {c.comments} comment{c.comments === 1 ? '' : 's'}{/if}</div>
 					</div>
 				</a>
 			</li>
@@ -74,6 +77,9 @@
 	}
 	.title {
 		font-weight: 600;
+	}
+	.chip {
+		margin-left: 0.35rem;
 	}
 	.meta {
 		margin-top: 0.1rem;

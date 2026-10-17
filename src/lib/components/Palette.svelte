@@ -6,12 +6,13 @@
 	import Icon from './Icon.svelte';
 
 	const prefs = getPrefs();
-	type Found = { repos: { name: string; description: string }[]; pulls: { title: string; repo: string; number: number }[] };
+	type Ref = { title: string; repo: string; number: number };
+	type Found = { repos: { name: string; description: string }[]; pulls: Ref[]; issues: Ref[] };
 	type Item = { label: string; hint?: string; kind: string; icon?: string; run: () => void };
 
 	let query = $state('');
 	let active = $state(0);
-	let found = $state<Found>({ repos: [], pulls: [] });
+	let found = $state<Found>({ repos: [], pulls: [], issues: [] });
 	let loaded = false;
 
 
@@ -50,6 +51,7 @@
 			...Object.entries(THEMES).map(([id, t]): Item => ({ label: `Theme: ${t.name}`, kind: 'Action', icon: 'palette', run: () => setPalette(id) })),
 			...pinned,
 			...found.pulls.map((p): Item => ({ label: p.title, hint: `${p.repo} #${p.number}`, kind: 'PR', icon: 'changes', run: go(`/${p.repo}/pulls/${p.number}`) })),
+			...found.issues.map((i): Item => ({ label: i.title, hint: `${i.repo} #${i.number}`, kind: 'Issue', icon: 'issue', run: go(`/${i.repo}/issues/${i.number}`) })),
 			...rest
 		];
 	});

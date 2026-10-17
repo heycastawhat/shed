@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import Icon from '#lib/components/Icon.svelte';
+	import Byline from '#lib/components/Byline.svelte';
+	import Description from '#lib/components/Description.svelte';
+	import LabelPicker from '#lib/components/LabelPicker.svelte';
 	import { ago } from '#lib/time.js';
 
 	let { data, form } = $props();
@@ -11,15 +15,24 @@
 	let armed = $state<ReturnType<typeof setTimeout>>();
 	const own = $derived(data.pull.user.id === data.user?.id);
 	const rows = $derived([
-		...(data.checks.total
-			? [{ text: `${data.checks.passed} of ${data.checks.total} checks passed`, state: data.checks.state === 'success' ? 'done' : ['failure', 'error'].includes(data.checks.state) ? 'fail' : 'todo' }]
+		...(data.checks.list.length
+			? [{ text: `${data.checks.list.filter((c) => c.state === 'success').length} of ${data.checks.list.length} checks passed`, state: mark(data.checks.state), checks: true }]
 			: []),
 		data.pull.mergeable ? { text: `No conflicts with ${data.pull.base.ref}`, state: 'done' } : { text: `Conflicts with ${data.pull.base.ref}`, state: 'fail' },
 		...(data.openThreads ? [{ text: `${data.openThreads} open thread${data.openThreads > 1 ? 's' : ''}`, state: 'todo' }] : []),
 		...(own ? [] : [{ text: 'Your approval', state: data.approved ? 'done' : 'todo' }])
 	]);
 	const blocked = $derived(rows.some((r) => r.state === 'fail'));
-	const pending = $derived(data.checks.total > 0 && data.checks.state === 'pending');
+	const pending = $derived(data.checks.list.length > 0 && data.checks.state === 'pending');
+
+	$effect(() => {
+		if (!pending) return;
+		const timer = setInterval(invalidateAll, 5000);
+		return () => clearInterval(timer);
+	});
+	function mark(state: string) {
+		return state === 'success' ? 'done' : ['failure', 'error'].includes(state) ? 'fail' : 'todo';
+	}
 	let commenting = $state(false);
 	let draft = $state('');
 	const reviewLabel: Record<string, string> = {
@@ -29,20 +42,19 @@
 	};
 </script>
 
+<div class="layout">
+<div>
 <ol class="timeline">
 	<li>
 		<img class="avatar" src={data.pull.user.avatar_url} alt="" />
-		<div class="card">
-		<div class="who"><strong>{data.pull.user.login}</strong>{#if data.bodyAgent}<span class="agent" title="Opened by an agent through forge">{data.bodyAgent}</span>{/if} opened this {ago(data.pull.created_at)}</div>
-		{#if data.body}<article class="markdown">{@html data.body}</article>{:else}<p class="muted empty">No description provided.</p>{/if}
-		</div>
+		<Description login={data.pull.user.login} agent={data.agent} created={data.pull.created_at} html={data.body} body={data.pull.body} can={data.repo.permissions.push || own} />
 	</li>
 	{#each data.timeline as item (item.id)}
 		<li>
 			<img class="avatar" src={item.user.avatar_url} alt="" />
 			<div class="card">
 			<div class="who">
-				<strong>{item.user.login}</strong>{#if item.agent}<span class="agent" title="Written by an agent through forge">{item.agent}</span>{/if}
+				<Byline bold login={item.user.login} agent={item.agent} />
 				{item.state ? (reviewLabel[item.state] ?? 'reviewed') : 'commented'} {ago(item.date)}
 			</div>
 			{#if item.html}<article class="markdown">{@html item.html}</article>{/if}
@@ -68,7 +80,7 @@
 						{/if}
 					</div>
 					<pre class="context">{c.context.join('\n')}</pre>
-					{#if c.agent}<div class="muted by"><span class="agent">{c.agent}</span></div>{/if}
+					{#if c.agent}<div class="muted by"><Byline login={item.user.login} agent={c.agent} /></div>{/if}
 					<article class="markdown">{@html c.html}</article>
 				</div>
 			{/each}
@@ -97,6 +109,16 @@
 			<ul>
 				{#each rows as r (r.text)}
 					<li class={r.state}><span class="mark">{r.state === 'done' ? '✓' : r.state === 'fail' ? '✕' : '·'}</span>{r.text}</li>
+					{#if 'checks' in r}
+						<li class="sub"><ul class="jobs">
+							{#each data.checks.list as c (c.name)}
+								<li class={mark(c.state)}>
+									<span class="mark">{c.state === 'success' ? '✓' : mark(c.state) === 'fail' ? '✕' : '·'}</span>{c.name}<span class="muted">{c.description}</span>
+									{#if c.url}<a href={c.url} target="_blank" rel="noreferrer">Logs</a>{/if}
+								</li>
+							{/each}
+						</ul></li>
+					{/if}
 				{/each}
 			</ul>
 		</div>
@@ -163,7 +185,10 @@
 		<button class="primary" disabled={commenting || !draft.trim()}>{commenting ? 'Commenting…' : 'Comment'}</button>
 	</div>
 </form>
+</div>
 
+<aside><LabelPicker labels={data.labels} current={data.pull.labels} can={data.repo.permissions.push} /></aside>
+</div>
 
 <svelte:window
 	onkeydown={(e) => {
@@ -177,11 +202,22 @@
 />
 
 <style>
+	.layout {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 15rem;
+		gap: 2rem;
+		align-items: start;
+	}
+	@media (max-width: 900px) {
+		.layout {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		aside {
+			order: -1;
+		}
+	}
 	.by {
 		padding: 0.5rem 0.75rem 0;
-	}
-	.by .agent {
-		margin-left: 0;
 	}
 	.timeline {
 		position: relative;
@@ -252,7 +288,7 @@
 		font-size: 0.85rem;
 		color: var(--muted);
 	}
-	.who strong {
+	.who :global(strong) {
 		color: var(--fg);
 	}
 	img {
@@ -292,6 +328,18 @@
 		border-radius: 0;
 		font-size: 0.9rem;
 	}
+	.merge .sub {
+		display: block;
+	}
+	.merge .jobs {
+		margin-left: 1.8rem;
+	}
+	.jobs li {
+		font-size: 0.85rem;
+	}
+	.jobs a {
+		margin-left: auto;
+	}
 	.mark {
 		display: grid;
 		place-items: center;
@@ -316,7 +364,7 @@
 	.bar {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
+		gap: 0.75rem;
 		padding: 0.5rem 1rem;
 		background: var(--surface);
 		border-top: 1px solid var(--border);
@@ -324,6 +372,10 @@
 	.bar label,
 	.scheduled {
 		margin-right: auto;
+	}
+	.bar label,
+	.bar button {
+		white-space: nowrap;
 	}
 	kbd {
 		margin-left: 0.3rem;
@@ -425,8 +477,7 @@
 		color: var(--del-fg);
 		font-size: 0.9rem;
 	}
-	.markdown,
-	.empty {
+	.markdown {
 		padding: 1rem;
 		margin: 0;
 	}
