@@ -66,6 +66,7 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
 - PRs #8–#20, #22 and #24 are closed throwaways from tests; #21 and #23 were throwaways that auto-merged (their files were removed from main afterwards).
 - `main` has `.forgejo/workflows/ci.yml`: `lint` (instant) and `test` (sleeps 20s) on `pull_request`, and on `push` to main only. Any PR gets two checks. For a quick throwaway PR, use the API with basic auth `ada:<admin password>` (the `dev/.git-credentials` token works for git only and gets 401 from the API), then close it and delete its branch.
 - Don't merge #5 or #6 from tests. Merging can't be undone, and a merged test PR has to be replaced with a new branch.
+- Release `v0.1.0` (on main, notes plus one asset `sample-0.1.0.txt`) and a lightweight tag `v0.0.1` (on `feature/retry-jitter`) are test data for the releases page. PR #34 is a closed throwaway from the branches page.
 
 ## Gotchas (each one cost time)
 
@@ -179,6 +180,11 @@ Done:
    Actions live in `src/lib/server/issue.ts` (`issueActions` = label/edit, spread into both pages; PRs use the `/issues/N` endpoints). The PR layout's title form posts to `<pr>?/edit`, so it works from the Files and Commits tabs too.
    Editing a body unsigns it first and re-appends the original forge footer on save, so agent attribution survives. ("Generated with Claude Code" is ordinary body text and stays editable.)
    Quirk: `/issues?labels=` takes label **names**, but `/pulls?labels=` takes label **ids** (a name fails with a `strconv.ParseInt` error), so the PR list maps the name first.
+
+17. Branches and releases: "N branches · N tags" links sit left of the branch picker on the Code tab (the layout fetches `tags?limit=1` for `x-total-count`; the picker hides on these pages).
+   `/[owner]/[repo]/branches`: default first, then by latest commit; last commit with `Byline`; behind/ahead vs the default branch for the 20 newest (two `compare` calls each, which return full commits and files, hence the cap);
+   the open PR (matched on `head.ref`) or "New pull request" (`?/openPr` → `openPush` from `home.ts`, drafted title, straight to the PR); delete with a confirm for push users, never the default or a protected branch (re-checked server-side).
+   `/[owner]/[repo]/releases`: Releases/Tags switch (`?tags`, and Tags when there are no releases); notes via `renderMarkdown(…, { ref: tag, dir: '' })`; assets and source archives link straight to Forgejo (so a private repo needs a Forgejo browser session).
 
 Next, in the order discussed:
 1. Deploy to `/opt/stacks` on server. (The session cookie is now an opaque id, so that blocker is gone. Persist `FORGE_DATA` and keep `FORGE_SECRET` stable, or everyone has to log in again and all keys die.)

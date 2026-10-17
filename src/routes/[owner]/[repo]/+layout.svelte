@@ -7,6 +7,7 @@
 	let { data, children } = $props();
 	const base = $derived(`/${data.repo.full_name}`);
 	const pinned = $derived(data.pins.includes(data.repo.full_name));
+	const listing = $derived(page.route.id?.match(/\/(branches|releases)$/)?.[1]);
 	let proto = $state<'ssh' | 'https'>('ssh');
 	const url = $derived(proto === 'ssh' ? data.repo.ssh_url : data.repo.clone_url);
 	const section = $derived(
@@ -43,16 +44,22 @@
 			</a>
 		{/if}
 		{#if data.agents}<a href="{base}/agents" class:active={section === 'agents'}><Icon name="agents" size={15} />Agents</a>{/if}
-		{#if data.branches.length && (section === 'code' || section === 'commits')}
-			<label class="branch">
-				<Icon name="branch" size={14} />
-				<span class="cur">{data.ref}</span>
-				<select value={data.ref} onchange={(e) => switchRef(e.currentTarget.value)} aria-label="Branch">
-					{#each data.branches as b (b)}<option>{b}</option>{/each}
-				</select>
-				<Icon name="chevron" size={13} />
-			</label>
-		{/if}
+		<div class="refs">
+			{#if section === 'code' && data.branches.length}
+				<a class="count-link" class:active={listing === 'branches'} href="{base}/branches"><Icon name="branch" size={14} />{data.branches.length} branch{data.branches.length === 1 ? '' : 'es'}</a>
+				<a class="count-link" class:active={listing === 'releases'} href="{base}/releases"><Icon name="tag" size={14} />{data.tags} tag{data.tags === 1 ? '' : 's'}</a>
+			{/if}
+			{#if data.branches.length && !listing && (section === 'code' || section === 'commits')}
+				<label class="branch">
+					<Icon name="branch" size={14} />
+					<span class="cur">{data.ref}</span>
+					<select value={data.ref} onchange={(e) => switchRef(e.currentTarget.value)} aria-label="Branch">
+						{#each data.branches as b (b)}<option>{b}</option>{/each}
+					</select>
+					<Icon name="chevron" size={13} />
+				</label>
+			{/if}
+		</div>
 	</nav>
 </div>
 
@@ -203,12 +210,27 @@ git push -u origin {data.repo.default_branch}</pre>
 		border-radius: 999px;
 		padding: 0 0.45rem;
 	}
+	.refs {
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+		margin: 0 0 0.35rem auto;
+	}
+	nav a.count-link {
+		gap: 0.3rem;
+		padding: 0.2rem 0;
+		margin: 0;
+		border: 0;
+		font-size: 0.85rem;
+	}
+	nav a.count-link.active {
+		color: var(--fg);
+	}
 	.branch {
 		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
-		margin: 0 0 0.35rem auto;
 		padding: 0.2rem 0.5rem;
 		border: 1px solid var(--border);
 		border-radius: 6px;

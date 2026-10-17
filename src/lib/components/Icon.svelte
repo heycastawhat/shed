@@ -34,6 +34,10 @@
 	import ITag from '@mingcute/svelte/core-regular/tag';
 	import IPencil from '@mingcute/svelte/core-regular/pencil';
 	import IFilter from '@mingcute/svelte/core-regular/filter';
+	import IDelete2 from '@mingcute/svelte/core-regular/delete-2';
+	import IDownload from '@mingcute/svelte/core-regular/download';
+	import IPackage from '@mingcute/svelte/core-regular/package';
+	import IFileZip from '@mingcute/svelte/core-regular/file-zip';
 
 	const ICONS = {
 		home: IHome4,
@@ -71,7 +75,11 @@
 		done: ICheckCircle,
 		tag: ITag,
 		pencil: IPencil,
-		filter: IFilter
+		filter: IFilter,
+		trash: IDelete2,
+		download: IDownload,
+		release: IPackage,
+		zip: IFileZip
 	};
 </script>
 
