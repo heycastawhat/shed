@@ -1,8 +1,8 @@
 <script lang="ts">
-	import GitMerge from '@lucide/svelte/icons/git-merge';
-	import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
-	import GitPullRequestClosed from '@lucide/svelte/icons/git-pull-request-closed';
-	import GitPullRequestDraft from '@lucide/svelte/icons/git-pull-request-draft';
+	import GitMerge from '@mingcute/svelte/core-regular/git-merge';
+	import GitPullRequest from '@mingcute/svelte/core-regular/git-pull-request';
+	import GitPullRequestClosed from '@mingcute/svelte/core-regular/git-pull-request-close';
+	import GitPullRequestDraft from '@mingcute/svelte/core-regular/pencil';
 
 	let { pull }: { pull: { state: string; merged: boolean; draft: boolean } } = $props();
 	const kind = $derived(pull.merged ? 'merged' : pull.state === 'closed' ? 'closed' : pull.draft ? 'draft' : 'open');
@@ -10,7 +10,7 @@
 </script>
 
 <span class="state {kind}">
-	<Svg size={14} strokeWidth={2} aria-hidden="true" />
+	<Svg size={14} />
 	{kind}
 </span>
 

@@ -4,8 +4,10 @@
   "workspaces": {
     "": {
       "name": "forge",
+      "dependencies": {
+        "@mingcute/svelte": "^3.0.2",
+      },
       "devDependencies": {
-        "@lucide/svelte": "^1.58.0",
         "@sveltejs/adapter-auto": "^8.0.0",
         "@sveltejs/kit": "^3.0.0",
         "@sveltejs/vite-plugin-svelte": "^7.2.0",
@@ -28,7 +30,9 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@lucide/svelte": ["@lucide/svelte@1.58.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-yUKVOUokJews09DTEf23We9/0Lju+XR+1Pcr6rYZBilpf4Uf6T3XRmalUgOsQW0drFfCI53WlIzgokkq2EqwYg=="],
+    "@mingcute/icons": ["@mingcute/icons@3.0.2", "", {}, "sha512-NuDZuZy0B/MmrdoVVOodOURS1qPqgcdSHFPKSG9gPEF6/dr0+zm5pfJs0U7Yta5jjoCdX0WZcVbZOov2tMMPTA=="],
+
+    "@mingcute/svelte": ["@mingcute/svelte@3.0.2", "", { "dependencies": { "@mingcute/icons": "3.0.2" }, "peerDependencies": { "svelte": ">=5.20.0" } }, "sha512-KlGMNseId/NrwKxX/7tiyYCsRJ9MmVzdg/FvzE83/NzIrQklyzCAt4lK4XMQ6gRnLtd+irb+BBHqdCkEINYmng=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.154.0", "", {}, "sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA=="],
 

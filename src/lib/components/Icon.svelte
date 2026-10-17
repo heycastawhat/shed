@@ -1,68 +1,77 @@
 <script lang="ts" module>
-	import Bot from '@lucide/svelte/icons/bot';
-	import Branch from '@lucide/svelte/icons/git-branch';
-	import Code from '@lucide/svelte/icons/code-xml';
-	import Commit from '@lucide/svelte/icons/git-commit-horizontal';
-	import File from '@lucide/svelte/icons/file';
-	import Diff from '@lucide/svelte/icons/file-diff';
-	import Folder from '@lucide/svelte/icons/folder';
-	import Inbox from '@lucide/svelte/icons/inbox';
-	import Message from '@lucide/svelte/icons/message-square';
-	import Lock from '@lucide/svelte/icons/lock';
-	import Monitor from '@lucide/svelte/icons/monitor';
-	import Moon from '@lucide/svelte/icons/moon';
-	import PaletteIcon from '@lucide/svelte/icons/palette';
-	import Sun from '@lucide/svelte/icons/sun';
-	import Pin from '@lucide/svelte/icons/pin';
-	import Check from '@lucide/svelte/icons/check';
-	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import Clock from '@lucide/svelte/icons/clock';
-	import External from '@lucide/svelte/icons/external-link';
-	import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
-	import Merge from '@lucide/svelte/icons/git-merge';
-	import House from '@lucide/svelte/icons/house';
-	import PanelLeft from '@lucide/svelte/icons/panel-left';
-	import PinOff from '@lucide/svelte/icons/pin-off';
-	import Plus from '@lucide/svelte/icons/plus';
-	import Repo from '@lucide/svelte/icons/folder-git-2';
-	import Search from '@lucide/svelte/icons/search';
-	import Sliders from '@lucide/svelte/icons/sliders-horizontal';
-	import X from '@lucide/svelte/icons/x';
+	import IHome4 from '@mingcute/svelte/core-regular/home-4';
+	import IGitMerge from '@mingcute/svelte/core-regular/git-merge';
+	import ICode from '@mingcute/svelte/core-regular/code';
+	import IGitCommit from '@mingcute/svelte/core-regular/git-commit';
+	import IGitBranch from '@mingcute/svelte/core-regular/git-branch';
+	import IFile from '@mingcute/svelte/core-regular/file';
+	import IFolder from '@mingcute/svelte/core-regular/folder';
+	import IFileMore from '@mingcute/svelte/core-regular/file-more';
+	import IInbox from '@mingcute/svelte/core-regular/inbox';
+	import IChat1 from '@mingcute/svelte/core-regular/chat-1';
+	import ILock from '@mingcute/svelte/core-regular/lock';
+	import IComputer from '@mingcute/svelte/core-regular/computer';
+	import IMoon from '@mingcute/svelte/core-regular/moon';
+	import IPalette from '@mingcute/svelte/core-regular/palette';
+	import ISun from '@mingcute/svelte/core-regular/sun';
+	import IPin from '@mingcute/svelte/core-regular/pin';
+	import IGitPullRequest from '@mingcute/svelte/core-regular/git-pull-request';
+	import IFolder2 from '@mingcute/svelte/core-regular/folder-2';
+	import IRobot from '@mingcute/svelte/core-regular/robot';
+	import ISearch from '@mingcute/svelte/core-regular/search';
+	import IAdd from '@mingcute/svelte/core-regular/add';
+	import IClose from '@mingcute/svelte/core-regular/close';
+	import ILeft from '@mingcute/svelte/core-regular/left';
+	import IRight from '@mingcute/svelte/core-regular/right';
+	import ISettings6 from '@mingcute/svelte/core-regular/settings-6';
+	import ILayoutLeftbarOpen from '@mingcute/svelte/core-regular/layout-leftbar-open';
+	import ICheck from '@mingcute/svelte/core-regular/check';
+	import ITime from '@mingcute/svelte/core-regular/time';
+	import IExternalLink from '@mingcute/svelte/core-regular/external-link';
+	import IDown from '@mingcute/svelte/core-regular/down';
+	import IRadiobox from '@mingcute/svelte/core-regular/radiobox';
+	import ICheckCircle from '@mingcute/svelte/core-regular/check-circle';
+	import ITag from '@mingcute/svelte/core-regular/tag';
+	import IPencil from '@mingcute/svelte/core-regular/pencil';
+	import IFilter from '@mingcute/svelte/core-regular/filter';
 
 	const ICONS = {
-		home: House,
-		merge: Merge,
-		code: Code,
-		commit: Commit,
-		branch: Branch,
-		file: File,
-		folder: Folder,
-		diff: Diff,
-		inbox: Inbox,
-		message: Message,
-		lock: Lock,
-		monitor: Monitor,
-		moon: Moon,
-		palette: PaletteIcon,
-		sun: Sun,
-		pin: Pin,
-		changes: GitPullRequest,
-		repos: Repo,
-		agents: Bot,
-		search: Search,
-		plus: Plus,
-		unpin: PinOff,
-		left: ChevronLeft,
-		right: ChevronRight,
-		sliders: Sliders,
-		layout: PanelLeft,
-		check: Check,
-		clock: Clock,
-		external: External,
-		chevron: ChevronDown,
-		x: X
+		home: IHome4,
+		merge: IGitMerge,
+		code: ICode,
+		commit: IGitCommit,
+		branch: IGitBranch,
+		file: IFile,
+		folder: IFolder,
+		diff: IFileMore,
+		inbox: IInbox,
+		message: IChat1,
+		lock: ILock,
+		monitor: IComputer,
+		moon: IMoon,
+		palette: IPalette,
+		sun: ISun,
+		pin: IPin,
+		changes: IGitPullRequest,
+		repos: IFolder2,
+		agents: IRobot,
+		search: ISearch,
+		plus: IAdd,
+		unpin: IClose,
+		left: ILeft,
+		right: IRight,
+		sliders: ISettings6,
+		layout: ILayoutLeftbarOpen,
+		check: ICheck,
+		clock: ITime,
+		external: IExternalLink,
+		chevron: IDown,
+		x: IClose,
+		issue: IRadiobox,
+		done: ICheckCircle,
+		tag: ITag,
+		pencil: IPencil,
+		filter: IFilter
 	};
 </script>
 
@@ -71,4 +80,4 @@
 	const Svg = $derived(ICONS[name as keyof typeof ICONS]);
 </script>
 
-<Svg {size} strokeWidth={1.75} aria-hidden="true" style="flex: none" />
+<Svg {size} style="flex: none" />

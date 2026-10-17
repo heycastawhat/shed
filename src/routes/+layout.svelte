@@ -120,7 +120,7 @@
 <div class="shell" class:side={data.user && prefs.nav === 'sidebar'} class:rail>
 	{#if data.user && prefs.nav === 'sidebar'}
 		<aside aria-label="Main">
-			<a class="brand" href="/"><img src={favicon} alt="" /><span class="label">forge</span></a>
+			<a class="brand" href="/">forge</a>
 			{@render search()}
 			<nav>
 				{#each items as it (it.href)}
@@ -165,7 +165,7 @@
 	{:else}
 		<header class="topbar">
 			<div class="bar">
-				<a class="brand" href="/"><img src={favicon} alt="" />forge</a>
+				<a class="brand" href="/">forge</a>
 				{#if data.user}
 					<nav>
 						{#each items as it (it.href)}
@@ -224,15 +224,10 @@
 	.brand {
 		display: flex;
 		align-items: center;
-		gap: 0.55rem;
 		padding: 0.1rem 0.45rem 0.7rem;
 		font-weight: 700;
 		font-size: 1.1rem;
 		color: var(--fg);
-	}
-	.brand img {
-		width: 1.4rem;
-		height: 1.4rem;
 	}
 	.search {
 		display: flex;
@@ -383,7 +378,7 @@
 		padding-inline: 0.4rem;
 	}
 	.rail .brand {
-		padding-inline: 0;
+		display: none;
 	}
 	.rail .search {
 		justify-content: center;
