@@ -1,0 +1,122 @@
+import { error } from '@sveltejs/kit';
+import { FORGEJO_URL } from '$app/env/private';
+
+export async function request(token: string | undefined, path: string, init: RequestInit = {}) {
+	const res = await fetch(`${FORGEJO_URL}/api/v1${path}`, {
+		...init,
+		headers: { ...(token && { authorization: `Bearer ${token}` }), ...init.headers }
+	});
+	if (!res.ok) error(res.status, (await res.json().catch(() => null))?.message || `Forgejo returned ${res.status} ${res.statusText}`);
+	return res;
+}
+
+export async function api<T>(token: string | undefined, path: string): Promise<T> {
+	return (await request(token, path)).json();
+}
+
+export async function apiPage<T>(token: string | undefined, path: string) {
+	const res = await request(token, path);
+	return { items: (await res.json()) as T[], total: Number(res.headers.get('x-total-count') ?? 0) };
+}
+
+export async function renderMarkdown(token: string | undefined, text: string, repo: string) {
+	const res = await request(token, '/markdown', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ Text: text, Mode: 'gfm', Context: `${FORGEJO_URL}/${repo}` })
+	});
+	return res.text();
+}
+
+// Forgejo's API can't resolve conversations, so a reaction on the thread's first comment stands in for it.
+const RESOLVED = 'rocket';
+
+export async function isResolved(token: string | undefined, repo: string, comment: number) {
+	const reactions = await api<{ content: string }[] | null>(token, `/repos/${repo}/issues/comments/${comment}/reactions`);
+	return !!reactions?.some((r) => r.content === RESOLVED);
+}
+
+export async function setResolved(token: string | undefined, repo: string, form: FormData) {
+	await request(token, `/repos/${repo}/issues/comments/${form.get('comment')}/reactions`, {
+		method: form.has('undo') ? 'DELETE' : 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ content: RESOLVED })
+	});
+}
+
+export const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
+
+export type User = { id: number; login: string; full_name: string; avatar_url: string };
+export type Repo = {
+	id: number;
+	full_name: string;
+	name: string;
+	description: string;
+	private: boolean;
+	updated_at: string;
+	default_branch: string;
+	owner: User;
+	clone_url: string;
+	ssh_url: string;
+	empty: boolean;
+	open_pr_counter: number;
+	permissions: { admin: boolean; push: boolean; pull: boolean };
+	default_merge_style: MergeStyle;
+	default_delete_branch_after_merge: boolean;
+	allow_merge_commits: boolean;
+	allow_rebase: boolean;
+	allow_rebase_explicit: boolean;
+	allow_squash_merge: boolean;
+	allow_fast_forward_only_merge: boolean;
+};
+export type MergeStyle = 'merge' | 'rebase' | 'rebase-merge' | 'squash' | 'fast-forward-only';
+export type Branch = { name: string };
+export type Entry = {
+	name: string;
+	path: string;
+	type: 'file' | 'dir' | 'symlink' | 'submodule';
+	size: number;
+	content?: string | null;
+};
+export type Commit = {
+	sha: string;
+	commit: { message: string; author: { name: string; date: string } };
+	author: User | null;
+};
+export type CommitDetail = Commit & { parents: { sha: string }[] };
+export type Pull = {
+	number: number;
+	title: string;
+	body: string;
+	state: 'open' | 'closed';
+	merged: boolean;
+	mergeable: boolean;
+	merged_by: User | null;
+	merged_at: string | null;
+	closed_at: string | null;
+	draft: boolean;
+	user: User;
+	head: { ref: string; label: string; sha: string };
+	base: { ref: string };
+	created_at: string;
+	comments: number;
+	changed_files?: number;
+	additions?: number;
+	deletions?: number;
+};
+// A pull request as returned by /repos/issues/search, which uses the issue shape.
+export type FoundPull = {
+	number: number;
+	title: string;
+	state: 'open' | 'closed';
+	user: User;
+	repository: { full_name: string };
+	created_at: string;
+	updated_at: string;
+	comments: number;
+	pull_request?: { merged: boolean; draft: boolean };
+};
+export type Comment = { id: number; body: string; user: User; created_at: string };
+export type ReviewComment = Comment & { path: string; position: number; original_position: number; diff_hunk: string; resolver: User | null; pull_request_review_id: number };
+export type Review = { id: number; body: string; user: User; state: string; submitted_at: string; stale: boolean; dismissed: boolean };
+export type CombinedStatus = { state: string; total_count: number; statuses: { state: string }[] | null };

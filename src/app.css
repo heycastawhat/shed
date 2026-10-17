@@ -1,0 +1,230 @@
+:root {
+	--bg: #ffffff;
+	--fg: #1a1b1e;
+	--muted: #6b7079;
+	--border: #e3e5e8;
+	--accent: #5b5bd6;
+	--surface: #f6f7f9;
+	--warn: #b45309;
+	color-scheme: light dark;
+	font-family: system-ui, sans-serif;
+}
+
+/* Theme follows the OS unless Settings → Appearance sets data-theme on <html>. */
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+:root[data-theme='dark'] {
+	color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bg: #111214;
+		--fg: #e6e7ea;
+		--muted: #8b9099;
+		--border: #26282c;
+		--accent: #8b8bf0;
+		--surface: #18191c;
+		--warn: #f59e0b;
+	}
+}
+:root[data-theme='dark'] {
+	--bg: #111214;
+	--fg: #e6e7ea;
+	--muted: #8b9099;
+	--border: #26282c;
+	--accent: #8b8bf0;
+	--surface: #18191c;
+	--warn: #f59e0b;
+}
+
+pre,
+code,
+td {
+	tab-size: 4;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+button,
+.button {
+	font: inherit;
+	padding: 0.35rem 0.8rem;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--surface);
+	color: var(--fg);
+	cursor: pointer;
+	transition:
+		border-color 0.12s,
+		background-color 0.12s,
+		filter 0.12s;
+}
+button:hover:not(:disabled),
+.button:hover {
+	border-color: color-mix(in srgb, var(--fg) 30%, var(--border));
+}
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+::selection {
+	background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+input,
+select,
+textarea {
+	accent-color: var(--accent);
+}
+
+:root {
+	--mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.agent {
+	margin-left: 0.4rem;
+	font-size: 0.75rem;
+	color: var(--accent);
+	border: 1px solid var(--accent);
+	border-radius: 999px;
+	padding: 0 0.5rem;
+	vertical-align: middle;
+}
+
+.tag {
+	margin-left: 0.4rem;
+	font-size: 0.75rem;
+	color: var(--muted);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 0 0.5rem;
+	vertical-align: middle;
+}
+
+/* Shiki dual-theme output: colours come from CSS vars so the theme follows the OS. */
+.shiki,
+.shiki span {
+	color: var(--shiki-light);
+	background-color: var(--shiki-light-bg);
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) .shiki,
+	:root:not([data-theme='light']) .shiki span {
+		color: var(--shiki-dark);
+		background-color: var(--shiki-dark-bg);
+	}
+}
+:root[data-theme='dark'] .shiki,
+:root[data-theme='dark'] .shiki span {
+	color: var(--shiki-dark);
+	background-color: var(--shiki-dark-bg);
+}
+.shiki {
+	margin: 0;
+	padding: 0.75rem 0;
+	font-family: var(--mono);
+	counter-reset: line;
+}
+.shiki .line::before {
+	counter-increment: line;
+	content: counter(line);
+	display: inline-block;
+	width: 3.5rem;
+	padding-right: 1rem;
+	text-align: right;
+	color: var(--muted);
+	user-select: none;
+}
+
+.markdown {
+	line-height: 1.6;
+}
+.markdown > :first-child {
+	margin-top: 0;
+}
+.markdown img {
+	max-width: 100%;
+}
+.markdown pre,
+.markdown code {
+	font-family: var(--mono);
+	font-size: 0.85em;
+	background: var(--surface);
+	border-radius: 4px;
+}
+.markdown code {
+	padding: 0.1em 0.3em;
+}
+.markdown pre {
+	padding: 0.8rem 1rem;
+	overflow-x: auto;
+}
+.markdown pre code {
+	padding: 0;
+}
+.markdown table {
+	border-collapse: collapse;
+}
+.markdown th,
+.markdown td {
+	border: 1px solid var(--border);
+	padding: 0.3rem 0.7rem;
+}
+.markdown blockquote {
+	margin: 0;
+	padding-left: 1rem;
+	border-left: 3px solid var(--border);
+	color: var(--muted);
+}
+
+:root {
+	--add-bg: #e6ffec;
+	--add-fg: #1a7f37;
+	--del-bg: #ffebe9;
+	--del-fg: #cf222e;
+	--hunk-bg: #eef1fb;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--add-bg: #12261e;
+		--add-fg: #3fb950;
+		--del-bg: #2d1517;
+		--del-fg: #f85149;
+		--hunk-bg: #161b2e;
+	}
+}
+:root[data-theme='dark'] {
+	--add-bg: #12261e;
+	--add-fg: #3fb950;
+	--del-bg: #2d1517;
+	--del-fg: #f85149;
+	--hunk-bg: #161b2e;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--bg);
+	font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+	border-color: var(--accent);
+	filter: brightness(1.1);
+}
+button.primary:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
