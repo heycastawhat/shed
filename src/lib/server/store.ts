@@ -9,6 +9,8 @@ export type AgentKey = {
 	repos: string[];
 	// Write tools that wait for the owner's approval instead of running straight away.
 	ask: string[];
+	// Tools a key can't use at all unless its owner turns them on (merging).
+	allow?: string[];
 	hash: string;
 	createdAt: string;
 	lastUsedAt: string | null;

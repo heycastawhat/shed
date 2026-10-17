@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 python3 - <<'EOF'
 import json, subprocess
 d = json.load(open('data/forge.json'))
-test = {'test-agent', 'write-test', 'tools-test', 'ask-test', 'rules-test', 'hdr-test', 'rules-test renamed', 'other', 'Claude Code · laptop'}
+test = {'test-agent', 'write-test', 'tools-test', 'ask-test', 'rules-test', 'hdr-test', 'rules-test renamed', 'other', 'Claude Code · laptop', 'merge-off', 'merge-on', 'merge-ask'}
 for k in d['keys']:
     if k['name'] in test:
         out = subprocess.run(['curl', '-s', '-H', 'Origin: http://localhost:5173', '-H', 'x-sveltekit-action: true', '-b', '.agents/tmp/app.jar',

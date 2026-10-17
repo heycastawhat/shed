@@ -3,7 +3,7 @@ import { createKey, revokeKey, updateKey } from '#lib/server/agents.js';
 import { api, type User } from '#lib/server/forgejo.js';
 import { read } from '#lib/server/store.js';
 import { addHost, hostsFor, pair, removeHost, survey } from '#lib/server/t3.js';
-import { WRITE_TOOLS, decide } from '#lib/server/tools.js';
+import { OPT_IN_TOOLS, WRITE_TOOLS, decide } from '#lib/server/tools.js';
 
 export async function load({ locals }) {
 	if (!locals.token) redirect(303, '/login');
@@ -20,9 +20,10 @@ export async function load({ locals }) {
 			error
 		})),
 		writeTools: WRITE_TOOLS,
+		optInTools: OPT_IN_TOOLS,
 		keys: d.keys
 			.filter((k) => k.userId === me.id)
-			.map(({ id, name, repos, ask, createdAt, lastUsedAt }) => ({ id, name, repos, ask: ask ?? [], createdAt, lastUsedAt })),
+			.map(({ id, name, repos, ask, allow, createdAt, lastUsedAt }) => ({ id, name, repos, ask: ask ?? [], allow: allow ?? [], createdAt, lastUsedAt })),
 		pending: approvals.filter((a) => a.status === 'pending'),
 		decided: approvals.filter((a) => a.status !== 'pending').slice(0, 10),
 		activity: d.activity.filter((a) => a.userId === me.id).slice(-30).reverse()
@@ -37,7 +38,7 @@ export const actions = {
 		if (!name) return fail(400, { error: 'Give the agent a name' });
 		const me = await api<User>(locals.token, '/user');
 		const ask = form.getAll('ask').map(String).filter((t) => WRITE_TOOLS.includes(t));
-		const key = await createKey(me, name, repoList(form), ask);
+		const key = await createKey(me, name, repoList(form), ask, allowList(form));
 		return { key, name };
 	},
 	edit: async ({ locals, request }) => {
@@ -49,7 +50,8 @@ export const actions = {
 		await updateKey(me.id, String(form.get('id')), {
 			name,
 			repos: repoList(form),
-			ask: form.getAll('ask').map(String).filter((t) => WRITE_TOOLS.includes(t))
+			ask: form.getAll('ask').map(String).filter((t) => WRITE_TOOLS.includes(t)),
+			allow: allowList(form)
 		});
 	},
 	addHost: async ({ locals, request }) => {
@@ -79,6 +81,8 @@ export const actions = {
 	approve: ({ locals, request }) => resolve(locals.token, request, true),
 	deny: ({ locals, request }) => resolve(locals.token, request, false)
 };
+
+const allowList = (form: FormData) => form.getAll('allow').map(String).filter((t) => OPT_IN_TOOLS.includes(t));
 
 // Empty means every repo.
 function repoList(form: FormData) {

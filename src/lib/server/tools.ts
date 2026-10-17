@@ -8,7 +8,7 @@ import { read, update, type AgentKey, type Approval } from './store.js';
 
 export type Ctx = { key: AgentKey; token: string };
 type Args = Approval['args'];
-type Tool = { description: string; params: Record<string, [string, string, boolean?]>; write?: boolean; run: (c: Ctx, a: Args) => Promise<unknown> };
+type Tool = { description: string; params: Record<string, [string, string, boolean?]>; write?: boolean; optIn?: boolean; run: (c: Ctx, a: Args) => Promise<unknown> };
 
 const post = (token: string, path: string, body: unknown) =>
 	request(token, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
@@ -158,6 +158,24 @@ export const tools: Record<string, Tool> = {
 			return { number: p.number, url: p.html_url };
 		}
 	},
+	merge_pull_request: {
+		description: 'Merge a pull request, or set it to merge once its checks pass. Only works if the owner turned merging on for this key.',
+		params: {
+			repo: REPO,
+			number: NUMBER,
+			style: ['string', "merge, squash, rebase, rebase-merge or fast-forward-only (default: the repo's default)"],
+			delete_branch: ['boolean', 'Delete the head branch afterwards'],
+			when_checks_pass: ['boolean', 'Schedule the merge for when checks pass instead of merging now']
+		},
+		write: true,
+		optIn: true,
+		run: async (c, a) => {
+			const style = a.style ?? (await api<Repo>(c.token, `/repos/${a.repo}`)).default_merge_style;
+			const body = { Do: style, delete_branch_after_merge: !!a.delete_branch, merge_when_checks_succeed: !!a.when_checks_pass };
+			await request(c.token, `${pr(a)}/merge`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+			return a.when_checks_pass ? 'Scheduled to merge when checks pass' : 'Merged';
+		}
+	},
 	get_rules: {
 		description: `Read the limits this repo sets for agents (${RULES_PATH}): required branch prefix, paths that need the owner's approval, tools that always ask or are disabled. Check before opening a PR.`,
 		params: { repo: REPO },
@@ -178,6 +196,8 @@ export const tools: Record<string, Tool> = {
 };
 
 export const WRITE_TOOLS = Object.entries(tools).filter(([, t]) => t.write).map(([name]) => name);
+export const OPT_IN_TOOLS = Object.entries(tools).filter(([, t]) => t.optIn).map(([name]) => name);
+export const usable = (key: AgentKey, name: string) => !tools[name]?.optIn || !!key.allow?.includes(name);
 
 export const schema = (t: Tool) => ({
 	type: 'object',
@@ -190,6 +210,7 @@ const message = (e: unknown) => (isHttpError(e) ? `${e.status}: ${e.body.message
 const label = (name: string, a: Args) => `${name}${a.number ? ` #${a.number}` : ''}`;
 
 async function execute(ctx: Ctx, name: string, args: Args) {
+	if (!usable(ctx.key, name)) error(403, `This key isn't allowed to ${name.replaceAll('_', ' ')}. ${ctx.key.login} can turn it on in forge under Settings → Agents.`);
 	const out = await tools[name].run(ctx, args);
 	if (tools[name].write) await logActivity(ctx.key, String(args.repo), label(name, args));
 	return text(out);
@@ -220,6 +241,7 @@ const result = (isError: boolean, t: string) => ({ ...(isError && { isError }), 
 export async function call(ctx: Ctx, name: string, args: Args) {
 	const tool = tools[name];
 	if (!tool) return result(true, `Unknown tool ${name}`);
+	if (!usable(ctx.key, name)) return result(true, `This key isn't allowed to ${name.replaceAll('_', ' ')}. ${ctx.key.login} can turn it on in forge under Settings → Agents.`);
 	const missing = Object.entries(tool.params).filter(([k, p]) => p[2] && (args[k] === undefined || args[k] === '')).map(([k]) => k);
 	if (missing.length) return result(true, `Missing required argument${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`);
 	if (tool.params.repo && !allows(ctx.key, String(args.repo))) return result(true, `This key can't access ${args.repo}`);

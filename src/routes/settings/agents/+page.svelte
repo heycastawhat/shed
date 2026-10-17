@@ -19,7 +19,8 @@
 		comment_on_line: 'comment on a line',
 		reply_to_thread: 'reply in a thread',
 		resolve_thread: 'resolve a thread',
-		open_pull_request: 'open a PR'
+		open_pull_request: 'open a PR',
+		merge_pull_request: 'merge a PR'
 	};
 	const mint = 't3 auth session issue --scope orchestration:read --scope orchestration:operate --scope source-control:write --label forge';
 	const label = (tool: string) => LABELS[tool] ?? tool.replaceAll('_', ' ');
@@ -81,7 +82,7 @@
 			<div>
 				<strong>{k.name}</strong>
 				<span class="muted">
-					{k.repos.includes('*') ? 'all repos' : k.repos.join(', ')} · {k.ask.length ? `asks first: ${k.ask.map(label).join(', ')}` : 'never asks'} · created {ago(k.createdAt)} · {k.lastUsedAt
+					{k.repos.includes('*') ? 'all repos' : k.repos.join(', ')} · {k.allow.length ? `can ${k.allow.map(label).join(', ')} · ` : ''}{k.ask.length ? `asks first: ${k.ask.map(label).join(', ')}` : 'never asks'} · created {ago(k.createdAt)} · {k.lastUsedAt
 						? `used ${ago(k.lastUsedAt)}`
 						: 'never used'}
 				</span>
@@ -100,6 +101,12 @@
 						<input name="repos" value={k.repos.includes('*') ? '' : k.repos.join(' ')} placeholder="All repos" aria-label="Repositories" />
 						<button class="primary">Save</button>
 					</div>
+					<fieldset>
+						<legend class="muted">Also allow it to</legend>
+						{#each data.optInTools as t (t)}
+							<label><input type="checkbox" name="allow" value={t} checked={k.allow.includes(t)} /> {label(t)}</label>
+						{/each}
+					</fieldset>
 					<fieldset>
 						<legend class="muted">Ask me first before it can</legend>
 						{#each data.writeTools as t (t)}
@@ -123,9 +130,15 @@
 			<button class="primary">Create key</button>
 		</div>
 		<fieldset>
+			<legend class="muted">Also allow it to</legend>
+			{#each data.optInTools as t (t)}
+				<label><input type="checkbox" name="allow" value={t} /> {label(t)}</label>
+			{/each}
+		</fieldset>
+		<fieldset>
 			<legend class="muted">Ask me first before it can</legend>
 			{#each data.writeTools as t (t)}
-				<label><input type="checkbox" name="ask" value={t} checked={t === 'open_pull_request'} /> {label(t)}</label>
+				<label><input type="checkbox" name="ask" value={t} checked={t === 'open_pull_request' || t === 'merge_pull_request'} /> {label(t)}</label>
 			{/each}
 		</fieldset>
 	</form>

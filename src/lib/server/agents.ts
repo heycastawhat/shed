@@ -3,7 +3,7 @@ import { userToken } from './auth.js';
 import { read, sha256, update, type AgentKey } from './store.js';
 
 // A key acts as its owner, using the owner's stored Forgejo grant (see userToken), so it keeps working after the browser session ends.
-export async function createKey(user: { id: number; login: string }, name: string, repos: string[], ask: string[]) {
+export async function createKey(user: { id: number; login: string }, name: string, repos: string[], ask: string[], allow: string[]) {
 	if (!(await read()).grants[user.id]) error(401, 'Log in to forge again');
 	const key = `fk_${crypto.getRandomValues(new Uint8Array(32)).toBase64({ alphabet: 'base64url', omitPadding: true })}`;
 	const record: AgentKey = {
@@ -13,6 +13,7 @@ export async function createKey(user: { id: number; login: string }, name: strin
 		login: user.login,
 		repos,
 		ask,
+		allow,
 		hash: await sha256(key),
 		createdAt: new Date().toISOString(),
 		lastUsedAt: null
@@ -21,7 +22,7 @@ export async function createKey(user: { id: number; login: string }, name: strin
 	return key;
 }
 
-export async function updateKey(userId: number, id: string, patch: Pick<AgentKey, 'name' | 'repos' | 'ask'>) {
+export async function updateKey(userId: number, id: string, patch: Pick<AgentKey, 'name' | 'repos' | 'ask' | 'allow'>) {
 	await update((d) => Object.assign(d.keys.find((k) => k.id === id && k.userId === userId) ?? {}, patch));
 }
 
