@@ -4,4 +4,4 @@
 	let { data } = $props();
 </script>
 
-<Tree repo={data.repo.full_name} ref={data.ref} path="" entries={data.entries} readme={data.readme} />
+<Tree repo={data.repo.full_name} ref={data.ref} path="" entries={data.entries} last={data.last} readme={data.readme} />

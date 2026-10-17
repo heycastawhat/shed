@@ -2,15 +2,17 @@
 	import Breadcrumbs from './Breadcrumbs.svelte';
 	import Icon from './Icon.svelte';
 	import { refPath } from '#lib/repo.js';
+	import { ago } from '#lib/time.js';
 
-	type Entry = { name: string; path: string; type: string };
+	type Entry = { name: string; path: string; type: string; last_commit_sha?: string };
 	let {
 		repo,
 		ref,
 		path,
 		entries,
+		last,
 		readme
-	}: { repo: string; ref: string; path: string; entries: Entry[]; readme?: { name: string; html: string } } = $props();
+	}: { repo: string; ref: string; path: string; entries: Entry[]; last: Record<string, { title: string; date: string }>; readme?: { name: string; html: string } } = $props();
 
 	const parent = $derived(path.split('/').filter(Boolean).slice(0, -1).join('/'));
 	const href = (e: Entry) => `/${repo}/${e.type === 'dir' ? 'tree' : 'blob'}/${refPath(ref, e.path)}`;
@@ -28,6 +30,11 @@
 				<span class="row"><span class="icon"><Icon name="commit" size={15} /></span>{e.name}</span>
 			{:else}
 				<a href={href(e)} class:dir={e.type === 'dir'}><span class="icon"><Icon name={e.type === 'dir' ? 'folder' : 'file'} size={15} /></span>{e.name}</a>
+			{/if}
+			{#if e.last_commit_sha && last[e.last_commit_sha]}
+				{@const c = last[e.last_commit_sha]}
+				<a class="msg" href="/{repo}/commit/{e.last_commit_sha}">{c.title}</a>
+				<span class="when" title={c.date}>{ago(c.date)}</span>
 			{/if}
 		</li>
 	{/each}
@@ -53,8 +60,38 @@
 		overflow: hidden;
 		font-size: 0.92rem;
 	}
+	li {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 9rem;
+		align-items: center;
+	}
+	li > :first-child:last-child {
+		grid-column: 1 / -1;
+	}
 	li + li {
 		border-top: 1px solid var(--border);
+	}
+	li:hover {
+		background: var(--surface);
+	}
+	.msg,
+	.when {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--muted);
+		font-size: 0.85rem;
+	}
+	.msg {
+		display: block;
+		padding: 0.5rem 1rem 0.5rem 0;
+	}
+	.msg:hover {
+		color: var(--accent);
+	}
+	.when {
+		padding-right: 1rem;
+		text-align: right;
 	}
 	a,
 	.row {
@@ -63,9 +100,6 @@
 		gap: 0.6rem;
 		padding: 0.5rem 1rem;
 		color: var(--fg);
-	}
-	a:hover {
-		background: var(--surface);
 	}
 	.icon {
 		display: flex;
