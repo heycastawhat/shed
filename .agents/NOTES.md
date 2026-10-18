@@ -201,7 +201,7 @@ Done:
    Sources (`sign.ts`): forge's own MCP signature; Claude Code's "Generated with [Claude Code]" PR footer (→ "Claude Code"); and the `Co-Authored-By: <name> <noreply@anthropic.com>` commit trailer (→ e.g. "Claude Opus 5.5").
    A PR counts as agent-made if its body says so or any of its commits has the trailer (the PR layout fetches commits for this). The sidebar/top bar brand is plain "forge" text now; the rail hides it.
 
-14. Small gaps closed: `/[owner]` is a user/org page (profile, org members, `RepoList.svelte` shared with `/repos`; `/users/<name>` works for orgs, and `/orgs/<name>/members` succeeding is how it tells them apart).
+14. Small gaps closed: `/[owner]` is a user/org page (a sticky profile column with orgs or members; a contribution heatmap from `/users/X/heatmap`, 15-minute buckets summed per day; repo cards; recent activity from `activities/feeds`, where `content` is `["N","title"]` JSON for issue events and `{Commits}` for pushes, a push with no commits is a new branch, and runs of pushes to one branch are merged; `/users/<name>` works for orgs, and `/orgs/<name>/members` succeeding is how it tells them apart).
    Markdown files and READMEs render with `renderMarkdown(…, { ref, dir })`: Forgejo gets `<repo>/src/branch/<ref>/<dir>` as context, and that prefix is rewritten to forge's `blob`/`raw` URLs (folder links redirect blob → tree).
    The tree view shows each entry's last commit subject and age (`last_commit_sha` from the contents API, then one `git/commits/<sha>` per distinct sha).
 

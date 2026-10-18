@@ -76,6 +76,10 @@ export type Repo = {
 	allow_rebase_explicit: boolean;
 	allow_squash_merge: boolean;
 	allow_fast_forward_only_merge: boolean;
+	language: string;
+	stars_count: number;
+	forks_count: number;
+	fork: boolean;
 };
 export type MergeStyle = 'merge' | 'rebase' | 'rebase-merge' | 'squash' | 'fast-forward-only';
 export type Branch = { name: string };

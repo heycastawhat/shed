@@ -40,6 +40,12 @@
 	import IDownload from '@mingcute/svelte/core-regular/download';
 	import IPackage from '@mingcute/svelte/core-regular/package';
 	import IFileZip from '@mingcute/svelte/core-regular/file-zip';
+	import IStar from '@mingcute/svelte/core-regular/star';
+	import ILocation from '@mingcute/svelte/core-regular/location';
+	import ILink from '@mingcute/svelte/core-regular/link';
+	import ICalendar from '@mingcute/svelte/core-regular/calendar';
+	import IFork from '@mingcute/svelte/core-regular/fork';
+	import IGroup from '@mingcute/svelte/core-regular/group';
 
 	const ICONS = {
 		home: IHome4,
@@ -83,7 +89,13 @@
 		trash: IDelete2,
 		download: IDownload,
 		release: IPackage,
-		zip: IFileZip
+		zip: IFileZip,
+		star: IStar,
+		location: ILocation,
+		link: ILink,
+		calendar: ICalendar,
+		fork: IFork,
+		group: IGroup
 	};
 </script>
 
