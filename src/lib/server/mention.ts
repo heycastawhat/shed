@@ -80,6 +80,7 @@ export async function mention(token: string | undefined, origin: string, where: 
 			].join('\n');
 		}
 		const thread = await startTask(host, repo, { userId: me.id, pushTo: [pushTo], text, title: `#${issue.number} ${ask.split('\n')[0]}`, runtimeMode: 'auto-accept-edits', baseRef, fromOrigin: true });
+		const agent = (await read()).tasks.findLast((t) => t.thread === thread)?.agent ?? 'T3 Code';
 		const url = `${origin}/agents/${encodeURIComponent(host.id)}/${encodeURIComponent(thread)}`;
 		const m: Mention = {
 			id: crypto.randomUUID(),
@@ -90,12 +91,13 @@ export async function mention(token: string | undefined, origin: string, where: 
 			repo,
 			number: issue.number,
 			kind: issue.pull_request ? 'pull' : 'issue',
+			agent,
 			line: line && { path: line.path, line: line.line },
 			createdAt: new Date().toISOString(),
 			done: false
 		};
 		await update((d) => d.mentions.push(m));
-		await reply(token, repo, issue.number, line, sign(`On it: [follow the task](${url}).`, 'agent', me.login));
+		await reply(token, repo, issue.number, line, sign(`On it: [follow the task](${url}).`, agent, me.login));
 	} catch (e) {
 		if (isHttpError(e)) return { action: 'comment', error: `Couldn't start @agent: ${e.body.message}`, posted: true };
 		throw e;
@@ -133,7 +135,7 @@ async function check() {
 							s.kind !== 'fail' && last ? `Done ([task](${m.url})):\n\n${summary(last)}` : `The agent stopped (${s.label.toLowerCase()}) without a summary. [See the task](${m.url}).`;
 						const token = await userToken(userId);
 						const me = await api<User>(token, '/user');
-						await reply(token, m.repo, m.number, m.line, sign(body, 'agent', me.login));
+						await reply(token, m.repo, m.number, m.line, sign(body, m.agent ?? 'T3 Code', me.login));
 					}
 				} catch (e) {
 					console.error(`@agent reply for ${m.repo}#${m.number}`, e);

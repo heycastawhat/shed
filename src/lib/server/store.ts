@@ -47,6 +47,7 @@ export type Mention = {
 	repo: string;
 	number: number;
 	kind: 'pull' | 'issue';
+	agent?: string;
 	line?: { path: string; line: string };
 	createdAt: string;
 	done: boolean;

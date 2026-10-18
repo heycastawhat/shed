@@ -203,7 +203,9 @@ export async function startTask(
 		workspaceStrategy: { type: 'worktree', baseRef: task.baseRef, startFromOrigin: task.fromOrigin },
 		initialMessage: { text: task.text, attachments: [] }
 	});
-	const agent = providers.find((p) => p.instanceId === modelSelection.instanceId)?.displayName ?? 'T3 Code';
+	const provider = providers.find((p) => p.instanceId === modelSelection.instanceId)?.displayName;
+	// T3 calls the Claude provider "Claude"; the product, and what its own PR footers say, is Claude Code.
+	const agent = provider === 'Claude' ? 'Claude Code' : (provider ?? 'T3 Code');
 	await update((d) => d.tasks.push({ repo, branches: task.pushTo ?? [], host: host.id, thread: threadId, agent, userId: task.userId, createdAt: new Date().toISOString() }));
 	return threadId;
 }
