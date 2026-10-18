@@ -69,6 +69,41 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
 - Release `v0.1.0` (on main, notes plus one asset `sample-0.1.0.txt`) and a lightweight tag `v0.0.1` (on `feature/retry-jitter`) are test data for the releases page. PR #34 is a closed throwaway from the branches page.
 - Milestones `v0.2` (due 30 Nov 2026; issues #27, #29) and `Backlog` (#28). #27 is assigned to ada, #28 and #30 to reviewer; #30 and #31 have assign/milestone events in their timelines. PR #35 is a closed throwaway from the triage tests.
 
+## Docker
+
+One image runs forge and T3 Code. It was never built (there's no Docker here); every step was checked by hand instead.
+- Build: `AGENTS=both docker compose build`. `AGENTS` is `claude` (the default), `codex` or `both`, and picks which agent CLIs get installed. Run it with `docker compose up -d`, which publishes forge on host port 3080.
+- `bun run build` uses `@sveltejs/adapter-node` 6 (`svelte-adapter-bun` only supports Kit 2), and Bun runs `build/index.js`, which needs no `node_modules`. The build validates env vars while analysing routes, so the Dockerfile passes dummy values.
+  The real values are read at runtime. Without them, `bun --bun` dies with a SIGABRT instead of printing the env error.
+- adapter-node 6 has no `ORIGIN`: it assumes `https` and takes the host from `Host`, and `url.origin` builds the OAuth redirect URI. Behind a TLS proxy that's right. Over plain http, set `PROTOCOL_HEADER=x-forwarded-proto`.
+- `docker-entrypoint.sh` starts `t3 serve` on `127.0.0.1:3773` (`T3_HOST`/`T3_PORT` override this). The first time, it mints a 10-year token for forge into `~/.t3/forge-token`.
+  It sets `T3_URL`/`T3_TOKEN`, overriding `.env`, so the bundled T3 is every user's built-in host. Then it runs forge. If either process exits, the container exits.
+  `t3` is pinned at `t3@0.1.0`, the same version as the desktop app, because `t3.ts` speaks T3's internal RPC. The npm package is a wrapper around a native binary (`@t3code/t3-linux-*`), which the image symlinks directly.
+- The container runs as `bun`, because Claude Code refuses bypass permissions as root. It has five volumes:
+  - `data` → `/data` (`forge.json`)
+  - `t3` → `~/.t3` (state, worktrees, `forge-token`, `git-credentials`)
+  - `projects` → `~/.t3/projects` (T3 clones)
+  - `claude` → `~/.claude` (`CLAUDE_CONFIG_DIR`, so `.claude.json` lives there too)
+  - `codex` → `~/.codex`
+- First run:
+  1. In `.env`, set `FORGEJO_URL`, an OAuth app whose redirect URI is `https://<forge host>/auth/callback`, and `FORGE_SECRET`.
+     Set `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` too, so agents can commit.
+     Never change `FORGE_SECRET` or drop the `data` volume, or everyone has to log in again and all keys die.
+  2. Log the agents in with `docker compose exec -it forge claude` (then `/login`) and/or `docker compose exec -it forge codex login --device-auth`.
+  3. Give T3 clones push access: `docker compose exec forge sh -c 'echo https://<user>:<token>@<forgejo host> > ~/.t3/git-credentials'`.
+  4. T3 is only reachable inside the container, so "Open in T3 Code" links (`http://127.0.0.1:3773/…`) don't work from a browser. Use `docker compose exec forge t3 connect link --headless` (untested), or publish 3773 with `T3_HOST=0.0.0.0`.
+     Pairing links for the bundled T3 come from `t3 auth pairing create --base-dir ~/.t3 --base-url <url>`. Other T3 hosts are still added in Settings → Agents.
+- Verified by hand:
+  - the build in a clean copy without `.env`, and the built server served pages from outside the repo;
+  - the npm `t3`/`claude`/`codex` bins run with Bun standing in for `node`;
+  - the entrypoint: T3 starts, the token is minted, forge serves pages, and SIGTERM stops both;
+  - forge's `t3.ts` (`config`, `survey`) against a headless `t3 serve`, and pairing-link redemption.
+- Not verified:
+  - the Docker build itself, and whether the base image already provides `node`;
+  - volume ownership;
+  - Codex's sandbox inside a container;
+  - whether T3 lists models once the agents are logged in (an unauthenticated headless T3 returned none).
+
 ## Gotchas (each one cost time)
 
 - **SvelteKit 3 differs from v2:**
@@ -209,7 +244,7 @@ Next, in the order discussed:
 2. Agent attribution, the rest: commit lists don't use the T3 task record (item 20). Maybe also a real Forgejo label (`agent/<key name>`) so Forgejo's own UI shows it.
 
 Waiting on the owner (asked, not answered; don't start without a yes):
-- **T3 Code bundled in the Docker image** alongside forge on server (`/opt/stacks/forge`), reachable over T3 Connect. Needs an OK to work on server, and a choice of Claude Code only vs Claude Code + Codex in the image.
+- **T3 Code bundled in the Docker image**: done as an image only (see "Docker"); never built, since there's no Docker here, and not deployed. Deploying it to server (`/opt/stacks/forge`) and T3 Connect still need an OK.
 - Smaller offers: a "show dismissed tasks" view on the hub; hub launch redirecting to the new task's page instead of the repo tab; clearing the old test sign-ins.
 
 Agent ideas (designs in `.agents/reference/`, not started):

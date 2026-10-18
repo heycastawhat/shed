@@ -1,0 +1,27 @@
+services:
+  forge:
+    build:
+      context: .
+      args:
+        AGENTS: ${AGENTS:-claude}
+    image: forge
+    init: true
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      FORGE_DATA: /data
+    ports:
+      - 3080:3000
+    volumes:
+      - data:/data
+      - t3:/home/bun/.t3
+      - projects:/home/bun/.t3/projects
+      - claude:/home/bun/.claude
+      - codex:/home/bun/.codex
+
+volumes:
+  data:
+  t3:
+  projects:
+  claude:
+  codex:
