@@ -49,6 +49,7 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
    Its browser session lasts 30 days (remember-me 365) and OAuth access tokens 24h, so forge's login bounce rarely stops at a password prompt.
 2. `bun run dev --port 5173 --strictPort` → http://localhost:5173. The OAuth redirect URI is registered for exactly this port.
 3. Optional, for CI: `cd dev/runner && ./forgejo-runner daemon` (forgejo-runner 13.2.0, registered as `laptop-host` with label `host`, so jobs say `runs-on: host` and run **directly on this machine**, one at a time).
+   Start it *after* Forgejo is up: it exits if it can't reach :3000, and queued jobs then end up "cancelled" (re-trigger with close + reopen on the PR).
    Re-register with a token from `dev/forgejo/forgejo forgejo-cli actions generate-runner-token` if `.runner` is lost.
 4. Check with `bun run check`. Smoke test: `.agents/scripts/login.sh && .agents/scripts/smoke.sh`.
 
