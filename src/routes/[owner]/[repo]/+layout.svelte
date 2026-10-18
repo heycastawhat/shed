@@ -11,7 +11,8 @@
 	let proto = $state<'ssh' | 'https'>('ssh');
 	const url = $derived(proto === 'ssh' ? data.repo.ssh_url : data.repo.clone_url);
 	const section = $derived(
-		page.route.id?.includes('/pulls') ? 'pulls' : page.route.id?.includes('/issues') ? 'issues' : page.route.id?.endsWith('/agents') ? 'agents' : /\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code'
+		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity|settings|compare)/)?.[1]?.replace('compare', 'pulls') ??
+			(/\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code')
 	);
 
 	function switchRef(ref: string) {
@@ -33,17 +34,23 @@
 	</h1>
 	{#if data.repo.description}<p>{data.repo.description}</p>{/if}
 	<nav>
-		<a href={base} class:active={section === 'code'}><Icon name="code" size={15} />Code</a>
-		<a href="{base}/commits/{refPath(data.ref)}" class:active={section === 'commits'}><Icon name="commit" size={15} />Commits</a>
-		<a href="{base}/pulls" class:active={section === 'pulls'}>
-			<Icon name="changes" size={15} />Pull requests{#if data.repo.open_pr_counter}<span class="count">{data.repo.open_pr_counter}</span>{/if}
-		</a>
-		{#if data.repo.has_issues}
-			<a href="{base}/issues" class:active={section === 'issues'}>
-				<Icon name="issue" size={15} />Issues{#if data.repo.open_issues_count}<span class="count">{data.repo.open_issues_count}</span>{/if}
+		<div class="tabs">
+			<a href={base} class:active={section === 'code'}><Icon name="code" size={15} />Code</a>
+			<a href="{base}/commits/{refPath(data.ref)}" class:active={section === 'commits'}><Icon name="commit" size={15} />Commits</a>
+			<a href="{base}/pulls" class:active={section === 'pulls'}>
+				<Icon name="changes" size={15} />Pull requests{#if data.repo.open_pr_counter}<span class="count">{data.repo.open_pr_counter}</span>{/if}
 			</a>
-		{/if}
-		{#if data.agents}<a href="{base}/agents" class:active={section === 'agents'}><Icon name="agents" size={15} />Agents</a>{/if}
+			{#if data.repo.has_issues}
+				<a href="{base}/issues" class:active={section === 'issues'}>
+					<Icon name="issue" size={15} />Issues{#if data.repo.open_issues_count}<span class="count">{data.repo.open_issues_count}</span>{/if}
+				</a>
+			{/if}
+			{#if data.repo.has_actions}<a href="{base}/actions" class:active={section === 'actions'}><Icon name="actions" size={15} />Actions</a>{/if}
+			{#if data.repo.has_wiki}<a href="{base}/wiki" class:active={section === 'wiki'}><Icon name="wiki" size={15} />Wiki</a>{/if}
+			<a href="{base}/activity" class:active={section === 'activity'}><Icon name="activity" size={15} />Activity</a>
+			{#if data.agents}<a href="{base}/agents" class:active={section === 'agents'}><Icon name="agents" size={15} />Agents</a>{/if}
+			{#if data.repo.permissions.admin}<a href="{base}/settings" class:active={section === 'settings'}><Icon name="sliders" size={15} />Settings</a>{/if}
+		</div>
 		<div class="refs">
 			{#if section === 'code' && data.branches.length}
 				<a class="count-link" class:active={listing === 'branches'} href="{base}/branches"><Icon name="branch" size={14} />{data.branches.length} branch{data.branches.length === 1 ? '' : 'es'}</a>
@@ -84,10 +91,13 @@ git push -u origin {data.repo.default_branch}</pre>
 <style>
 	.head {
 		margin-bottom: 1.5rem;
+		container-type: inline-size;
 	}
 	h1 {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
+		overflow-wrap: anywhere;
 		gap: 0.15rem;
 		font-size: 1.3rem;
 		font-weight: 400;
@@ -185,10 +195,36 @@ git push -u origin {data.repo.default_branch}</pre>
 		margin-top: 1rem;
 		border-bottom: 1px solid var(--border);
 	}
+	.tabs {
+		display: flex;
+		gap: 1.2rem;
+		min-width: 0;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+	@container (max-width: 640px) {
+		nav {
+			flex-wrap: wrap;
+			border: 0;
+		}
+		.tabs {
+			flex-basis: 100%;
+			border-bottom: 1px solid var(--border);
+		}
+		.refs {
+			flex-wrap: wrap;
+			margin: 0.6rem 0 0;
+		}
+		.refs:empty {
+			display: none;
+		}
+	}
 	nav a {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
+		flex: none;
+		white-space: nowrap;
 		color: var(--muted);
 		padding: 0.5rem 0.1rem;
 		border-bottom: 2px solid transparent;

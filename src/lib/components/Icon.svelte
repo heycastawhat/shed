@@ -40,12 +40,32 @@
 	import IDownload from '@mingcute/svelte/core-regular/download';
 	import IPackage from '@mingcute/svelte/core-regular/package';
 	import IFileZip from '@mingcute/svelte/core-regular/file-zip';
+	import IPlayCircle from '@mingcute/svelte/core-regular/play-circle';
+	import IBook2 from '@mingcute/svelte/core-regular/book-2';
+	import IChartBar from '@mingcute/svelte/core-regular/chart-bar';
+	import INotification from '@mingcute/svelte/core-regular/notification';
+	import IEye2 from '@mingcute/svelte/core-regular/eye-2';
+	import IUpload2 from '@mingcute/svelte/core-regular/upload-2';
+	import IHistory from '@mingcute/svelte/core-regular/history';
+	import ICopy2 from '@mingcute/svelte/core-regular/copy-2';
+	import IKey2 from '@mingcute/svelte/core-regular/key-2';
+	import IWebhook from '@mingcute/svelte/core-regular/webhook';
+	import IShield from '@mingcute/svelte/core-regular/shield';
+	import IArchive from '@mingcute/svelte/core-regular/archive';
+	import ICompass from '@mingcute/svelte/core-regular/compass';
+	import ITransfer from '@mingcute/svelte/core-regular/transfer';
+	import IRefresh2 from '@mingcute/svelte/core-regular/refresh-2';
+	import ILayoutGrid from '@mingcute/svelte/core-regular/layout-grid';
+	import IPackage2 from '@mingcute/svelte/core-regular/package-2';
+	import IGlobe from '@mingcute/svelte/core-regular/globe';
+	import IEdit2 from '@mingcute/svelte/core-regular/edit-2';
 	import IStar from '@mingcute/svelte/core-regular/star';
 	import ILocation from '@mingcute/svelte/core-regular/location';
 	import ILink from '@mingcute/svelte/core-regular/link';
 	import ICalendar from '@mingcute/svelte/core-regular/calendar';
 	import IFork from '@mingcute/svelte/core-regular/fork';
 	import IGroup from '@mingcute/svelte/core-regular/group';
+	import IMenu from '@mingcute/svelte/core-regular/menu';
 
 	const ICONS = {
 		home: IHome4,
@@ -95,7 +115,27 @@
 		link: ILink,
 		calendar: ICalendar,
 		fork: IFork,
-		group: IGroup
+		group: IGroup,
+		menu: IMenu,
+		actions: IPlayCircle,
+		wiki: IBook2,
+		activity: IChartBar,
+		bell: INotification,
+		eye: IEye2,
+		upload: IUpload2,
+		history: IHistory,
+		copy: ICopy2,
+		key: IKey2,
+		webhook: IWebhook,
+		shield: IShield,
+		archive: IArchive,
+		explore: ICompass,
+		transfer: ITransfer,
+		refresh: IRefresh2,
+		projects: ILayoutGrid,
+		packages: IPackage2,
+		globe: IGlobe,
+		edit: IEdit2
 	};
 </script>
 

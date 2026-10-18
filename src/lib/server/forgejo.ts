@@ -80,6 +80,12 @@ export type Repo = {
 	stars_count: number;
 	forks_count: number;
 	fork: boolean;
+	has_wiki: boolean;
+	has_actions: boolean;
+	has_projects: boolean;
+	has_releases: boolean;
+	archived: boolean;
+	watchers_count: number;
 };
 export type MergeStyle = 'merge' | 'rebase' | 'rebase-merge' | 'squash' | 'fast-forward-only';
 export type Branch = { name: string };
