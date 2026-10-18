@@ -1,8 +1,10 @@
 <script lang="ts">
+	import MentionPicker from '#lib/components/MentionPicker.svelte';
 	import { enhance } from '$app/forms';
 
 	let { data, form } = $props();
 	let busy = $state(false);
+	let mentionInput = $state<HTMLTextAreaElement>();
 </script>
 
 <h2>New issue</h2>
@@ -20,6 +22,7 @@
 	<input name="title" placeholder="Title" value={form?.title ?? ''} aria-label="Title" required {@attach (el) => el.focus()} />
 	<div class="compose">
 		<textarea
+	bind:this={mentionInput}
 			name="body"
 			placeholder="Describe it (Markdown supported)"
 			rows="12"
@@ -28,6 +31,7 @@
 				if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) e.currentTarget.form?.requestSubmit();
 			}}
 		></textarea>
+<MentionPicker input={mentionInput} />
 		<div class="bar">
 			{#if form?.error}<span class="error">{form.error}</span>{/if}
 			<span class="muted hint">Ctrl+Enter to create</span>

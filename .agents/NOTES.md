@@ -197,6 +197,7 @@ Done:
 19. `@agent` mentions (`src/lib/mention.ts` finds them, skipping code and quotes; `src/lib/server/mention.ts` acts). A comment posted *through forge* (PR conversation, PR line comment, issue) that mentions `@agent` starts a T3 task on the commenter's own first host with the repo as a project
    (PR: on the PR branch, pushing to it; line comment: plus the diff lines above it; issue: a new `agent/issue-N-…` branch off the default one) and replies "On it" with the task link, signed as agent `agent`. Open mentions live in `forge.json` (`mentions`).
    The request hook runs `sweepMentions()` at most every 15s: a finished task gets "Done" plus the agent's last message (cut at ~4000 chars), a failed one a "stopped" note; line-comment replies go to the same line. Mentions made in Forgejo's own UI do nothing yet (stage 3: webhook + a real Forgejo user).
+   Typing `@` in a comment box (PR/issue composers, line comments, descriptions, new issue) opens `MentionPicker.svelte`: `@agent` first, then the repo's `/assignees` (via `/[owner]/[repo]/mentionable`, cached per page load); arrows + Enter/Tab pick, Esc closes. Add it to a new textarea with `bind:this` + `<MentionPicker input={…} />`.
    `store.read()` caches the load *promise*: two concurrent first loads used to make two copies, and the sweep's `done` flags landed on the lost one, so it posted twice.
 
 Next, in the order discussed:

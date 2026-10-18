@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MentionPicker from './MentionPicker.svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { unsign } from '#lib/sign.js';
@@ -10,6 +11,7 @@
 	let editing = $state(false);
 	let busy = $state(false);
 	let draft = $state('');
+	let mentionInput = $state<HTMLTextAreaElement>();
 </script>
 
 <div class="card">
@@ -39,6 +41,7 @@
 			}}
 		>
 			<textarea
+	bind:this={mentionInput}
 				name="body"
 				bind:value={draft}
 				rows={Math.min(20, Math.max(6, draft.split('\n').length + 1))}
@@ -49,6 +52,7 @@
 					if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) e.currentTarget.form?.requestSubmit();
 				}}
 			></textarea>
+<MentionPicker input={mentionInput} />
 			<div class="bar">
 				{#if page.form?.error && page.form.action === 'body'}<span class="error">{page.form.error}</span>{/if}
 				<span class="muted hint">Ctrl+Enter to save, Esc to cancel</span>

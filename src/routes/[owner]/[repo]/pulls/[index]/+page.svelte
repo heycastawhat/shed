@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MentionPicker from '#lib/components/MentionPicker.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import Icon from '#lib/components/Icon.svelte';
@@ -40,6 +41,7 @@
 		REQUEST_CHANGES: 'requested changes',
 		COMMENT: 'reviewed'
 	};
+	let mentionInput = $state<HTMLTextAreaElement>();
 </script>
 
 <div class="layout">
@@ -171,6 +173,7 @@
 	}}
 >
 	<textarea
+	bind:this={mentionInput}
 		name="body"
 		bind:value={draft}
 		placeholder="Leave a comment (Markdown supported)"
@@ -179,6 +182,7 @@
 			if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) e.currentTarget.form?.requestSubmit();
 		}}
 	></textarea>
+<MentionPicker input={mentionInput} />
 	<div class="compose-bar">
 		{#if form?.error && form.action === 'comment'}<span class="error">{form.error}</span>{/if}
 		<span class="muted hint">Ctrl+Enter to send</span>

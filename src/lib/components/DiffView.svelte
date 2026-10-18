@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MentionPicker from './MentionPicker.svelte';
 	import Byline from '#lib/components/Byline.svelte';
 	import Icon from './Icon.svelte';
 	import { onMount } from 'svelte';
@@ -155,6 +156,7 @@
 
 	const label = (f: FileDiff) => (f.status === 'renamed' ? `${f.from} → ${f.to}` : f.to);
 	const sign = { add: '+', del: '-', ctx: ' ' };
+	let mentionInput = $state<HTMLTextAreaElement>();
 </script>
 
 <div class="toolbar">
@@ -263,6 +265,7 @@
 							<input type="hidden" name="path" value={path} />
 							<input type="hidden" name="line" value={composer?.line} />
 							<textarea
+	bind:this={mentionInput}
 								name="body"
 								rows="3"
 								bind:value={draft}
@@ -273,6 +276,7 @@
 									if (e.key === 'Escape') composer = null;
 								}}
 							></textarea>
+<MentionPicker input={mentionInput} />
 							<div class="bar">
 								{#if commentError}<span class="error">{commentError}</span>{/if}
 								<button type="button" onclick={() => (composer = null)}>Cancel</button>
