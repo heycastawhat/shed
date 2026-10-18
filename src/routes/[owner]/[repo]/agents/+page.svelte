@@ -36,7 +36,7 @@
 		{#if form && 'setupError' in form}<p class="error">{form.setupError}</p>{/if}
 	</form>
 {:else}
-	<div class="agents">
+	<div class="agents" class:solo={!data.threads.length}>
 		<aside>
 			<NewTask targets={[{ repo: data.repo.full_name, base: data.repo.default_branch, hosts: data.hosts }]} error={form?.error} />
 			<ul>
@@ -66,9 +66,17 @@
 <style>
 	.agents {
 		display: grid;
-		grid-template-columns: 320px 1fr;
+		grid-template-columns: 320px minmax(0, 1fr);
 		gap: 1.25rem;
 		align-items: start;
+	}
+	.agents.solo {
+		grid-template-columns: minmax(0, 40rem);
+	}
+	@media (max-width: 800px) {
+		.agents {
+			grid-template-columns: minmax(0, 1fr);
+		}
 	}
 	aside ul {
 		list-style: none;
