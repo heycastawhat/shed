@@ -24,6 +24,9 @@
 		...(own ? [] : [{ text: 'Your approval', state: data.approved ? 'done' : 'todo' }])
 	]);
 	const blocked = $derived(rows.some((r) => r.state === 'fail'));
+	// Forgejo only refuses a merge on failed checks when branch protection requires them, so failed checks alone can be overridden.
+	const override = $derived(blocked && data.pull.mergeable && data.checks.state !== 'pending');
+	const failedRuns = $derived([...new Set(data.checks.list.filter((c) => mark(c.state) === 'fail' && c.run).map((c) => c.run))]);
 	const pending = $derived(data.checks.list.length > 0 && data.checks.state === 'pending');
 
 	$effect(() => {
@@ -107,7 +110,22 @@
 		<p class="muted">You don't have permission to merge this pull request.</p>
 	{:else}
 		<div class="checks">
-			<h3>{data.autoMerge ? 'Auto-merge is on' : blocked ? "Can't merge yet" : rows.every((r) => r.state === 'done') ? 'Ready to merge' : 'Almost there'}</h3>
+			<div class="checks-head">
+				<h3>{data.autoMerge ? 'Auto-merge is on' : blocked ? (override ? 'Checks failed' : "Can't merge yet") : rows.every((r) => r.state === 'done') ? 'Ready to merge' : 'Almost there'}</h3>
+				{#if failedRuns.length}
+					<form method="POST" action="?/rerun" use:enhance={() => {
+						busy = true;
+						return async ({ update }) => {
+							await update();
+							busy = false;
+						};
+					}}>
+						{#each failedRuns as run (run)}<input type="hidden" name="run" value={run} />{/each}
+						{#if form?.error && form.action === 'rerun'}<span class="error">{form.error}</span>{/if}
+						<button disabled={busy}>Re-run failed checks</button>
+					</form>
+				{/if}
+			</div>
 			<ul>
 				{#each rows as r (r.text)}
 					<li class={r.state}><span class="mark">{r.state === 'done' ? '✓' : r.state === 'fail' ? '✕' : '·'}</span>{r.text}</li>
@@ -149,8 +167,18 @@
 			{#if !own}
 				<button formaction="?/approve" bind:this={approveBtn} disabled={busy || data.approved}>{data.approved ? 'Approved' : 'Approve'} <kbd>A</kbd></button>
 			{/if}
-			<button class="primary" bind:this={mergeBtn} disabled={busy || blocked}>
-				{#if armed}Press M again to merge{:else if pending}Merge when checks pass <kbd>M</kbd>{:else}{data.mergeStyles.find((s) => s.value === style)?.label} <kbd>M</kbd>{/if}
+			<button
+				class={override ? 'danger' : 'primary'}
+				bind:this={mergeBtn}
+				disabled={busy || (blocked && !override)}
+				onclick={(e) => {
+					// Overriding failed checks takes a second click, like the M key always does.
+					if (!override || armed) return;
+					e.preventDefault();
+					armed = setTimeout(() => (armed = undefined), 3000);
+				}}
+			>
+				{#if armed}{override ? 'Click again to confirm' : 'Press M again to merge'}{:else if override}Merge anyway <kbd>M</kbd>{:else if pending}Merge when checks pass <kbd>M</kbd>{:else}{data.mergeStyles.find((s) => s.value === style)?.label} <kbd>M</kbd>{/if}
 			</button>
 			{#if pending}<input type="hidden" name="when_checks_pass" />{/if}
 			{/if}
@@ -316,6 +344,30 @@
 	h3 {
 		margin: 0 0 0.75rem;
 		font-size: 1rem;
+	}
+	.checks-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+	.checks-head form {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+	}
+	.checks-head button {
+		font-size: 0.85rem;
+		padding: 0.2rem 0.6rem;
+	}
+	button.danger {
+		color: var(--del-fg);
+		border-color: var(--del-fg);
+		font-weight: 600;
+		background: none;
+	}
+	button.danger:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--del-fg) 12%, transparent);
 	}
 	.merge ul {
 		list-style: none;

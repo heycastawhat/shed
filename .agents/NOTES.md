@@ -196,7 +196,8 @@ Done:
    Forgejo schedules even with no checks at all and then waits for a status forever, so the button is only offered while checks are pending.
 
 12. CI status: the merge card lists each commit status (job name, description, a Logs link to Forgejo's job page) under the "N of M checks passed" row, and the page re-polls every 5s while checks are pending.
-   Forgejo calls a status's state `status`, not `state` (the old count was always 0). Job logs aren't in the API, hence the link out.
+   Forgejo calls a status's state `status`, not `state` (the old count was always 0).
+   Failed checks: "Re-run failed checks" (`?/rerun`: the run number from each status's `target_url` → its id via `/actions/runs` → `POST /actions/runs/<id>/rerun`; 404 on Forgejo versions without it says so) and "Merge anyway" (red, needs a second click or M twice), offered only when the PR is mergeable and nothing is pending; Forgejo itself still refuses if branch protection requires the checks. Job logs aren't in the API, hence the link out.
 
 13. Agent attribution: `Byline.svelte` renders "<agent pill> on behalf of <user>" for PR lists, Changes, the PR header, the conversation, line comments and commit lists.
    Sources (`sign.ts`): forge's own MCP signature; Claude Code's "Generated with [Claude Code]" PR footer (→ "Claude Code"); and the `Co-Authored-By: <name> <noreply@anthropic.com>` commit trailer (→ e.g. "Claude Opus 5.5").

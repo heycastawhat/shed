@@ -97,7 +97,8 @@ export async function load({ locals, params, parent }) {
 				name: s.context.replace(/^\/ /, ''),
 				state: s.status,
 				description: s.description,
-				url: s.target_url && new URL(s.target_url, FORGEJO_URL).href
+				url: s.target_url && new URL(s.target_url, FORGEJO_URL).href,
+				run: s.target_url?.match(/\/actions\/runs\/(\d+)\//)?.[1]
 			})).sort((a, b) => a.name.localeCompare(b.name))
 		},
 		openThreads: [...threads.values()].filter((t) => !t.closed && !t.resolved).length,
@@ -144,6 +145,18 @@ export const actions = {
 			delete_branch_after_merge: form.has('delete_branch'),
 			merge_when_checks_succeed: form.has('when_checks_pass')
 		});
+	},
+	// Status links carry the run's number in the repo; the rerun endpoint wants its global id.
+	rerun: async ({ locals, params, request: req }) => {
+		const wanted = new Set((await req.formData()).getAll('run').map(String));
+		const base = `/repos/${params.owner}/${params.repo}/actions`;
+		try {
+			const { workflow_runs } = await api<{ workflow_runs: { id: number; index_in_repo: number }[] }>(locals.token, `${base}/runs?limit=50`);
+			for (const r of workflow_runs.filter((r) => wanted.has(String(r.index_in_repo)))) await request(locals.token, `${base}/runs/${r.id}/rerun`, { method: 'POST' });
+		} catch (e) {
+			if (isHttpError(e)) return fail(e.status, { action: 'rerun', error: e.status === 404 ? "This Forgejo can't re-run checks from forge; use Logs → Re-run" : e.body.message });
+			throw e;
+		}
 	},
 	cancelAutoMerge: async ({ locals, params }) =>
 		post('merge', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}/merge`, undefined, 'DELETE'),
