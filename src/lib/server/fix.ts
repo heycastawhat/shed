@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { api, type Pull, type ReviewComment, type User } from './forgejo.js';
-import { hostsFor, projectFor, shell, startTask } from './t3.js';
+import { hostWithProject, startTask } from './t3.js';
 
 // Hands one review thread to a T3 agent on the PR's branch. Once its push changes the line, the thread counts as outdated.
 export async function fixWithAgent(token: string | undefined, owner: string, repo: string, index: string, form: FormData) {
@@ -27,10 +27,7 @@ export async function fixWithAgent(token: string | undefined, owner: string, rep
 	].join('\n');
 	const title = `#${pull.number} ${c.path.split('/').pop()}: ${c.body.split('\n')[0]}`;
 	const me = await api<User>(token, '/user');
-	// The first host that has the repo as a project; hosts that are down are skipped.
-	const hosts = await hostsFor(me.id);
-	const has = await Promise.all(hosts.map((h) => shell(h).then((s) => !!projectFor(s, repo), () => false)));
-	const host = hosts[has.indexOf(true)];
+	const host = await hostWithProject(me.id, repo);
 	if (!host) error(400, `No reachable T3 Code host has a project called "${repo}"`);
 	const thread = await startTask(host, repo, { text, title, runtimeMode: 'auto-accept-edits', baseRef: branch, fromOrigin: true });
 	redirect(303, `/${owner}/${repo}/agents?thread=${encodeURIComponent(thread)}`);

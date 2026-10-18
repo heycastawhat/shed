@@ -194,15 +194,17 @@ Done:
    Quirks: the pulls list has no assignee filter, so with `assignee` set the PR list pages through `/issues?type=pulls&assigned_by=` and fetches each `/pulls/N` for its branches. It filters milestones by id (`milestone=`), the issues list by `milestones=` (names or ids).
    An unknown label or milestone name makes Forgejo **ignore** the filter and return everything, so `listFilters` flags it and the list is emptied by hand; an unknown `assigned_by` user is a 404.
 
+19. `@agent` mentions (`src/lib/mention.ts` finds them, skipping code and quotes; `src/lib/server/mention.ts` acts). A comment posted *through forge* (PR conversation, PR line comment, issue) that mentions `@agent` starts a T3 task on the commenter's own first host with the repo as a project
+   (PR: on the PR branch, pushing to it; line comment: plus the diff lines above it; issue: a new `agent/issue-N-…` branch off the default one) and replies "On it" with the task link, signed as agent `agent`. Open mentions live in `forge.json` (`mentions`).
+   The request hook runs `sweepMentions()` at most every 15s: a finished task gets "Done" plus the agent's last message (cut at ~4000 chars), a failed one a "stopped" note; line-comment replies go to the same line. Mentions made in Forgejo's own UI do nothing yet (stage 3: webhook + a real Forgejo user).
+   `store.read()` caches the load *promise*: two concurrent first loads used to make two copies, and the sweep's `done` flags landed on the lost one, so it posted twice.
+
 Next, in the order discussed:
 1. Deploy to `/opt/stacks` on server. (The session cookie is now an opaque id, so that blocker is gone. Persist `FORGE_DATA` and keep `FORGE_SECRET` stable, or everyone has to log in again and all keys die.)
 2. Agent attribution, the rest: Fix with agent / T3 task work by agents without a Claude trailer (e.g. Codex) is still unmarked; a forge-side record of which PRs/commits came from which T3 task would cover it.
    Maybe also a real Forgejo label (`agent/<key name>`) so Forgejo's own UI shows it.
 
 Waiting on the owner (asked, not answered; don't start without a yes):
-- **`@t3code` mentions in PRs.** Design agreed in principle: a comment mentioning the bot starts a T3 task on the PR branch (comment + attached code + PR title as context, mostly reusing `fix.ts`) and forge replies "On it" with a link.
-  Only users with their own T3 host can trigger it, and it runs on *their* host. Order: (1) mentions in comments posted through forge; (2) a completion reply with the agent's summary (forge polls open mention-tasks, or the agent replies via forge MCP `reply_to_thread`);
-  (3) a Forgejo webhook plus a real `t3code` Forgejo user so it works from Forgejo's UI and autocompletes. Open question: name it `@t3code` or the host-neutral `@agent`.
 - **T3 Code bundled in the Docker image** alongside forge on server (`/opt/stacks/forge`), reachable over T3 Connect. Needs an OK to work on server, and a choice of Claude Code only vs Claude Code + Codex in the image.
 - Smaller offers: a "show dismissed tasks" view on the hub; hub launch redirecting to the new task's page instead of the repo tab; clearing the old test sign-ins.
 

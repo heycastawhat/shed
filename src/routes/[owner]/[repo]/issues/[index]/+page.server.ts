@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { issueActions, send, triageOptions } from '#lib/server/issue.js';
+import { mention } from '#lib/server/mention.js';
 import { unsign } from '#lib/sign.js';
 import { api, renderMarkdown, type Issue, type Label, type Milestone, type User } from '#lib/server/forgejo.js';
 
@@ -59,10 +60,10 @@ export async function load({ locals, params }) {
 }
 
 export const actions = {
-	comment: async ({ locals, params, request: req }) => {
+	comment: async ({ locals, params, request: req, url }) => {
 		const body = String((await req.formData()).get('body') ?? '').trim();
 		if (!body) return fail(400, { action: 'comment', error: 'Comment is empty' });
-		return send('comment', locals.token, `/repos/${params.owner}/${params.repo}/issues/${params.index}/comments`, 'POST', { body });
+		return (await send('comment', locals.token, `/repos/${params.owner}/${params.repo}/issues/${params.index}/comments`, 'POST', { body })) ?? mention(locals.token, url.origin, params, body);
 	},
 	// Close or reopen, posting the composer's text first if there is any.
 	state: async ({ locals, params, request: req }) => {

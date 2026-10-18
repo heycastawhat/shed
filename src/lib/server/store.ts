@@ -37,12 +37,27 @@ export type Approval = {
 };
 // A T3 Code server forge drives agents on. `token` is encrypted like the grants.
 export type T3Host = { id: string; userId: number; name: string; url: string; token: string; addedAt: string; expiresAt?: string };
+// A task started by an @agent mention, until forge has posted its result. `line` is set for a line comment, whose thread the replies go to.
+export type Mention = {
+	id: string;
+	userId: number;
+	host: string;
+	thread: string;
+	url: string;
+	repo: string;
+	number: number;
+	kind: 'pull' | 'issue';
+	line?: { path: string; line: string };
+	createdAt: string;
+	done: boolean;
+};
 // Per-user UI state, keyed by Forgejo user id: pinned repos, snoozed Home items (key -> until), and dismissed banners.
 type Data = {
 	keys: AgentKey[];
 	t3Hosts: T3Host[];
 	activity: Activity[];
 	approvals: Approval[];
+	mentions: Mention[];
 	grants: Record<number, StoredGrant>;
 	sessions: Session[];
 	pins: Record<number, string[]>;
@@ -51,23 +66,27 @@ type Data = {
 };
 
 const file = `${FORGE_DATA}/forge.json`;
-let data: Data | undefined;
+let data: Promise<Data> | undefined;
 let writing = Promise.resolve();
 
-export async function read() {
-	data ??= {
-		keys: [],
-		t3Hosts: [],
-		activity: [],
-		approvals: [],
-		pins: {},
-		snoozed: {},
-		dismissed: {},
-		grants: {},
-		sessions: [],
-		...(await readFile(file, 'utf8').then(JSON.parse, () => ({})))
-	};
-	return data!;
+// One shared load: concurrent first callers would otherwise each get their own copy, and changes to the losing one vanish.
+export function read() {
+	data ??= readFile(file, 'utf8')
+		.then(JSON.parse, () => ({}))
+		.then((saved) => ({
+			keys: [],
+			t3Hosts: [],
+			activity: [],
+			approvals: [],
+			mentions: [],
+			pins: {},
+			snoozed: {},
+			dismissed: {},
+			grants: {},
+			sessions: [],
+			...saved
+		}));
+	return data;
 }
 
 // Writes are chained and go through a temp file, so concurrent agent calls can't interleave or truncate it.
@@ -76,6 +95,7 @@ export async function update(fn: (d: Data) => void) {
 	fn(d);
 	d.activity = d.activity.slice(-500);
 	d.approvals = d.approvals.slice(-200);
+	d.mentions = d.mentions.filter((m) => !m.done).concat(d.mentions.filter((m) => m.done).slice(-50));
 	for (const [u, m] of Object.entries(d.snoozed)) d.snoozed[+u] = Object.fromEntries(Object.entries(m).filter(([, until]) => Date.parse(until) > Date.now()));
 	for (const u of Object.keys(d.dismissed)) d.dismissed[+u] = d.dismissed[+u].slice(-100);
 	writing = writing.then(async () => {

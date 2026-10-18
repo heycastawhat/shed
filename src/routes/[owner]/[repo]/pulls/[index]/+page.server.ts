@@ -3,6 +3,7 @@ import { FORGEJO_URL } from '$app/env/private';
 import { parseDiff } from '#lib/diff.js';
 import { unsign } from '#lib/sign.js';
 import { fixWithAgent } from '#lib/server/fix.js';
+import { mention } from '#lib/server/mention.js';
 import { issueActions, triageOptions } from '#lib/server/issue.js';
 import { api, isResolved, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
 
@@ -127,10 +128,10 @@ async function post(action: string, token: string | undefined, path: string, bod
 }
 
 export const actions = {
-	comment: async ({ locals, params, request: req }) => {
+	comment: async ({ locals, params, request: req, url }) => {
 		const body = String((await req.formData()).get('body') ?? '').trim();
 		if (!body) return fail(400, { action: 'comment', error: 'Comment is empty' });
-		return post('comment', locals.token, `/repos/${params.owner}/${params.repo}/issues/${params.index}/comments`, { body });
+		return (await post('comment', locals.token, `/repos/${params.owner}/${params.repo}/issues/${params.index}/comments`, { body })) ?? mention(locals.token, url.origin, params, body);
 	},
 	approve: async ({ locals, params }) =>
 		post('approve', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}/reviews`, { event: 'APPROVED', body: '' }),

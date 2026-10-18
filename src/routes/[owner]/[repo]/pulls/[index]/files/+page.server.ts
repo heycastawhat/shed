@@ -2,6 +2,7 @@ import { fail, isHttpError } from '@sveltejs/kit';
 import type { Draft } from '#lib/diff.js';
 import { loadDiff } from '#lib/server/diff.js';
 import { fixWithAgent } from '#lib/server/fix.js';
+import { mention } from '#lib/server/mention.js';
 import { unsign } from '#lib/sign.js';
 import { api, isResolved, renderMarkdown, request, setResolved, type Review, type ReviewComment } from '#lib/server/forgejo.js';
 
@@ -46,12 +47,12 @@ async function review(token: string | undefined, pr: string, event: string, body
 }
 
 export const actions = {
-	comment: async ({ locals, params, request: req }) => {
+	comment: async ({ locals, params, request: req, url }) => {
 		const form = await req.formData();
 		const body = String(form.get('body') ?? '').trim();
 		if (!body) return fail(400, { action: 'comment', error: 'Comment is empty' });
 		const draft = { path: String(form.get('path')), line: String(form.get('line')), body };
-		return review(locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}`, 'COMMENT', '', [draft], 'comment');
+		return (await review(locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}`, 'COMMENT', '', [draft], 'comment')) ?? mention(locals.token, url.origin, params, body, draft);
 	},
 	agent: async ({ locals, params, request: req }) => fixWithAgent(locals.token, params.owner, params.repo, params.index, await req.formData()),
 	resolve: async ({ locals, params, request: req }) => setResolved(locals.token, `${params.owner}/${params.repo}`, await req.formData()),

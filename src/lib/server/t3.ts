@@ -172,6 +172,13 @@ export async function config(host: Host): Promise<{ models: ModelChoice[]; web: 
 // A forge repo maps to the T3 project with the same title.
 export const projectFor = (snap: Snapshot, repo: string) => snap.projects.find((p) => p.title === repo);
 
+// The first of the user's hosts that has the repo as a project; hosts that are down are skipped.
+export async function hostWithProject(userId: number, repo: string) {
+	const hosts = await hostsFor(userId);
+	const has = await Promise.all(hosts.map((h) => shell(h).then((s) => !!projectFor(s, repo), () => false)));
+	return hosts.at(has.indexOf(true));
+}
+
 // Starts a task in a fresh T3 worktree off `baseRef`, with the model of your latest T3 thread so forge needs no model settings.
 export async function startTask(host: Host, repo: string, task: { text: string; title?: string; modelSelection?: ModelSelection; runtimeMode: string; baseRef: string; fromOrigin?: boolean }) {
 	const snap = await shell(host);

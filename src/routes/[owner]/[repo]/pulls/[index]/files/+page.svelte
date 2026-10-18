@@ -26,6 +26,7 @@
 	}
 </script>
 
+{#if form && 'posted' in form}<p class="error">{form.error}</p>{/if}
 <DiffView
 	files={data.files}
 	comments={data.comments}
