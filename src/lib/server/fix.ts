@@ -29,6 +29,6 @@ export async function fixWithAgent(token: string | undefined, owner: string, rep
 	const me = await api<User>(token, '/user');
 	const host = await hostWithProject(me.id, repo);
 	if (!host) error(400, `No reachable T3 Code host has a project called "${repo}"`);
-	const thread = await startTask(host, repo, { text, title, runtimeMode: 'auto-accept-edits', baseRef: branch, fromOrigin: true });
+	const thread = await startTask(host, `${owner}/${repo}`, { userId: me.id, pushTo: [branch], text, title, runtimeMode: 'auto-accept-edits', baseRef: branch, fromOrigin: true });
 	redirect(303, `/${owner}/${repo}/agents?thread=${encodeURIComponent(thread)}`);
 }

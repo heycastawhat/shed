@@ -17,7 +17,7 @@
 	<EditTitle title={p.title} number={p.number} can={data.repo.permissions.push || p.user.id === data.user?.id} action="{base}?/edit" />
 	<div class="meta">
 		<PrState pull={p} />
-		<span><Byline login={p.user.login} agent={data.agent} /> wants to merge <code>{p.head.label}</code> into <code>{p.base.ref}</code> · opened {ago(p.created_at)}</span>
+		<span><Byline login={p.user.login} agent={data.agent} href={data.agentHref} /> wants to merge <code>{p.head.label}</code> into <code>{p.base.ref}</code> · opened {ago(p.created_at)}</span>
 		<!-- The conversation tab has a Labels sidebar, so only the other tabs show them here. -->
 		{#if tab !== '[index]'}{#each p.labels as l (l.id)}<LabelChip label={l} />{/each}{/if}
 	</div>

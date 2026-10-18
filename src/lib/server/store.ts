@@ -51,6 +51,9 @@ export type Mention = {
 	createdAt: string;
 	done: boolean;
 };
+// A T3 task forge started, so its pushes can be credited to it. `branches` are where it was told to push; empty for a task that picks
+// its own branch, which is filled in once a PR from the thread's branch is seen. `agent` is the provider's name, e.g. "Codex".
+export type AgentTask = { repo: string; branches: string[]; host: string; thread: string; agent: string; userId: number; createdAt: string };
 // Per-user UI state, keyed by Forgejo user id: pinned repos, snoozed Home items (key -> until), and dismissed banners.
 type Data = {
 	keys: AgentKey[];
@@ -58,6 +61,7 @@ type Data = {
 	activity: Activity[];
 	approvals: Approval[];
 	mentions: Mention[];
+	tasks: AgentTask[];
 	grants: Record<number, StoredGrant>;
 	sessions: Session[];
 	pins: Record<number, string[]>;
@@ -79,6 +83,7 @@ export function read() {
 			activity: [],
 			approvals: [],
 			mentions: [],
+			tasks: [],
 			pins: {},
 			snoozed: {},
 			dismissed: {},
@@ -95,6 +100,7 @@ export async function update(fn: (d: Data) => void) {
 	fn(d);
 	d.activity = d.activity.slice(-500);
 	d.approvals = d.approvals.slice(-200);
+	d.tasks = d.tasks.slice(-500);
 	d.mentions = d.mentions.filter((m) => !m.done).concat(d.mentions.filter((m) => m.done).slice(-50));
 	for (const [u, m] of Object.entries(d.snoozed)) d.snoozed[+u] = Object.fromEntries(Object.entries(m).filter(([, until]) => Date.parse(until) > Date.now()));
 	for (const u of Object.keys(d.dismissed)) d.dismissed[+u] = d.dismissed[+u].slice(-100);

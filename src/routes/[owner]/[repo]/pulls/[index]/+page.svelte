@@ -49,7 +49,7 @@
 <ol class="timeline">
 	<li>
 		<img class="avatar" src={data.pull.user.avatar_url} alt="" />
-		<Description login={data.pull.user.login} agent={data.agent} created={data.pull.created_at} html={data.body} body={data.pull.body} can={data.repo.permissions.push || own} />
+		<Description login={data.pull.user.login} agent={data.agent} agentHref={data.agentHref} created={data.pull.created_at} html={data.body} body={data.pull.body} can={data.repo.permissions.push || own} />
 	</li>
 	{#each data.timeline as item (item.id)}
 		<li>

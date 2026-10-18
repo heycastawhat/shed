@@ -44,10 +44,10 @@ export async function mention(token: string | undefined, origin: string, where: 
 		const host = await hostWithProject(me.id, where.repo);
 		if (!host) return { action: 'comment', error: `@agent needs one of your T3 Code hosts (Settings → Agents) to have a project called "${where.repo}"`, posted: true };
 		const ask = withoutMention(body);
-		let text: string, baseRef: string;
+		let text: string, baseRef: string, pushTo: string;
 		if (issue.pull_request) {
 			const pull = await api<Pull>(token, `/repos/${repo}/pulls/${where.index}`);
-			baseRef = pull.head.ref;
+			baseRef = pushTo = pull.head.ref;
 			const code = line && (await hunk(token, repo, pull.number, line));
 			text = [
 				`${me.login} asked you on pull request #${pull.number} ("${pull.title}") in ${repo}:`,
@@ -63,7 +63,7 @@ export async function mention(token: string | undefined, origin: string, where: 
 			].join('\n');
 		} else {
 			baseRef = (await api<Repo>(token, `/repos/${repo}`)).default_branch;
-			const branch = `agent/issue-${issue.number}-${slug(issue.title)}`;
+			const branch = (pushTo = `agent/issue-${issue.number}-${slug(issue.title)}`);
 			text = [
 				`${me.login} asked you on issue #${issue.number} ("${issue.title}") in ${repo}:`,
 				'',
@@ -79,7 +79,7 @@ export async function mention(token: string | undefined, origin: string, where: 
 				'End with a short summary of what you did; it is posted back to the issue.'
 			].join('\n');
 		}
-		const thread = await startTask(host, where.repo, { text, title: `#${issue.number} ${ask.split('\n')[0]}`, runtimeMode: 'auto-accept-edits', baseRef, fromOrigin: true });
+		const thread = await startTask(host, repo, { userId: me.id, pushTo: [pushTo], text, title: `#${issue.number} ${ask.split('\n')[0]}`, runtimeMode: 'auto-accept-edits', baseRef, fromOrigin: true });
 		const url = `${origin}/agents/${encodeURIComponent(host.id)}/${encodeURIComponent(thread)}`;
 		const m: Mention = {
 			id: crypto.randomUUID(),

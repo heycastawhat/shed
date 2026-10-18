@@ -7,7 +7,7 @@
 	import Byline from './Byline.svelte';
 	import Icon from './Icon.svelte';
 
-	let { login, agent, created, html, body, can }: { login: string; agent?: string; created: string; html: string; body: string; can: boolean } = $props();
+	let { login, agent, agentHref, created, html, body, can }: { login: string; agent?: string; agentHref?: string; created: string; html: string; body: string; can: boolean } = $props();
 	let editing = $state(false);
 	let busy = $state(false);
 	let draft = $state('');
@@ -16,7 +16,7 @@
 
 <div class="card">
 	<div class="who">
-		<Byline bold {login} {agent} /> opened this {ago(created)}
+		<Byline bold {login} {agent} href={agentHref} /> opened this {ago(created)}
 		{#if can && !editing}
 			<button
 				class="edit"

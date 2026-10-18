@@ -180,23 +180,47 @@ export async function hostWithProject(userId: number, repo: string) {
 }
 
 // Starts a task in a fresh T3 worktree off `baseRef`, with the model of your latest T3 thread so forge needs no model settings.
-export async function startTask(host: Host, repo: string, task: { text: string; title?: string; modelSelection?: ModelSelection; runtimeMode: string; baseRef: string; fromOrigin?: boolean }) {
-	const snap = await shell(host);
-	const project = projectFor(snap, repo);
-	if (!project) error(400, `${host.name} has no T3 project called "${repo}"`);
+// `repo` is the forge repo (`owner/name`); its T3 project has the name as its title. `pushTo` are the branches the task is told to push to.
+export async function startTask(
+	host: Host,
+	repo: string,
+	task: { userId: number; pushTo?: string[]; text: string; title?: string; modelSelection?: ModelSelection; runtimeMode: string; baseRef: string; fromOrigin?: boolean }
+) {
+	const name = repo.split('/')[1];
+	const [snap, { providers }] = await Promise.all([shell(host), rpc<{ providers: Provider[] }>(host, 'server.getConfig', {})]);
+	const project = projectFor(snap, name);
+	if (!project) error(400, `${host.name} has no T3 project called "${name}"`);
 	const latest = [...snap.threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
 	if (!latest && !task.modelSelection) error(400, 'Start one thread in T3 Code first, so forge knows which model to use');
+	const modelSelection = task.modelSelection ?? latest.modelSelection;
 	const { threadId } = await rpc<{ threadId: string }>(host, 'orchestration.launchThread', {
 		commandId: crypto.randomUUID(),
 		projectId: project.id,
 		title: (task.title ?? task.text.split('\n')[0]).replace(/^(.{60}\S*).+$/, '$1…'),
-		modelSelection: task.modelSelection ?? latest.modelSelection,
+		modelSelection,
 		runtimeMode: task.runtimeMode,
 		interactionMode: 'default',
 		workspaceStrategy: { type: 'worktree', baseRef: task.baseRef, startFromOrigin: task.fromOrigin },
 		initialMessage: { text: task.text, attachments: [] }
 	});
+	const agent = providers.find((p) => p.instanceId === modelSelection.instanceId)?.displayName ?? 'T3 Code';
+	await update((d) => d.tasks.push({ repo, branches: task.pushTo ?? [], host: host.id, thread: threadId, agent, userId: task.userId, createdAt: new Date().toISOString() }));
 	return threadId;
+}
+
+// The forge-started task that pushed to `branch`, for crediting a PR opened at `openedAt`. A task that picked its own branch
+// matches if its thread is on that branch now; that's only checked for tasks started in the 3 days before the PR, and remembered.
+export async function taskOn(repo: string, branch: string, openedAt: string) {
+	const tasks = (await read()).tasks.filter((t) => t.repo === repo);
+	const known = tasks.findLast((t) => t.branches.includes(branch));
+	if (known) return known;
+	for (const t of tasks.filter((t) => !t.branches.length && t.createdAt < openedAt && Date.parse(openedAt) - Date.parse(t.createdAt) < 3 * 86400_000).reverse()) {
+		const host = (await hostsFor(t.userId)).find((h) => h.id === t.host);
+		const snap = host && (await shell(host).catch(() => null));
+		if (snap?.threads.find((x) => x.id === t.thread)?.branch !== branch) continue;
+		await update(() => t.branches.push(branch));
+		return t;
+	}
 }
 
 export const dispatch = (host: Host, command: Record<string, unknown>) =>
@@ -222,7 +246,7 @@ export async function hostFor(userId: number, id: unknown) {
 	return host;
 }
 
-// Starts the task described by the NewTask form, in `repo` (the T3 project title).
+// Starts the task described by the NewTask form, in `repo` (`owner/name`).
 export async function launchFromForm(userId: number, repo: string, form: FormData) {
 	const text = String(form.get('text') ?? '').trim();
 	if (!text) error(400, 'Describe the task');
@@ -230,6 +254,7 @@ export async function launchFromForm(userId: number, repo: string, form: FormDat
 	const [instanceId, model] = String(form.get('model')).split('/');
 	const reasoning = form.get('reasoning');
 	const thread = await startTask(host, repo, {
+		userId,
 		text,
 		runtimeMode: String(form.get('mode')),
 		baseRef: String(form.get('base')),

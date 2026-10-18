@@ -85,7 +85,7 @@ export const actions = {
 		const repo = String(form.get('repo'));
 		let to: string;
 		try {
-			to = await launchFromForm((await api<User>(locals.token, '/user')).id, repo.split('/')[1], form);
+			to = await launchFromForm((await api<User>(locals.token, '/user')).id, repo, form);
 		} catch (e) {
 			if (isHttpError(e)) return fail(e.status, { launchError: e.body.message });
 			throw e;

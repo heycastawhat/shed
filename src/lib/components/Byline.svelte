@@ -1,5 +1,5 @@
 <script lang="ts">
-	let { login, agent, bold = false }: { login: string; agent?: string; bold?: boolean } = $props();
+	let { login, agent, href, bold = false }: { login: string; agent?: string; href?: string; bold?: boolean } = $props();
 </script>
 
-{#if agent}<span class="agent" title="An agent acting for @{login} through forge">{agent}</span> on behalf of{' '}{/if}{#if bold}<strong>{login}</strong>{:else}{login}{/if}
+{#if agent}<svelte:element this={href ? 'a' : 'span'} class="agent" {href} title="An agent acting for @{login} through forge">{agent}</svelte:element> on behalf of{' '}{/if}{#if bold}<strong>{login}</strong>{:else}{login}{/if}
