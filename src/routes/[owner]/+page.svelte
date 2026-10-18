@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Byline from '#lib/components/Byline.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import { ago } from '#lib/time.js';
 
@@ -140,7 +141,7 @@
 							<span class="dot"><Icon name={icon} size={14} /></span>
 							<div>
 								<div>
-									{#if data.members}<a class="who" href="/{a.who}">{a.who}</a>{/if}
+									{#if a.agent}<Byline bold login={a.who} agent={a.agent} />{:else if data.members}<a class="who" href="/{a.who}">{a.who}</a>{/if}
 									{verb}
 									{#if a.number}
 										<a href="/{a.repo}/{isPull(a.op) ? 'pulls' : 'issues'}/{a.number}">{a.repo}#{a.number}</a>
@@ -151,7 +152,7 @@
 									{/if}
 									<span class="muted when">{ago(a.created)}</span>
 								</div>
-								{#if a.title}<div class="detail" class:quote={a.op.startsWith('comment')}>{#if a.agent}<span class="agent">{a.agent}</span> {/if}{a.title}</div>{/if}
+								{#if a.title}<div class="detail" class:quote={a.op.startsWith('comment')}>{a.title}</div>{/if}
 								{#each a.commits as c (c.sha)}
 									<div class="detail commit"><a href="/{a.repo}/commit/{c.sha}"><code>{c.sha.slice(0, 7)}</code></a> {c.message}</div>
 								{/each}

@@ -10,6 +10,7 @@ type Feed = {
 	repo: { full_name: string };
 	ref_name: string;
 	content: string;
+	comment?: { body: string } | null;
 	created: string;
 };
 
@@ -23,7 +24,8 @@ function event(a: Feed) {
 	} catch {
 		[number, title] = a.content.split('|');
 	}
-	const comment = a.op_type.startsWith('comment') && title !== undefined ? unsign(title) : undefined;
+	// `content` is cut short, so the signature at the end of a comment is only in the full `comment` body.
+	const comment = a.op_type.startsWith('comment') && title !== undefined ? unsign(a.comment?.body ?? title) : undefined;
 	return {
 		id: a.id,
 		// A push with no commits is a new branch.
