@@ -22,6 +22,23 @@
 		return [AGENT, ...all].filter((p) => p.login.toLowerCase().startsWith(q) || p.full_name.toLowerCase().includes(q)).slice(0, 8);
 	});
 
+	// Where character `i` sits on screen. A textarea doesn't say, so lay the same text out in an invisible copy with the same styles and measure a marker.
+	function caret(el: HTMLTextAreaElement, i: number) {
+		const style = getComputedStyle(el);
+		const copy = document.createElement('div');
+		for (const k of ['font', 'letterSpacing', 'lineHeight', 'padding', 'border', 'boxSizing', 'tabSize', 'textTransform', 'wordSpacing'] as const) copy.style[k] = style[k];
+		Object.assign(copy.style, { position: 'fixed', visibility: 'hidden', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', width: `${el.offsetWidth}px`, top: '0', left: '0' });
+		copy.textContent = el.value.slice(0, i);
+		const mark = copy.appendChild(document.createElement('span'));
+		mark.textContent = '@';
+		document.body.append(copy);
+		const r = el.getBoundingClientRect();
+		const m = mark.getBoundingClientRect();
+		copy.remove();
+		const top = r.top + m.top - el.scrollTop;
+		return { left: r.left + m.left - el.scrollLeft, top, bottom: top + m.height };
+	}
+
 	// The `@word` being typed right before the caret, if any; same boundary rule as the server's @agent detection.
 	function update() {
 		if (!input) return;
@@ -29,10 +46,25 @@
 		query = m && input.selectionStart === input.selectionEnd ? m[1] : null;
 		if (query === null) return;
 		active = 0;
-		const r = input.getBoundingClientRect();
-		const up = innerHeight - r.bottom < 260;
-		pos = { left: r.left, top: up ? innerHeight - r.top + 4 : r.bottom + 4, up };
-		people(`${page.params.owner}/${page.params.repo}`).then((p) => (all = p));
+		place();
+		people(`${page.params.owner}/${page.params.repo}`).then((p) => {
+			all = p;
+			place();
+		});
+	}
+
+	// Open below the @; near the bottom of the window, scroll to make room, and only open upwards if the page can't scroll.
+	function place() {
+		if (!input || query === null) return;
+		const i = input.selectionStart - query.length - 1;
+		const need = matches.length * 34 + 16;
+		let at = caret(input, i);
+		if (innerHeight - at.bottom < need) {
+			scrollBy(0, need - (innerHeight - at.bottom));
+			at = caret(input, i);
+		}
+		const up = innerHeight - at.bottom < need;
+		pos = { left: at.left, top: up ? innerHeight - at.top + 2 : at.bottom + 2, up };
 	}
 
 	function pick(p: Person) {
