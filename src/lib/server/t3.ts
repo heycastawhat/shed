@@ -211,10 +211,11 @@ export async function startTask(
 // The forge-started task that pushed to `branch`, for crediting a PR opened at `openedAt`. A task that picked its own branch
 // matches if its thread is on that branch now; that's only checked for tasks started in the 3 days before the PR, and remembered.
 export async function taskOn(repo: string, branch: string, openedAt: string) {
-	const tasks = (await read()).tasks.filter((t) => t.repo === repo);
+	// Only tasks from before the PR opened: one started later (Fix with agent, @agent) worked on someone else's PR.
+	const tasks = (await read()).tasks.filter((t) => t.repo === repo && Date.parse(t.createdAt) < Date.parse(openedAt));
 	const known = tasks.findLast((t) => t.branches.includes(branch));
 	if (known) return known;
-	for (const t of tasks.filter((t) => !t.branches.length && t.createdAt < openedAt && Date.parse(openedAt) - Date.parse(t.createdAt) < 3 * 86400_000).reverse()) {
+	for (const t of tasks.filter((t) => !t.branches.length && Date.parse(openedAt) - Date.parse(t.createdAt) < 3 * 86400_000).reverse()) {
 		const host = (await hostsFor(t.userId)).find((h) => h.id === t.host);
 		const snap = host && (await shell(host).catch(() => null));
 		if (snap?.threads.find((x) => x.id === t.thread)?.branch !== branch) continue;

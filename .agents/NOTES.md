@@ -202,7 +202,7 @@ Done:
 
 20. T3 task attribution: `startTask` (every forge-started task: Fix with agent, `@agent`, NewTask) records `{ repo, branches, host, thread, agent, userId }` in `forge.json` `tasks` (last 500); `agent` is the provider's display name ("Claude", "Codex").
    `branches` is where the task was told to push (PR head, or `agent/issue-N-…`); for a NewTask it's empty, and `taskOn()` fills it in when a PR shows up from the thread's current branch (T3's `t3/<slug>`, checked only for tasks started in the 3 days before the PR).
-   The PR layout uses it only when no signature/footer/trailer names an agent; the pill links to `/agents/<host>/<thread>` (`Byline`'s `href`). So a Fix or `@agent` on a human's PR also marks the PR as the agent's. PRs #38 and #39 are closed throwaways from these tests.
+   The PR layout uses it only when no signature/footer/trailer names an agent; the pill links to `/agents/<host>/<thread>` (`Byline`'s `href`). Only tasks started before the PR opened count, so a Fix or `@agent` on a human's PR doesn't credit the PR to the agent. PRs #38 and #39 are closed throwaways from these tests.
 
 Next, in the order discussed:
 1. Deploy to `/opt/stacks` on server. (The session cookie is now an opaque id, so that blocker is gone. Persist `FORGE_DATA` and keep `FORGE_SECRET` stable, or everyone has to log in again and all keys die.)
