@@ -166,7 +166,7 @@ Uncommitted work, by workstream:
    - `tools.ts` validates the MCP `repo`/number args.
    Still to do: cookie flags behind TLS, auth checks on every action and endpoint, `{@html}` sinks, open redirects, T3 host SSRF, mention authz, `+error.svelte`, `/healthz` plus Dockerfile `HEALTHCHECK`, env validation, refusing to start on a corrupt `forge.json`, and a "Security" section in NOTES.
 3. **Mobile layout.** Done so far:
-   - `+layout.svelte`: a phone header plus an off-canvas drawer under 700px (uses an icon `menu` that may not be in `Icon.svelte` yet; check).
+   - `+layout.svelte`: a phone header plus an off-canvas drawer under 700px.
    - `DiffView`: split view falls back to unified on phones.
    - Narrow rules for `Tree`, `branches`, the issue and PR pages, and the `ListFilters` wrap.
    Still to do: screenshot every page at 390px and 800px, then fix the rest (merge card, Triage stacking, palette, mention picker).
