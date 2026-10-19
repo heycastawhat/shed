@@ -163,4 +163,17 @@
 		color: var(--del-fg);
 		border-color: var(--border) !important;
 	}
+	@media (max-width: 700px) {
+		li {
+			grid-template-columns: minmax(0, 1fr) auto auto;
+			gap: 0.3rem 0.75rem;
+		}
+		.name,
+		.last {
+			grid-column: 1 / -1;
+		}
+		.ab {
+			justify-content: flex-start;
+		}
+	}
 </style>

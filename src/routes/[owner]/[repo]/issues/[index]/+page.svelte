@@ -127,9 +127,6 @@
 		.layout {
 			grid-template-columns: minmax(0, 1fr);
 		}
-		aside {
-			order: -1;
-		}
 	}
 	.timeline {
 		position: relative;
@@ -265,5 +262,15 @@
 	.error {
 		color: var(--del-fg);
 		font-size: 0.9rem;
+	}
+	@media (max-width: 700px) {
+		.who,
+		.compose-bar {
+			flex-wrap: wrap;
+			row-gap: 0.4rem;
+		}
+		.hint {
+			display: none;
+		}
 	}
 </style>

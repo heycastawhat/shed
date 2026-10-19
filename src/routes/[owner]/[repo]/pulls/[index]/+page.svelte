@@ -244,9 +244,6 @@
 		.layout {
 			grid-template-columns: minmax(0, 1fr);
 		}
-		aside {
-			order: -1;
-		}
 	}
 	.by {
 		padding: 0.5rem 0.75rem 0;
@@ -536,5 +533,17 @@
 	.markdown {
 		padding: 1rem;
 		margin: 0;
+	}
+	@media (max-width: 700px) {
+		.who,
+		.bar,
+		.checks-head,
+		.compose-bar {
+			flex-wrap: wrap;
+			row-gap: 0.4rem;
+		}
+		.hint {
+			display: none;
+		}
 	}
 </style>

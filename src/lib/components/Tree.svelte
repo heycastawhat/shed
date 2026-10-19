@@ -122,4 +122,18 @@
 	.markdown {
 		padding: 1.5rem 2rem;
 	}
+	@media (max-width: 700px) {
+		li {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.msg {
+			display: none;
+		}
+		a {
+			overflow-wrap: anywhere;
+		}
+		.markdown {
+			padding: 1rem;
+		}
+	}
 </style>

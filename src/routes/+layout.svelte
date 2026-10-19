@@ -18,13 +18,20 @@
 	let menu = $state<HTMLDetailsElement>();
 	let pinMenu = $state<HTMLDetailsElement>();
 	let mod = $state('Ctrl');
+	let drawer = $state(false);
+	let narrow = $state(false);
+	$effect(() => {
+		const m = matchMedia('(max-width: 700px)');
+		narrow = m.matches;
+		m.onchange = () => (narrow = m.matches);
+	});
 	$effect(() => {
 		mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 	});
 
 	const path = $derived(page.url.pathname);
-	const NOT_REPOS = new Set(['', 'changes', 'settings', 'login', 'logout', 'auth', 'mcp', 'pin', 'prefs', 'palette.json', 'repos', 'new', 'agents']);
-	const rail = $derived(prefs.nav === 'sidebar' && prefs.collapsed);
+	const NOT_REPOS = new Set(['', 'changes', 'settings', 'login', 'logout', 'auth', 'mcp', 'pin', 'prefs', 'palette.json', 'repos', 'new', 'agents', 'explore', 'notifications', 'search', 'orgs', 'healthz']);
+	const rail = $derived(prefs.nav === 'sidebar' && prefs.collapsed && !narrow);
 
 	const pinned = $derived(
 		data.pins.map((name, i) => {
@@ -43,6 +50,7 @@
 	// Close menus whenever we navigate.
 	$effect(() => {
 		path;
+		drawer = false;
 		if (menu) menu.open = false;
 		if (pinMenu) pinMenu.open = false;
 	});
@@ -60,6 +68,7 @@
 		}
 		if (e.key === 'Escape') {
 			if (menu?.open) menu.open = false;
+			drawer = false;
 			return;
 		}
 		if (e.ctrlKey || e.metaKey || e.altKey || prefs.palette || (e.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) return;
@@ -117,9 +126,16 @@
 	</button>
 {/snippet}
 
-<div class="shell" class:side={data.user && prefs.nav === 'sidebar'} class:rail>
-	{#if data.user && prefs.nav === 'sidebar'}
-		<aside aria-label="Main">
+<div class="shell" class:user={data.user} class:side={data.user && prefs.nav === 'sidebar'} class:rail>
+	{#if data.user}
+		<header class="mobile">
+			<button class="icon" onclick={() => (drawer = true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
+			<a class="brand" href="/">forge</a>
+			<button class="icon" onclick={() => (prefs.palette = true)} aria-label="Search and commands"><Icon name="search" size={20} /></button>
+			<a class="icon" href="/new" aria-label="New repository"><Icon name="plus" size={20} /></a>
+		</header>
+		{#if drawer}<div class="scrim" role="presentation" onclick={() => (drawer = false)}></div>{/if}
+		<aside aria-label="Main" class:open={drawer} class:extra={prefs.nav === 'bar'}>
 			<a class="brand" href="/">forge</a>
 			{@render search()}
 			<nav>
@@ -162,7 +178,8 @@
 				</button>
 			</div>
 		</aside>
-	{:else}
+	{/if}
+	{#if !data.user || prefs.nav === 'bar'}
 		<header class="topbar">
 			<div class="bar">
 				<a class="brand" href="/">forge</a>
@@ -518,7 +535,7 @@
 		right: 0;
 		top: calc(100% + 0.35rem);
 	}
-	.side .menu .panel {
+	aside .menu .panel {
 		right: auto;
 		left: 0;
 		top: auto;
@@ -559,6 +576,77 @@
 	}
 	.side main {
 		margin: 0 auto;
+	}
+
+	/* Phones: either nav mode becomes a slim bar with the sidebar as an off-canvas drawer. */
+	.mobile,
+	aside.extra {
+		display: none;
+	}
+	@media (max-width: 700px) {
+		.shell.side {
+			display: block;
+		}
+		.user .topbar {
+			display: none;
+		}
+		.mobile {
+			display: flex;
+			align-items: center;
+			gap: 0.25rem;
+			padding: 0.4rem 0.5rem;
+			border-bottom: 1px solid var(--border);
+		}
+		.mobile .brand {
+			flex: 1;
+			padding: 0 0.25rem;
+		}
+		.icon {
+			display: grid;
+			place-items: center;
+			width: 2.5rem;
+			height: 2.5rem;
+			padding: 0;
+			border: 0;
+			background: none;
+			color: var(--fg);
+		}
+		aside,
+		aside.extra {
+			display: flex;
+			position: fixed;
+			z-index: 30;
+			left: 0;
+			top: 0;
+			width: min(17rem, 85vw);
+			height: 100dvh;
+			transform: translateX(-100%);
+			visibility: hidden;
+			transition:
+				transform 0.2s,
+				visibility 0.2s;
+		}
+		aside.open {
+			transform: none;
+			visibility: visible;
+			box-shadow: 0 0 40px rgb(0 0 0 / 0.3);
+		}
+		.scrim {
+			position: fixed;
+			inset: 0;
+			z-index: 29;
+			background: rgb(0 0 0 / 0.35);
+		}
+		aside nav a {
+			padding-block: 0.6rem;
+		}
+		.chord,
+		.collapse {
+			display: none;
+		}
+		main {
+			padding: 1rem;
+		}
 	}
 
 </style>

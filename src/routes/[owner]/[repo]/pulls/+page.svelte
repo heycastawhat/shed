@@ -55,6 +55,7 @@
 <style>
 	.top {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.5rem;
 		margin-bottom: 0.75rem;

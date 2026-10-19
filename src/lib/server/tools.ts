@@ -244,6 +244,9 @@ export async function call(ctx: Ctx, name: string, args: Args) {
 	if (!usable(ctx.key, name)) return result(true, `This key isn't allowed to ${name.replaceAll('_', ' ')}. ${ctx.key.login} can turn it on in forge under Settings → Agents.`);
 	const missing = Object.entries(tool.params).filter(([k, p]) => p[2] && (args[k] === undefined || args[k] === '')).map(([k]) => k);
 	if (missing.length) return result(true, `Missing required argument${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`);
+	if (tool.params.repo && !/^[\w.-]+\/[\w.-]+$/.test(String(args.repo))) return result(true, 'repo must be owner/name');
+	const bad = Object.entries(tool.params).find(([k, [type]]) => type === 'number' && args[k] !== undefined && !/^\d+$/.test(String(args[k])));
+	if (bad) return result(true, `${bad[0]} must be a whole number`);
 	if (tool.params.repo && !allows(ctx.key, String(args.repo))) return result(true, `This key can't access ${args.repo}`);
 	try {
 		const verdict = tool.write ? await gate(ctx, name, args) : undefined;

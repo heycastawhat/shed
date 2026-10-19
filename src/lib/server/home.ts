@@ -76,7 +76,7 @@ const humanize = (branch: string) => {
 };
 
 // One commit: its subject is the title. Several: the branch name as the title and the subjects as a list.
-function draft(c: Compare, branch: string) {
+export function draft(c: Compare, branch: string) {
 	const subjects = c.commits.map((x) => x.commit.message.split('\n')[0]);
 	return c.total_commits === 1 ? { title: subjects[0], body: '' } : { title: humanize(branch), body: subjects.map((s) => `- ${s}`).join('\n') };
 }

@@ -150,9 +150,9 @@ One image runs forge and T3 Code. It was never built (there's no Docker here); e
 The owner's goal: **production-ready by Monday 2026-10-19**, and **as close to feature parity with Forgejo's own web UI as possible**.
 Deploy is **prepare-only**: target `forge.example.com` on server (`/opt/stacks/forge`, docker compose) against git.example.com (Forgejo **15.0.5**). Don't touch server or register anything on git.example.com until the owner says deploy.
 
-Last pushed commit: `389e0c4`. Nine background agents were started on 2026-10-18 and **all stopped on a usage limit**. Their partial work is **uncommitted in the working tree**.
-`bun run check` currently fails with 4 errors, all in unfinished files: `src/lib/server/code.ts` (`Entry.sha`), and `src/routes/[owner]/[repo]/settings/+layout.*` (`repo` missing from parent data).
-Don't `git checkout`/`stash` the tree blindly: finish or fix each piece, then commit it with explicit paths. Every workstream below is restartable from its brief.
+Last pushed commit: `389e0c4`. Nine background agents were started on 2026-10-18 and **all stopped on a usage limit**. Their partial work is in the WIP commit after `d7ecb9b`.
+All of it was committed as work in progress in one commit (`bun run check` passes); the pieces are unfinished, not broken.
+Every workstream below is restartable from its brief.
 
 Uncommitted work, by workstream:
 1. **Forgejo 15 compatibility** (most important, because prod is 15). Done so far:

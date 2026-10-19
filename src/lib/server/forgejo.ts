@@ -2,10 +2,12 @@ import { error } from '@sveltejs/kit';
 import { FORGEJO_URL } from '$app/env/private';
 
 export async function request(token: string | undefined, path: string, init: RequestInit = {}) {
+	// Paths are built from URL params and agent arguments; fetch would resolve a `..` segment and escape the repo (and an agent key's repo scope).
+	if (path.split('?')[0].split(/[/\\]/).some((s) => /^(\.|%2e){1,2}$/i.test(s))) error(400, 'Invalid path');
 	const res = await fetch(`${FORGEJO_URL}/api/v1${path}`, {
 		...init,
 		headers: { ...(token && { authorization: `Bearer ${token}` }), ...init.headers }
-	});
+	}).catch(() => error(502, "Couldn't reach Forgejo"));
 	if (!res.ok) error(res.status, (await res.json().catch(() => null))?.message || `Forgejo returned ${res.status} ${res.statusText}`);
 	return res;
 }
@@ -92,6 +94,7 @@ export type Branch = { name: string };
 export type Entry = {
 	name: string;
 	path: string;
+	sha?: string;
 	type: 'file' | 'dir' | 'symlink' | 'submodule';
 	size: number;
 	last_commit_sha?: string;

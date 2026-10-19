@@ -58,12 +58,15 @@
 <style>
 	.top {
 		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 		align-items: center;
 		justify-content: space-between;
 		margin-bottom: 0.75rem;
 	}
 	.left {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.5rem;
 	}

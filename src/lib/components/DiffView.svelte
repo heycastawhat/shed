@@ -74,7 +74,9 @@
 	// Comments on files that a later push dropped from the diff entirely.
 	const gone = $derived(Object.entries(comments ?? {}).filter(([k]) => !files.some((f) => k.startsWith(`${f.to}\0`))));
 
-	let split = $state(false);
+	let wantSplit = $state(false);
+	let narrow = $state(false);
+	const split = $derived(wantSplit && !narrow);
 	let collapsed = $state<Record<number, boolean>>({});
 	const additions = $derived(files.reduce((n, f) => n + f.additions, 0));
 	const deletions = $derived(files.reduce((n, f) => n + f.deletions, 0));
@@ -103,14 +105,17 @@
 
 	onMount(() => {
 		try {
-			split = localStorage.getItem('diff-view') === 'split';
+			wantSplit = localStorage.getItem('diff-view') === 'split';
 			if (viewedKey) viewed = JSON.parse(localStorage.getItem(viewedKey) ?? '{}');
 		} catch {}
 		files.forEach((_, i) => isViewed(i) && (collapsed[i] = true));
+		const m = matchMedia('(max-width: 700px)');
+		narrow = m.matches;
+		m.onchange = () => (narrow = m.matches);
 	});
 
 	function setSplit(value: boolean) {
-		split = value;
+		wantSplit = value;
 		try {
 			localStorage.setItem('diff-view', value ? 'split' : 'unified');
 		} catch {}
@@ -748,5 +753,40 @@
 	}
 	:global(:root[data-theme='dark']) td.code :global(span) {
 		color: var(--shiki-dark);
+	}
+	@media (max-width: 700px) {
+		.toggle {
+			display: none;
+		}
+		td {
+			padding: 0 0.35rem;
+		}
+		td.num {
+			min-width: 1.75rem;
+		}
+		.file-head button {
+			min-width: 0;
+			padding-inline: 0.75rem;
+		}
+		.file-head .path {
+			min-width: 0;
+			overflow-wrap: anywhere;
+		}
+		.viewed {
+			padding: 0 0.75rem 0 0;
+		}
+		.thread-box {
+			position: sticky;
+			left: 0.5rem;
+			margin: 0.5rem;
+			max-width: calc(100vw - 3rem - 2px);
+		}
+	}
+	@media (hover: none) {
+		.plus {
+			opacity: 0.6;
+			width: 1.4rem;
+			height: 1.4rem;
+		}
 	}
 </style>
