@@ -145,6 +145,47 @@ One image runs forge and T3 Code. It was never built (there's no Docker here); e
   `.agents/tmp` is scratch (one-off playwright scripts like `chat.ts`, `question.ts`, `hublaunch.ts`, `dismiss.ts`, `paltheme.ts`); none of it is load-bearing.
 - Editing Svelte with Python substring replaces: match on unique text, not indentation plus `{/each}`; one cut the wrong block.
 
+## Handoff (2026-10-19, read this first)
+
+The owner's goal: **production-ready by Monday 2026-10-19**, and **as close to feature parity with Forgejo's own web UI as possible**.
+Deploy is **prepare-only**: target `forge.example.com` on server (`/opt/stacks/forge`, docker compose) against git.example.com (Forgejo **15.0.5**). Don't touch server or register anything on git.example.com until the owner says deploy.
+
+Last pushed commit: `389e0c4`. Nine background agents were started on 2026-10-18 and **all stopped on a usage limit**. Their partial work is **uncommitted in the working tree**.
+`bun run check` currently fails with 4 errors, all in unfinished files: `src/lib/server/code.ts` (`Entry.sha`), and `src/routes/[owner]/[repo]/settings/+layout.*` (`repo` missing from parent data).
+Don't `git checkout`/`stash` the tree blindly: finish or fix each piece, then commit it with explicit paths. Every workstream below is restartable from its brief.
+
+Uncommitted work, by workstream:
+1. **Forgejo 15 compatibility** (most important, because prod is 15). Done so far:
+   - `dev/forgejo15/` (gitignored): Forgejo 15.0.5 on :3001 with `seed.sh` (test data), `run-forge.sh` (a second forge dev server on :5174 from an rsynced copy in `app/`, because two dev servers in one checkout share `.svelte-kit/generated` env), `.env.5174`, and `forge-data/`.
+   - `.agents/scripts/crawl.e2e.ts` visits every route type and reports non-2xx, page errors and console errors (`BASE=http://localhost:5174 JAR=app15.jar bun ../scripts/crawl.e2e.ts`, run from `.agents/tmp`).
+   - `.agents/scripts/writes.sh` is a write-path script, started but unfinished.
+   - `.agents/scripts/login.sh` was changed to handle the second instance; check the diff.
+   Next: finish the write-path checks (comment, line comment, approve, triage, edit, close/reopen, merge, auto-merge, delete branch, new issue/PR) on 15, fix incompatibilities (feature-detect and hide what 15 lacks), and add a "Forgejo 15 vs 17" gotchas list.
+2. **Security pass.** Done so far:
+   - `request()` in `forgejo.ts` rejects `.`/`..` path segments, and maps a network failure to a 502.
+   - `tools.ts` validates the MCP `repo`/number args.
+   Still to do: cookie flags behind TLS, auth checks on every action and endpoint, `{@html}` sinks, open redirects, T3 host SSRF, mention authz, `+error.svelte`, `/healthz` plus Dockerfile `HEALTHCHECK`, env validation, refusing to start on a corrupt `forge.json`, and a "Security" section in NOTES.
+3. **Mobile layout.** Done so far:
+   - `+layout.svelte`: a phone header plus an off-canvas drawer under 700px (uses an icon `menu` that may not be in `Icon.svelte` yet; check).
+   - `DiffView`: split view falls back to unified on phones.
+   - Narrow rules for `Tree`, `branches`, the issue and PR pages, and the `ListFilters` wrap.
+   Still to do: screenshot every page at 390px and 800px, then fix the rest (merge card, Triage stacking, palette, mention picker).
+4. **Parity: code and repo header.** `src/lib/server/code.ts` is started and has a type error. Not started: Star/Watch/Fork, clone/download menu, web edit/new/upload/delete/rename, blame, file history, Go to file (`t`), permalinks, line anchors.
+5. **Parity: PRs and comments.**
+   - Started: `src/routes/[owner]/[repo]/compare/[...spec]/+page.server.ts` (no page yet).
+   - `home.ts` exports `draft()` so compare can reuse it.
+   - The issue/PR page diffs may be this agent's or the mobile agent's; check before committing.
+   Not started: reviewers, WIP toggle, close/reopen PR, update branch, edit/delete/quote/react on comments, comment anchors, lock/pin/due date/dependencies/subscribe, cross-reference events. The branches page's "New pull request" should go to compare.
+6. **Parity: repo settings.** `src/lib/server/repo-settings.ts` and `settings/+layout.*` are started (broken). Not started: General/Merge/Collaborators/Branch protection/Webhooks/Deploy keys/Actions secrets+variables/Danger zone pages, `/labels` and `/milestones` management, new-repo options, `/new/migrate`.
+7. **Parity: Actions.** Nothing on disk. To build: `/actions` runs list + workflows + dispatch, `/actions/runs/[run]` jobs + logs (ANSI, groups, follow), rerun/cancel/delete/artifacts, and status icons in commit lists. Then point the merge card's Logs links at it.
+8. **Parity: wiki, activity, projects, packages, release editing.** Nothing on disk. The tabs already exist (`/wiki`, `/activity` currently 404). Extract the owner page's feed into an `ActivityFeed.svelte` and reuse it.
+9. **Parity: notifications, explore, search, orgs, user settings.** Nothing on disk. `NOT_REPOS` already has `explore`, `notifications`, `search`, `orgs`; icons `bell`/`explore` exist. Check the OAuth scopes in `auth.ts` before building SSH keys/tokens pages.
+
+Already pushed this session: `@agent` mentions + picker, T3 task attribution, the owner page redesign, the merge card's "Re-run failed checks" / "Merge anyway", the agents tab layout fix, and the repo tabs (Actions, Wiki, Activity, Settings — Settings for admins), plus icons, ahead of the parity work.
+Running locally: start Forgejo first, then `bun run dev`, then the runner (see "Running locally"). The 15 instance is `cd dev/forgejo15 && ./forgejo web --config custom/conf/app.ini` (check its `run`/log files), then `./run-forge.sh`.
+After the parity work: write the deploy runbook (the `.env` for forge.example.com, the OAuth app on git.example.com with redirect `https://forge.example.com/auth/callback`, `PROTOCOL_HEADER` only if not behind TLS, git identity env, volumes) and hand it to the owner to approve.
+Agents share one checkout: give each a distinct area, have them re-read files before editing, and commit only their own hunks (filtered `git diff` → `git apply --cached`). Nine at once hit the usage limit, so run 3–4 at a time.
+
 ## Status and roadmap
 
 Done:
