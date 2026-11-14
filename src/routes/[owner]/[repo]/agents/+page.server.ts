@@ -44,7 +44,7 @@ export const actions = {
 	launch: async ({ locals, params, request }) => {
 		let to: string;
 		try {
-			to = await launchFromForm((await api<User>(locals.token, '/user')).id, `${params.owner}/${params.repo}`, await request.formData());
+			to = await launchFromForm(locals.token, `${params.owner}/${params.repo}`, await request.formData());
 		} catch (e) {
 			if (isHttpError(e)) return fail(e.status, { error: e.body.message });
 			throw e;

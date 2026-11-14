@@ -34,6 +34,7 @@
 	h2 {
 		margin: 0;
 		font-size: 1.1rem;
+		overflow-wrap: anywhere;
 	}
 	pre {
 		white-space: pre-wrap;
@@ -43,6 +44,7 @@
 	}
 	.meta {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.6rem;
 		margin-top: 0.8rem;
@@ -57,6 +59,7 @@
 	.shas {
 		margin-left: auto;
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.4rem;
 		align-items: center;
 	}

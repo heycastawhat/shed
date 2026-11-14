@@ -103,4 +103,14 @@
 		display: inline-block;
 		margin-top: 0.8rem;
 	}
+	@media (max-width: 700px) {
+		.row {
+			flex-wrap: wrap;
+			gap: 0.3rem 1rem;
+		}
+		.side {
+			justify-content: space-between;
+			flex-basis: 100%;
+		}
+	}
 </style>

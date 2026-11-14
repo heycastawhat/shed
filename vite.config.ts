@@ -11,7 +11,12 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 
-			adapter: adapter()
+			adapter: adapter(),
+			// Scripts only: Shiki and the theme CSS use inline styles, and markdown images can come from anywhere.
+			csp: {
+				mode: 'auto',
+				directives: { 'script-src': ['self'], 'object-src': ['none'], 'base-uri': ['self'], 'frame-ancestors': ['none'] }
+			}
 		})
 	]
 });

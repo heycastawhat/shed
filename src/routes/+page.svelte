@@ -342,4 +342,20 @@
 		padding: 2rem 1rem;
 		text-align: center;
 	}
+	@media (max-width: 700px) {
+		.keys {
+			display: none;
+		}
+		.need {
+			flex-wrap: wrap;
+			row-gap: 0.5rem;
+		}
+		.what {
+			flex-basis: calc(100% - 5.5rem);
+		}
+		.buttons {
+			flex-wrap: wrap;
+			margin-left: 5.5rem;
+		}
+	}
 </style>

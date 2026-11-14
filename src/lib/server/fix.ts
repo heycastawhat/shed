@@ -1,10 +1,11 @@
 import { error, redirect } from '@sveltejs/kit';
-import { api, type Pull, type ReviewComment, type User } from './forgejo.js';
+import { api, requirePush, type Pull, type ReviewComment, type User } from './forgejo.js';
 import { hostWithProject, startTask } from './t3.js';
 
 // Hands one review thread to a T3 agent on the PR's branch. Once its push changes the line, the thread counts as outdated.
 export async function fixWithAgent(token: string | undefined, owner: string, repo: string, index: string, form: FormData) {
 	const pr = `/repos/${owner}/${repo}/pulls/${index}`;
+	await requirePush(token, `${owner}/${repo}`);
 	const [pull, c] = await Promise.all([
 		api<Pull>(token, pr),
 		api<ReviewComment>(token, `${pr}/reviews/${form.get('review')}/comments/${form.get('comment')}`)

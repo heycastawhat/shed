@@ -3,7 +3,7 @@ import { parseDiff } from '#lib/diff.js';
 import { mentionsAgent, withoutMention } from '#lib/mention.js';
 import { sign } from '#lib/sign.js';
 import { status } from '#lib/agent-status.js';
-import { api, request, type Issue, type Pull, type Repo, type User } from './forgejo.js';
+import { api, request, requirePush, type Issue, type Pull, type Repo, type User } from './forgejo.js';
 import { userToken } from './auth.js';
 import { hostsFor, hostWithProject, projection, shell, startTask } from './t3.js';
 import { read, update, type Mention } from './store.js';
@@ -40,6 +40,7 @@ export async function mention(token: string | undefined, origin: string, where: 
 	if (!token || !mentionsAgent(body)) return;
 	const repo = `${where.owner}/${where.repo}`;
 	try {
+		await requirePush(token, repo);
 		const [me, issue] = await Promise.all([api<User>(token, '/user'), api<Issue>(token, `/repos/${repo}/issues/${where.index}`)]);
 		const host = await hostWithProject(me.id, where.repo);
 		if (!host) return { action: 'comment', error: `@agent needs one of your T3 Code hosts (Settings → Agents) to have a project called "${where.repo}"`, posted: true };

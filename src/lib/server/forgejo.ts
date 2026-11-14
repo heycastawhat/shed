@@ -12,6 +12,12 @@ export async function request(token: string | undefined, path: string, init: Req
 	return res;
 }
 
+// Agent tasks push with the T3 host's git credentials, not the user's, so forge checks write access itself before starting one.
+export async function requirePush(token: string | undefined, repo: string) {
+	const r = await api<{ permissions?: { push: boolean } }>(token, `/repos/${repo}`);
+	if (!r.permissions?.push) error(403, `You need write access to ${repo} to start an agent on it`);
+}
+
 export async function api<T>(token: string | undefined, path: string): Promise<T> {
 	return (await request(token, path)).json();
 }
@@ -66,6 +72,7 @@ export type Repo = {
 	owner: User;
 	clone_url: string;
 	ssh_url: string;
+	html_url: string;
 	empty: boolean;
 	open_pr_counter: number;
 	open_issues_count: number;

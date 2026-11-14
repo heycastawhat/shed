@@ -2,12 +2,12 @@
 // Needs playwright-core (not a project dep): `cd .agents/tmp && bun add playwright-core@1.56.1`, then
 // `bun .agents/tmp/../scripts/line-comments.e2e.ts` from .agents/tmp. Posts a real comment on PR #1 — delete it after.
 import { chromium } from 'playwright-core';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const out = new URL('../tmp', import.meta.url).pathname;
 const jar = readFileSync(`${out}/app.jar`, 'utf8');
 const session = jar.split('\n').map((l) => l.split('\t')).find((f) => f[5] === 'forge_session')!;
-const browser = await chromium.launch({ executablePath: '/usr/bin/chromium' });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined) });
 const ctx = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1200, height: 900 } });
 await ctx.addCookies([{ name: 'forge_session', value: session[6], domain: 'localhost', path: '/' }]);
 const page = await ctx.newPage();

@@ -75,9 +75,23 @@ let data: Promise<Data> | undefined;
 let writing = Promise.resolve();
 
 // One shared load: concurrent first callers would otherwise each get their own copy, and changes to the losing one vanish.
+// Only a missing file starts empty. An unreadable or corrupt one throws (the init hook stops the server), since starting
+// empty and saving would wipe every session, key and host.
 export function read() {
 	data ??= readFile(file, 'utf8')
-		.then(JSON.parse, () => ({}))
+		.then(
+			(text) => {
+				try {
+					return JSON.parse(text);
+				} catch (e) {
+					throw new Error(`${file} is not valid JSON (${e}). Fix or restore it; forge won't overwrite it.`);
+				}
+			},
+			(e) => {
+				if (e?.code === 'ENOENT') return {};
+				throw new Error(`Can't read ${file}: ${e}`);
+			}
+		)
 		.then((saved) => ({
 			keys: [],
 			t3Hosts: [],
@@ -105,12 +119,14 @@ export async function update(fn: (d: Data) => void) {
 	d.mentions = d.mentions.filter((m) => !m.done).concat(d.mentions.filter((m) => m.done).slice(-50));
 	for (const [u, m] of Object.entries(d.snoozed)) d.snoozed[+u] = Object.fromEntries(Object.entries(m).filter(([, until]) => Date.parse(until) > Date.now()));
 	for (const u of Object.keys(d.dismissed)) d.dismissed[+u] = d.dismissed[+u].slice(-100);
-	writing = writing.then(async () => {
+	// A failed write mustn't poison the chain for every later one.
+	const next = writing.then(async () => {
 		await mkdir(FORGE_DATA, { recursive: true });
 		await writeFile(`${file}.tmp`, JSON.stringify(d), { mode: 0o600 });
 		await rename(`${file}.tmp`, file);
 	});
-	await writing;
+	writing = next.catch(() => {});
+	await next;
 }
 
 const aes = crypto.subtle.digest('SHA-256', new TextEncoder().encode(FORGE_SECRET)).then((raw) =>

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Drives forge's write actions (the same form posts the UI makes) against a throwaway PR and issue, then checks Forgejo's state.
-# Run login.sh first. Defaults to the Forgejo 15 pair; for 17: APP=localhost:5173 FJ=localhost:3000 FJDIR=forgejo JAR=app.
+# Run login.sh first. Defaults to :5173 against dev/forgejo on :3000; override APP/FJ/FJDIR/JAR for another pair.
 # Creates, merges and deletes throwaway branches/PRs/issues in ada/sample, so only point it at a test instance.
 set -uo pipefail
-APP=${APP:-localhost:5174} FJ=${FJ:-localhost:3001} FJDIR=${FJDIR:-forgejo15} JAR=${JAR:-app15}
+APP=${APP:-localhost:5173} FJ=${FJ:-localhost:3000} FJDIR=${FJDIR:-forgejo} JAR=${JAR:-app}
 cd "$(dirname "$0")/../tmp"
 JP=$(cat ../../dev/$FJDIR/.admin-password) RP=$(cat ../../dev/$FJDIR/.reviewer-password)
 R=/repos/ada/sample T=$(date +%s) fail=0
@@ -14,6 +14,7 @@ py() { python3 -Ic "import json,sys; d=json.load(sys.stdin); print($1)"; }
 act() {
 	local url=$1; shift
 	local args=(-X POST); for f in "$@"; do args+=(--form-string "$f"); done
+	[ $# = 0 ] && args+=(-H 'Content-Type: application/x-www-form-urlencoded' --data '')
 	curl -s -b $JAR.jar -H "Origin: http://$APP" -H 'x-sveltekit-action: true' -H 'accept: application/json' "${args[@]}" "$APP$url" |
 		python3 -Ic "import json,sys; d=json.load(sys.stdin); print(d.get('type'), d.get('status',''), d.get('location','') or '', (d.get('data') or '')[:200] if d.get('type')=='failure' else '')"
 }

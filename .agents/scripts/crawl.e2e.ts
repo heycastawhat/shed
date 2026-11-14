@@ -1,10 +1,10 @@
 // Visits every route type in headless Chromium and reports non-2xx responses, uncaught page errors and console errors.
-// Needs playwright-core from .agents/tmp (see line-comments.e2e.ts). Run from .agents/tmp after login.sh:
+// Needs playwright-core (a devDependency). Run from .agents/tmp after login.sh:
 //   bun ../scripts/crawl.e2e.ts                                   (:5173, app.jar)
 //   BASE=http://localhost:5174 JAR=app15.jar bun ../scripts/crawl.e2e.ts
 // REPO (default ada/sample) and ORG (default kiwi) pick the test data; PR/issue/commit ids are discovered from the list pages.
 import { chromium, type Page } from 'playwright-core';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const base = process.env.BASE ?? 'http://localhost:5173';
 const repo = process.env.REPO ?? 'ada/sample';
@@ -12,7 +12,7 @@ const org = process.env.ORG ?? 'kiwi';
 const jar = readFileSync(process.env.JAR ?? 'app.jar', 'utf8');
 const session = jar.split('\n').map((l) => l.split('\t')).find((f) => f[5] === 'forge_session')![6];
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/chromium' });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined) });
 const ctx = await browser.newContext({ viewport: { width: 1300, height: 900 } });
 await ctx.addCookies([{ name: 'forge_session', value: session, domain: 'localhost', path: '/' }]);
 const page = await ctx.newPage();
@@ -66,6 +66,10 @@ const paths = [
 	`${r}/branches`,
 	`${r}/releases`,
 	`${r}/releases?tags`,
+	`${r}/actions`,
+	`${r}/wiki`,
+	`${r}/wiki/Setup`,
+	`${r}/activity`,
 	`${r}/issues`,
 	`${r}/issues?state=closed`,
 	`${r}/issues?labels=bug`,
@@ -79,7 +83,8 @@ const paths = [
 	`${r}/pulls?milestone=v0.2`,
 	`${r}/pulls?assignee=ada`,
 	...[pull, closedPull].filter(Boolean).flatMap((n) => [`${r}/pulls/${n}`, `${r}/pulls/${n}/files`, `${r}/pulls/${n}/commits`]),
-	`${r}/agents`,
+	// 404s by design for a user with no T3 host (the tab is hidden then).
+	process.env.T3 && `${r}/agents`,
 	'/agents',
 	task && `/agents/${task}`,
 	'/settings/account',

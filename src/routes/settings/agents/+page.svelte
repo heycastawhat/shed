@@ -338,10 +338,24 @@
 	}
 	.row input:first-child {
 		width: 14rem;
+		min-width: 0;
+	}
+	.row button {
+		flex: none;
 	}
 	.row input:nth-child(2) {
 		flex: 1;
 		min-width: 0;
+	}
+	@media (max-width: 700px) {
+		.row {
+			flex-wrap: wrap;
+		}
+		.row input:first-child,
+		.row input:nth-child(2) {
+			flex: 1 1 100%;
+			width: auto;
+		}
 	}
 	.steps {
 		margin: 0 0 0.75rem;

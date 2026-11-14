@@ -8,6 +8,9 @@ const SESSION = 'forge_session';
 type Grant = { access_token: string; refresh_token: string; expires_in: number };
 const MONTH = 60 * 60 * 24 * 30;
 
+// Secure follows the request so plain-http dev and LAN setups still get cookies; behind the TLS proxy url.protocol is https.
+export const cookie = (url: URL, maxAge?: number) => ({ path: '/', httpOnly: true, sameSite: 'lax' as const, secure: url.protocol === 'https:', maxAge });
+
 export function authorizeUrl(redirectUri: string, state: string) {
 	const url = new URL('/login/oauth/authorize', FORGEJO_URL);
 	url.search = new URLSearchParams({
@@ -67,7 +70,7 @@ function describe(ua: string | null) {
 	return os ? `${browser} on ${os}` : browser;
 }
 
-export async function startSession(cookies: Cookies, g: Grant, ua: string | null = null) {
+export async function startSession(cookies: Cookies, url: URL, g: Grant, ua: string | null = null) {
 	const res = await fetch(new URL('/api/v1/user', FORGEJO_URL), { headers: { authorization: `Bearer ${g.access_token}` } });
 	if (!res.ok) error(502, `Forgejo user lookup failed: ${res.status}`);
 	const user: { id: number; login: string } = await res.json();
@@ -79,15 +82,15 @@ export async function startSession(cookies: Cookies, g: Grant, ua: string | null
 		d.sessions = d.sessions.filter((s) => now - Date.parse(s.createdAt) < MONTH * 1000);
 		d.sessions.push({ hash, userId: user.id, createdAt: new Date(now).toISOString(), ua: describe(ua) });
 	});
-	cookies.set(SESSION, id, { path: '/', httpOnly: true, sameSite: 'lax', maxAge: MONTH });
+	cookies.set(SESSION, id, cookie(url, MONTH));
 }
 
-async function sessionUser(cookies: Cookies) {
+async function sessionUser(cookies: Cookies, url: URL) {
 	const id = cookies.get(SESSION);
 	if (!id) return;
 	const hash = await sha256(id);
 	const s = (await read()).sessions.find((s) => s.hash === hash && Date.now() - Date.parse(s.createdAt) < MONTH * 1000);
-	if (!s) cookies.delete(SESSION, { path: '/' });
+	if (!s) cookies.delete(SESSION, cookie(url));
 	return s?.userId;
 }
 
@@ -108,19 +111,19 @@ export async function endSessions(cookies: Cookies, userId: number, id?: string)
 	await update((d) => (d.sessions = d.sessions.filter((s) => s.userId !== userId || s.hash === mine || (id !== undefined && !s.hash.startsWith(id)))));
 }
 
-export async function clearSession(cookies: Cookies) {
+export async function clearSession(cookies: Cookies, url: URL) {
 	const id = cookies.get(SESSION);
-	cookies.delete(SESSION, { path: '/' });
+	cookies.delete(SESSION, cookie(url));
 	const hash = id && (await sha256(id));
 	if (hash) await update((d) => (d.sessions = d.sessions.filter((s) => s.hash !== hash)));
 }
 
-export async function sessionToken(cookies: Cookies) {
-	const userId = await sessionUser(cookies);
+export async function sessionToken(cookies: Cookies, url: URL) {
+	const userId = await sessionUser(cookies, url);
 	if (!userId) return;
 	try {
 		return await userToken(userId);
 	} catch {
-		await clearSession(cookies);
+		await clearSession(cookies, url);
 	}
 }

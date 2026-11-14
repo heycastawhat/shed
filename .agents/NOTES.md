@@ -28,6 +28,7 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
   **Themes** (colour palettes, on top of the mode): `src/lib/themes.ts` holds them (Forge, Catppuccin, Rosé Pine, Nord, Gruvbox, Mono) and generates CSS that the layout injects.
   The `forge_palette` cookie makes the hook set `data-palette` on `<html>`. Palettes only set bg/surface/fg/muted/border/accent; use those vars (plus `--warn`, `--add-fg`, `--del-fg`) and never hard-code colours.
   Appearance shows themes as cards with light/dark previews, then Mode, then Navigation.
+- **Mobile:** under 700px (viewport) the shell becomes a phone header plus an off-canvas drawer, and components add their own `@media (max-width: 700px)` rules (rows wrap, inputs go full width). The repo header uses a container query (640px) and its tab bar scrolls sideways with a fade. Inputs/selects in flex or grid rows need `min-width: 0` (and `minmax(0, 1fr)` tracks) or they push the page wider. Check new pages at 390 and 800px for `scrollWidth > innerWidth`.
 - **Repo pages:** the repo header is muted owner / bold name, a "Private" tag and a ghost Pin button; tabs have icons. The branch picker is a label with an invisible `<select>` laid over it (`field-sizing: content` doesn't work on `<select>` in this Chromium).
   `CommitList` groups commits by day (en-NZ dates) and falls back to an initial avatar. The PR list has a segmented Open/Closed switch and an empty state.
   The PR conversation is a timeline (avatar column + connecting line); a merged/closed PR ends with an event dot, and the merge card only renders for open PRs, above the composer.
@@ -45,34 +46,32 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
 
 ## Running locally
 
-1. `cd dev/forgejo && ./forgejo web`. This is Forgejo 17.0.0 on SQLite, at http://localhost:3000, with SSH on :2222. Config is in `custom/conf/app.ini`.
-   Its browser session lasts 30 days (remember-me 365) and OAuth access tokens 24h, so forge's login bounce rarely stops at a password prompt.
-2. `bun run dev --port 5173 --strictPort` → http://localhost:5173. The OAuth redirect URI is registered for exactly this port.
-3. Optional, for CI: `cd dev/runner && ./forgejo-runner daemon` (forgejo-runner 13.2.0, registered as `laptop-host` with label `host`, so jobs say `runs-on: host` and run **directly on this machine**, one at a time).
-   Start it *after* Forgejo is up: it exits if it can't reach :3000, and queued jobs then end up "cancelled" (re-trigger with close + reopen on the PR).
-   Re-register with a token from `dev/forgejo/forgejo forgejo-cli actions generate-runner-token` if `.runner` is lost.
-4. Check with `bun run check`. Smoke test: `.agents/scripts/login.sh && .agents/scripts/smoke.sh`.
+The dev machine (aarch64, Fedora Aurora, no system node/bun/chromium) was set up from scratch on 2026-11-15:
+- **bun** lives in `~/.bun/bin` (not on PATH by default: `export PATH=$HOME/.bun/bin:$PATH`).
+- **Forgejo 15.0.5** (the version prod runs) is `dev/forgejo/forgejo` (the arm64 release binary) on SQLite at http://localhost:3000, SSH :2222, config `dev/forgejo/custom/conf/app.ini`, log `dev/forgejo/run.log`.
+  On a fresh machine: download the binary, write an app.ini like the current one (`INSTALL_LOCK`, cookie `forge_dev_fj`, `[oauth2] ACCESS_TOKEN_EXPIRATION_TIME = 86400`), `forgejo migrate`, create users `ada` (admin) and `reviewer` with random passwords in `dev/forgejo/.{admin,reviewer}-password`, then `.agents/scripts/seed.sh` (test data plus `.env` with a fresh OAuth app and `FORGE_SECRET`).
+- **Chromium** for tests is Playwright's (`~/.cache/ms-playwright`, installed with `bunx playwright install chromium`); `playwright-core` is a devDependency. The e2e scripts use `/usr/bin/chromium` when it exists, else that one (`CHROMIUM` overrides).
+- **podman** is available (rootless); `podman build --format docker -t forge .` builds the image (`--format docker` keeps `HEALTHCHECK`).
+
+1. `cd dev/forgejo && nohup ./forgejo web --config custom/conf/app.ini > run.log 2>&1 &`.
+2. `bun run dev --port 5173 --strictPort` → http://localhost:5173. The OAuth app allows redirects to :5173, :5174 and :3080 (a container test).
+   **Editing an OAuth app's redirect URIs via the API makes Forgejo issue a new client secret**; copy it into `.env` and restart the dev server.
+3. There is no runner on this machine yet (`dev/runner` is gone), so PR checks stay "waiting"; that's enough for the auto-merge path in `writes.sh`.
+4. Check with `bun run check && bun run test`. End to end: `.agents/scripts/login.sh`, then `.agents/scripts/writes.sh` (every write action against throwaway PRs/issues) and `cd .agents/tmp && bun ../scripts/crawl.e2e.ts` (every route; `T3=1` to include the repo Agents tab).
 
 - Admin login: user `ada`, password in `dev/forgejo/.admin-password`. OAuth client ID and secret are in `.env` (see `.env.example`).
-- The owner's real instance is **git.example.com** (Forgejo 15.0.5) and is offered for use. Point `FORGEJO_URL` at it and register an OAuth app there.
-  Ask first, because it's outward-facing.
-- No Docker on this machine, hence the host-mode runner.
+- The owner's real instance is **git.example.com** (Forgejo 15.0.5). Don't point forge at it or register anything there without asking: it's outward-facing.
 
-### Test data (`ada/sample` on the local Forgejo)
-- PR #1 is merged (it has a review with an inline comment on `auth.ts`). PR #2 and PR #3 are merged; #2's comments are throwaway. PR #4 is closed.
-- Org `kiwi` ("Kiwi Test Org", repo `kiwi/website`, ada is a member) exists for testing owner pages.
-- PR #6 is merged. PR #7 (`feature/greeting`, by ada) is merged too; its one thread was fixed by an agent via Fix with agent.
-- **PR #5** (by the second user `reviewer`, password in `dev/forgejo/.reviewer-password`, write access to the repo) was merged by ada on 2026-10-16. For Approve / Request changes tests, open a fresh PR as `reviewer`.
-- Don't litter PR #1 or #6 with test comments, or delete the ones you add afterwards (`DELETE /repos/ada/sample/pulls/N/reviews/ID`).
-- PRs #8–#20, #22 and #24 are closed throwaways from tests; #21 and #23 were throwaways that auto-merged (their files were removed from main afterwards).
-- `main` has `.forgejo/workflows/ci.yml`: `lint` (instant) and `test` (sleeps 20s) on `pull_request`, and on `push` to main only. Any PR gets two checks. For a quick throwaway PR, use the API with basic auth `ada:<admin password>` (the `dev/.git-credentials` token works for git only and gets 401 from the API), then close it and delete its branch.
-- Don't merge #5 or #6 from tests. Merging can't be undone, and a merged test PR has to be replaced with a new branch.
-- Release `v0.1.0` (on main, notes plus one asset `sample-0.1.0.txt`) and a lightweight tag `v0.0.1` (on `feature/retry-jitter`) are test data for the releases page. PR #34 is a closed throwaway from the branches page.
-- Milestones `v0.2` (due 30 Nov 2026; issues #27, #29) and `Backlog` (#28). #27 is assigned to ada, #28 and #30 to reviewer; #30 and #31 have assign/milestone events in their timelines. PR #35 is a closed throwaway from the triage tests.
+### Test data (`ada/sample` on the local Forgejo, from `seed.sh`)
+- PR #1 `feature/api-retries` (open, by ada; reviewer left a line comment on `retry.ts`), #2 `feature/greeting` (open, by `reviewer`: use it or a fresh reviewer PR for Approve tests), #3 closed, #4 merged.
+- Issues #5–#8: #5 (bug, v0.2, assigned ada), #6 (Backlog, assigned reviewer), #7 (v0.2), #8 closed. Labels bug/enhancement/docs/good first issue; milestones `v0.2` (due 30 Nov 2026) and `Backlog`.
+- Release `v0.1.0` (one asset `sample-0.1.0.txt`) and lightweight tag `v0.0.1`. Wiki pages Home and Setup. Org `kiwi` with `kiwi/website`.
+- `main` has `.forgejo/workflows/ci.yml` (`runs-on: host`). Everything numbered above #8 is a `writes.sh` throwaway; it also leaves `tw-<time>-a.txt` files on main.
+- For a quick throwaway PR, use the API with basic auth `ada:<admin password>`, then close it and delete its branch.
 
 ## Docker
 
-One image runs forge and T3 Code. It was never built (there's no Docker here); every step was checked by hand instead.
+One image runs forge and T3 Code. Deploy steps are in `DEPLOY.md`. It was built and run with podman on arm64 (2026-11-15): healthy, OAuth login, pages and client navigation with the CSP, the bundled T3 starting, SIGTERM stopping it. Not yet built for x86_64.
 - Build: `AGENTS=both docker compose build`. `AGENTS` is `claude` (the default), `codex` or `both`, and picks which agent CLIs get installed. Run it with `docker compose up -d`, which publishes forge on host port 3080.
 - `bun run build` uses `@sveltejs/adapter-node` 6 (`svelte-adapter-bun` only supports Kit 2), and Bun runs `build/index.js`, which needs no `node_modules`. The build validates env vars while analysing routes, so the Dockerfile passes dummy values.
   The real values are read at runtime. Without them, `bun --bun` dies with a SIGABRT instead of printing the env error.
@@ -145,46 +144,42 @@ One image runs forge and T3 Code. It was never built (there's no Docker here); e
   `.agents/tmp` is scratch (one-off playwright scripts like `chat.ts`, `question.ts`, `hublaunch.ts`, `dismiss.ts`, `paltheme.ts`); none of it is load-bearing.
 - Editing Svelte with Python substring replaces: match on unique text, not indentation plus `{/each}`; one cut the wrong block.
 
-## Handoff (2026-10-19, read this first)
+## Security
 
-The owner's goal: **production-ready by Monday 2026-10-19**, and **as close to feature parity with Forgejo's own web UI as possible**.
-Deploy is **prepare-only**: target `forge.example.com` on server (`/opt/stacks/forge`, docker compose) against git.example.com (Forgejo **15.0.5**). Don't touch server or register anything on git.example.com until the owner says deploy.
+Decided in the security pass (2026-11-15):
+- **Paths:** `request()` in `forgejo.ts` rejects `.`/`..` segments (they'd escape a repo or an agent key's scope) and maps a network failure to a 502; `tools.ts` validates MCP `repo`/number args.
+- **Cookies:** every cookie is `httpOnly`, `sameSite=lax`, and `secure` when the request is https (`cookie(url, maxAge)` in `auth.ts`; use it for new cookies). Behind the TLS proxy that's always on; plain-http dev still works.
+- **Auth:** pages that need a user redirect to `/login`; forge-side writes (keys, hosts, pins, dismiss, snooze, approvals) resolve the user with `api('/user')`, which 401s anonymously. Forgejo enforces its own writes.
+  Approvals are decided only by their owner (`decide` filters on `userId`). Kit's origin check covers CSRF for form posts.
+- **Agents need write access:** `requirePush()` in `forgejo.ts` gates `@agent` mentions, Fix with agent and NewTask launches, because tasks push with the T3 host's git credentials, not the user's.
+- **T3 hosts (SSRF):** hosts are user-supplied URLs fetched server-side. Private IPs and loopback are **allowed on purpose** (T3 lives on the LAN). The guard is: http(s) only, no credentials/query/fragment in the URL (`hostUrl()` in `t3.ts`), and redirects are never followed (`redirect: 'manual'`, so a 3xx is a failure).
+- **`{@html}`:** only Forgejo-rendered markdown (sanitised by Forgejo), Shiki output, `highlightLines` (escapes token text) and `themeCss` (constants). Never put user text in `{@html}` unescaped.
+- **Redirects:** Kit's `redirect()` throws on any cross-origin target unless `external` is passed (only `/login` → Forgejo does), so user input can't make an open redirect. `/pin` only goes back to a same-origin Referer.
+- **Headers:** `hooks.server.ts` adds `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: DENY` to everything. The CSP (in `vite.config.ts`, `kit.csp`) restricts **scripts only** (`'self'` + Kit's nonce), plus `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`; styles and images stay open because Shiki and the theme CSS are inline and markdown images can be anywhere. Inline `<script>` won't run; don't add any.
+- **Raw files** (`/raw/…`) are served with a `sandbox` CSP (opaque origin), html/js as `text/plain`, and SVG/XML as `attachment` (an `<img>` still renders them).
+- **Errors:** `+error.svelte` shows the message for 4xx and 502-style errors but a generic text for 500s. Kit already hides unexpected errors' messages.
+- **Startup:** `src/env.ts` validates env (FORGEJO_URL and T3_URL http(s) URLs, client id/secret present, FORGE_SECRET ≥ 32 chars; the Dockerfile's build-time dummy is long enough).
+  The `init` hook loads `forge.json` first: a missing file starts empty, but an unreadable or corrupt one **stops the server** rather than being overwritten. Writes go to a temp file then rename, and a failed write doesn't block later ones.
+- `/healthz` (no auth, `ok`) backs the Dockerfile `HEALTHCHECK` (`bun -e fetch(...)`, since the image has no curl).
 
-Last pushed commit: `389e0c4`. Nine background agents were started on 2026-10-18 and **all stopped on a usage limit**. Their partial work is in the WIP commit after `d7ecb9b`.
-All of it was committed as work in progress in one commit (`bun run check` passes); the pieces are unfinished, not broken.
-Every workstream below is restartable from its brief.
+## Handoff (2026-11-15, read this first)
 
-Uncommitted work, by workstream:
-1. **Forgejo 15 compatibility** (most important, because prod is 15). Done so far:
-   - `dev/forgejo15/` (gitignored): Forgejo 15.0.5 on :3001 with `seed.sh` (test data), `run-forge.sh` (a second forge dev server on :5174 from an rsynced copy in `app/`, because two dev servers in one checkout share `.svelte-kit/generated` env), `.env.5174`, and `forge-data/`.
-   - `.agents/scripts/crawl.e2e.ts` visits every route type and reports non-2xx, page errors and console errors (`BASE=http://localhost:5174 JAR=app15.jar bun ../scripts/crawl.e2e.ts`, run from `.agents/tmp`).
-   - `.agents/scripts/writes.sh` is a write-path script, started but unfinished.
-   - `.agents/scripts/login.sh` was changed to handle the second instance; check the diff.
-   Next: finish the write-path checks (comment, line comment, approve, triage, edit, close/reopen, merge, auto-merge, delete branch, new issue/PR) on 15, fix incompatibilities (feature-detect and hide what 15 lacks), and add a "Forgejo 15 vs 17" gotchas list.
-2. **Security pass.** Done so far:
-   - `request()` in `forgejo.ts` rejects `.`/`..` path segments, and maps a network failure to a 502.
-   - `tools.ts` validates the MCP `repo`/number args.
-   Still to do: cookie flags behind TLS, auth checks on every action and endpoint, `{@html}` sinks, open redirects, T3 host SSRF, mention authz, `+error.svelte`, `/healthz` plus Dockerfile `HEALTHCHECK`, env validation, refusing to start on a corrupt `forge.json`, and a "Security" section in NOTES.
-3. **Mobile layout.** Done so far:
-   - `+layout.svelte`: a phone header plus an off-canvas drawer under 700px.
-   - `DiffView`: split view falls back to unified on phones.
-   - Narrow rules for `Tree`, `branches`, the issue and PR pages, and the `ListFilters` wrap.
-   Still to do: screenshot every page at 390px and 800px, then fix the rest (merge card, Triage stacking, palette, mention picker).
-4. **Parity: code and repo header.** `src/lib/server/code.ts` is started and has a type error. Not started: Star/Watch/Fork, clone/download menu, web edit/new/upload/delete/rename, blame, file history, Go to file (`t`), permalinks, line anchors.
-5. **Parity: PRs and comments.**
-   - Started: `src/routes/[owner]/[repo]/compare/[...spec]/+page.server.ts` (no page yet).
-   - `home.ts` exports `draft()` so compare can reuse it.
-   - The issue/PR page diffs may be this agent's or the mobile agent's; check before committing.
-   Not started: reviewers, WIP toggle, close/reopen PR, update branch, edit/delete/quote/react on comments, comment anchors, lock/pin/due date/dependencies/subscribe, cross-reference events. The branches page's "New pull request" should go to compare.
-6. **Parity: repo settings.** `src/lib/server/repo-settings.ts` and `settings/+layout.*` are started (broken). Not started: General/Merge/Collaborators/Branch protection/Webhooks/Deploy keys/Actions secrets+variables/Danger zone pages, `/labels` and `/milestones` management, new-repo options, `/new/migrate`.
-7. **Parity: Actions.** Nothing on disk. To build: `/actions` runs list + workflows + dispatch, `/actions/runs/[run]` jobs + logs (ANSI, groups, follow), rerun/cancel/delete/artifacts, and status icons in commit lists. Then point the merge card's Logs links at it.
-8. **Parity: wiki, activity, projects, packages, release editing.** Nothing on disk. The tabs already exist (`/wiki`, `/activity` currently 404). Extract the owner page's feed into an `ActivityFeed.svelte` and reuse it.
-9. **Parity: notifications, explore, search, orgs, user settings.** Nothing on disk. `NOT_REPOS` already has `explore`, `notifications`, `search`, `orgs`; icons `bell`/`explore` exist. Check the OAuth scopes in `auth.ts` before building SSH keys/tokens pages.
+The owner's goal: production-ready, then **as close to feature parity with Forgejo's own web UI as possible**.
+Deploy is **prepare-only**: `DEPLOY.md` is the runbook for `forge.example.com` on server (`/opt/stacks/forge`) against git.example.com (Forgejo 15.0.5). Don't touch server or register anything on git.example.com until the owner says deploy.
 
-Already pushed this session: `@agent` mentions + picker, T3 task attribution, the owner page redesign, the merge card's "Re-run failed checks" / "Merge anyway", the agents tab layout fix, and the repo tabs (Actions, Wiki, Activity, Settings — Settings for admins), plus icons, ahead of the parity work.
-Running locally: start Forgejo first, then `bun run dev`, then the runner (see "Running locally"). The 15 instance is `cd dev/forgejo15 && ./forgejo web --config custom/conf/app.ini` (check its `run`/log files), then `./run-forge.sh`.
-After the parity work: write the deploy runbook (the `.env` for forge.example.com, the OAuth app on git.example.com with redirect `https://forge.example.com/auth/callback`, `PROTOCOL_HEADER` only if not behind TLS, git identity env, volumes) and hand it to the owner to approve.
-Agents share one checkout: give each a distinct area, have them re-read files before editing, and commit only their own hunks (filtered `git diff` → `git apply --cached`). Nine at once hit the usage limit, so run 3–4 at a time.
+Prod-readiness, done 2026-11-15: Forgejo 15 checked (every write path and route, see "Running locally"), the security pass ("Security"), the mobile pass ("Layout"), the Docker image built and run, and the dead repo tabs filled:
+Actions (runs list from `/actions/runs`, which wraps runs as `{ workflow_runs, total_count }`; logs link to Forgejo), Wiki (read-only, `src/lib/server/wiki.ts`; Forgejo's markdown API ignores `[[Links]]`, so they're rewritten first; edits link to Forgejo), Activity (`ActivityFeed.svelte` + `src/lib/server/feed.ts`, shared with the owner page), and Settings (links out to Forgejo's settings).
+Forgejo 15 has no `/actions/runs/{id}/rerun`, so "Re-run failed checks" reports it can't.
+
+Parity work, not started (the half-built compare, repo settings and `code.ts` were removed; restore from `5416c49` if useful):
+1. **Code and repo header:** Star/Watch/Fork, clone/download menu, web edit/new/upload/delete/rename, blame, file history, Go to file (`t`), permalinks, line anchors.
+2. **PRs and comments:** compare page + new PR from any branch (`home.ts` exports `draft()` for it), reviewers, WIP toggle, close/reopen PR, update branch, edit/delete/quote/react on comments, comment anchors, lock/pin/due date/dependencies/subscribe, cross-reference events.
+3. **Repo settings in forge:** General/Merge/Collaborators/Branch protection/Webhooks/Deploy keys/Actions secrets+variables/Danger zone, `/labels` and `/milestones` management, new-repo options, `/new/migrate`.
+4. **Actions:** run detail page, workflow dispatch, cancel/delete/artifacts, status icons in commit lists. Job logs aren't in the API on 15 or 17.
+5. **Wiki editing, projects, packages, release editing.**
+6. **Notifications, explore, search, orgs, user settings.** `NOT_REPOS` already has `explore`, `notifications`, `search`, `orgs`. Check the OAuth scopes in `auth.ts` before building SSH keys/tokens pages.
+
+Agents share one checkout: give each a distinct area, have them re-read files before editing, and commit only their own hunks. Run 3–4 at a time at most (nine at once hit a usage limit).
 
 ## Status and roadmap
 

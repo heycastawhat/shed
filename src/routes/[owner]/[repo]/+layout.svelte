@@ -11,7 +11,7 @@
 	let proto = $state<'ssh' | 'https'>('ssh');
 	const url = $derived(proto === 'ssh' ? data.repo.ssh_url : data.repo.clone_url);
 	const section = $derived(
-		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity|settings|compare)/)?.[1]?.replace('compare', 'pulls') ??
+		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity)/)?.[1] ??
 			(/\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code')
 	);
 
@@ -49,7 +49,9 @@
 			{#if data.repo.has_wiki}<a href="{base}/wiki" class:active={section === 'wiki'}><Icon name="wiki" size={15} />Wiki</a>{/if}
 			<a href="{base}/activity" class:active={section === 'activity'}><Icon name="activity" size={15} />Activity</a>
 			{#if data.agents}<a href="{base}/agents" class:active={section === 'agents'}><Icon name="agents" size={15} />Agents</a>{/if}
-			{#if data.repo.permissions.admin}<a href="{base}/settings" class:active={section === 'settings'}><Icon name="sliders" size={15} />Settings</a>{/if}
+			{#if data.repo.permissions.admin}
+				<a href="{data.repo.html_url}/settings" target="_blank" rel="noreferrer"><Icon name="sliders" size={15} />Settings<Icon name="external" size={11} /></a>
+			{/if}
 		</div>
 		<div class="refs">
 			{#if section === 'code' && data.branches.length}
@@ -202,6 +204,23 @@ git push -u origin {data.repo.default_branch}</pre>
 		overflow-x: auto;
 		scrollbar-width: none;
 	}
+	@supports (animation-timeline: scroll()) {
+		.tabs {
+			animation: tabs-fade linear both;
+			animation-timeline: scroll(self inline);
+		}
+	}
+	@keyframes tabs-fade {
+		from {
+			mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+		}
+		99% {
+			mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+		}
+		to {
+			mask-image: none;
+		}
+	}
 	@container (max-width: 640px) {
 		nav {
 			flex-wrap: wrap;
@@ -215,7 +234,7 @@ git push -u origin {data.repo.default_branch}</pre>
 			flex-wrap: wrap;
 			margin: 0.6rem 0 0;
 		}
-		.refs:empty {
+		nav .refs:not(:has(:global(*))) {
 			display: none;
 		}
 	}

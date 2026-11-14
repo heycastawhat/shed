@@ -112,6 +112,7 @@
 	}
 	.grow {
 		flex: 1;
+		min-width: 0;
 	}
 	input:not([type='radio']):not([type='checkbox']),
 	select {
@@ -121,6 +122,7 @@
 		border-radius: 6px;
 		background: var(--bg);
 		color: var(--fg);
+		min-width: 0;
 	}
 	input:focus-visible,
 	select:focus-visible {
@@ -171,7 +173,7 @@
 	}
 	.two {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 0.8rem;
 	}
 	.branch {

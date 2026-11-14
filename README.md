@@ -1,56 +1,7 @@
-# sv
+# forge
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A faster UI for [Forgejo](https://forgejo.org), with better code review and coding agents built in. Forgejo stays the backend (git, auth, CI); forge only talks to its REST API.
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-bun x sv@1.1.1 create --template minimal --types ts --install bun .
-```
-
-## Adding features
-
-Add features to your project with `sv add`:
-
-```sh
-npx sv add
-```
-
-For example, to add Tailwind CSS:
-
-```sh
-npx sv add tailwindcss
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- Develop: see "Running locally" in [.agents/NOTES.md](.agents/NOTES.md). A fresh local Forgejo can be seeded with `.agents/scripts/seed.sh`.
+- Deploy: [DEPLOY.md](DEPLOY.md).
+- Check: `bun run check && bun run test`.

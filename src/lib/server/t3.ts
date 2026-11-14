@@ -1,5 +1,6 @@
 import { error, isHttpError } from '@sveltejs/kit';
 import { T3_TOKEN, T3_URL } from '$app/env/private';
+import { api, requirePush, type User } from './forgejo.js';
 import { decrypt, encrypt, read, update } from './store.js';
 
 export type Host = { id: string; name: string; url: string; token: string; expiresAt?: string };
@@ -14,8 +15,16 @@ export async function hostsFor(userId: number): Promise<Host[]> {
 	return T3_URL && T3_TOKEN ? [{ id: 'env', name: new URL(T3_URL).host, url: T3_URL, token: T3_TOKEN }, ...mine] : mine;
 }
 
+// Hosts are user-supplied URLs fetched server-side. Private addresses are allowed on purpose (T3 normally runs on the LAN or loopback),
+// so the guard is only: http(s), no credentials or extras in the URL, and redirects are never followed (see rpc and pair).
+function hostUrl(raw: string) {
+	const u = URL.parse(raw);
+	if (!u || !/^https?:$/.test(u.protocol) || u.username || u.password || u.search || u.hash) error(400, 'The host must be a plain http(s) URL');
+	return u.origin + u.pathname.replace(/\/+$/, '');
+}
+
 export async function addHost(userId: number, name: string, url: string, token: string, expiresAt?: string) {
-	const host = { id: crypto.randomUUID(), name, url: url.replace(/\/+$/, ''), token };
+	const host = { id: crypto.randomUUID(), name, url: hostUrl(url), token };
 	await rpc(host, 'server.getConfig', {});
 	const record = { ...host, userId, token: await encrypt(token), addedAt: new Date().toISOString(), expiresAt };
 	await update((d) => d.t3Hosts.push(record));
@@ -24,12 +33,14 @@ export async function addHost(userId: number, name: string, url: string, token: 
 // Redeems a pairing link from T3's Settings → Connections (`<host>/pair#token=…`, or a hosted one with `?host=`) for a token.
 // The link is single-use and lasts 5 minutes; the token lasts 30 days and T3 issues no refresh token, so the host is paired again after that.
 export async function pair(link: string) {
-	const u = new URL(link);
+	const u = URL.parse(link);
+	if (!u) error(400, "That isn't a link");
 	const code = new URLSearchParams(u.hash.slice(1)).get('token') ?? u.searchParams.get('token');
 	if (!code) error(400, 'That link has no pairing token in it');
-	const url = (u.searchParams.get('host') ?? u.origin).replace(/\/+$/, '');
+	const url = hostUrl(u.searchParams.get('host') ?? u.origin);
 	const res = await fetch(`${url}/oauth/token`, {
 		method: 'POST',
+		redirect: 'manual',
 		body: new URLSearchParams({
 			grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
 			subject_token: code,
@@ -95,7 +106,7 @@ export type Projection = {
 const failure = (cause: { error?: { message?: string } }[]) => cause.find((c) => c.error?.message)?.error!.message ?? JSON.stringify(cause).slice(0, 300);
 
 async function rpc<T>(host: Host, tag: string, payload: unknown, firstChunkOnly = false): Promise<T> {
-	const res = await fetch(`${host.url}/api/auth/websocket-ticket`, { method: 'POST', headers: { authorization: `Bearer ${host.token}` } }).catch(() =>
+	const res = await fetch(`${host.url}/api/auth/websocket-ticket`, { method: 'POST', redirect: 'manual', headers: { authorization: `Bearer ${host.token}` } }).catch(() =>
 		error(502, `Could not reach T3 Code at ${host.url}`)
 	);
 	if (!res.ok) error(502, `T3 Code at ${host.name} refused the connection (${res.status})`);
@@ -250,9 +261,10 @@ export async function hostFor(userId: number, id: unknown) {
 }
 
 // Starts the task described by the NewTask form, in `repo` (`owner/name`).
-export async function launchFromForm(userId: number, repo: string, form: FormData) {
+export async function launchFromForm(token: string | undefined, repo: string, form: FormData) {
 	const text = String(form.get('text') ?? '').trim();
 	if (!text) error(400, 'Describe the task');
+	const [{ id: userId }] = await Promise.all([api<User>(token, '/user'), requirePush(token, repo)]);
 	const host = await hostFor(userId, form.get('host'));
 	const [instanceId, model] = String(form.get('model')).split('/');
 	const reasoning = form.get('reasoning');

@@ -4,7 +4,7 @@ t3dir=$HOME/.t3
 port=${T3_PORT:-3773}
 
 t3 serve --no-browser --host "${T3_HOST:-127.0.0.1}" --port "$port" --base-dir "$t3dir" "$t3dir/projects" &
-until bun -e "await fetch('http://127.0.0.1:$port')" 2>/dev/null; do kill -0 $! || exit 1; sleep 1; done
+until bun -e "await fetch('http://127.0.0.1:$port', { signal: AbortSignal.timeout(3000) })" 2>/dev/null; do kill -0 $! || exit 1; sleep 1; done
 
 # forge's built-in host is always this bundled T3, so it gets its own long-lived token, minted once.
 [ -s "$t3dir/forge-token" ] || t3 auth session issue --base-dir "$t3dir" --scope orchestration:read --scope orchestration:operate --scope source-control:write \
