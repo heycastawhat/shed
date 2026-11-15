@@ -57,7 +57,7 @@
 		if (!t) return;
 		// The title comes from the page's <title>, minus the repo it's in.
 		setTimeout(() => {
-			const title = document.title.split(' · ')[0] || t.key.split('/').pop()!;
+			const title = (t.kind === 'file' ? t.key.split('/').pop() : document.title.split(' · ')[0]) || t.key.split('/').pop()!;
 			const i = tabs.findIndex((x) => x.key === t.key);
 			if (i < 0) tabs = [...tabs, { ...t, title }].slice(-12);
 			else tabs[i] = { ...tabs[i], href: t.href, title };
@@ -104,12 +104,26 @@
 {/if}
 
 <style>
+	/* Sticky, so a tab is one click away anywhere down a long diff; DiffView's sticky file names sit below it (--sticky-top, set on .sheet). */
 	.tabstrip {
+		position: sticky;
+		top: 0;
+		z-index: 5;
 		display: flex;
 		gap: 0.3rem;
+		height: var(--sticky-top);
+		box-sizing: border-box;
 		overflow-x: auto;
-		padding: 0.6rem 1rem 0;
-		scrollbar-width: thin;
+		padding: 0.5rem 1rem;
+		border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+		background: var(--bg);
+		scrollbar-width: none;
+	}
+	/* Phones keep their own layout, as in Sink. */
+	@media (max-width: 700px) {
+		.tabstrip {
+			display: none;
+		}
 	}
 	a {
 		display: flex;

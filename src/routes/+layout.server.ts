@@ -1,5 +1,6 @@
 import { toUser } from '#lib/server/accounts.js';
 import { read } from '#lib/server/store.js';
+import { LAYOUTS } from '#lib/prefs.svelte.js';
 import { db } from '#lib/server/shed.js';
 
 export async function load({ locals, cookies }) {
@@ -13,6 +14,6 @@ export async function load({ locals, cookies }) {
 		unread: user ? db.query<{ n: number }, [number]>('select count(*) as n from notifications where user_id = ? and unread = 1').get(user.id)!.n : 0,
 		nav: cookies.get('forge_nav') === 'bar' ? ('bar' as const) : ('sidebar' as const),
 		collapsed: cookies.get('forge_nav_collapsed') === '1',
-		tabs: cookies.get('forge_tabs') === '1'
+		layout: LAYOUTS.find((l) => l === cookies.get('forge_layout')) ?? 'classic'
 	};
 }

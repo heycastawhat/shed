@@ -14,7 +14,7 @@
 
 	let { data, children } = $props();
 	// Seeded from the cookies once; after that the client state is the source of truth.
-	const prefs = untrack(() => new Prefs({ nav: data.nav, collapsed: data.collapsed, tabs: data.tabs }));
+	const prefs = untrack(() => new Prefs({ nav: data.nav, collapsed: data.collapsed, layout: data.layout }));
 	setPrefs(prefs);
 
 	let menu = $state<HTMLDetailsElement>();
@@ -217,7 +217,7 @@
 	{/if}
 
 	<div class="sheet">
-		{#if data.user && prefs.tabs}<TabStrip />{/if}
+		{#if data.user && prefs.layout === 'tabs'}<TabStrip />{/if}
 		<main>{@render children()}</main>
 	</div>
 	{#if data.user}
@@ -602,6 +602,14 @@
 		box-sizing: border-box;
 		background: var(--bg);
 		border-radius: var(--radius-sheet);
+	}
+	.sheet:has(> :global(.tabstrip)) {
+		--sticky-top: 2.9rem;
+	}
+	@media (max-width: 700px) {
+		.sheet:has(> :global(.tabstrip)) {
+			--sticky-top: 0px;
+		}
 	}
 	.side .sheet {
 		margin-left: 0;

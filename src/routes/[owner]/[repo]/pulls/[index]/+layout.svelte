@@ -13,6 +13,8 @@
 	const tab = $derived(page.route.id?.split('/').pop());
 </script>
 
+<svelte:head><title>{p.title} · #{p.number} · {data.repo.full_name}</title></svelte:head>
+
 <div class="head">
 	<EditTitle title={p.title} number={p.number} can={data.repo.permissions.push || p.user.id === data.user?.id} action="{base}?/edit" />
 	<div class="meta">

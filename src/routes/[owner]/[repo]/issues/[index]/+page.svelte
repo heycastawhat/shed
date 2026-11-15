@@ -27,6 +27,8 @@
 	}
 </script>
 
+<svelte:head><title>{i.title} · #{i.number} · {data.repo.full_name}</title></svelte:head>
+
 <div class="head">
 	<EditTitle title={i.title} number={i.number} {can} action="?/edit" />
 	<div class="meta">

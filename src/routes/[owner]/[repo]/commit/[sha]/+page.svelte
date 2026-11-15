@@ -6,6 +6,8 @@
 	const [title, ...body] = $derived(data.commit.commit.message.trim().split('\n'));
 </script>
 
+<svelte:head><title>{title} · {data.commit.sha.slice(0, 8)} · {data.repo.full_name}</title></svelte:head>
+
 <div class="commit">
 	<h2>{title}</h2>
 	{#if body.join('').trim()}<pre>{body.join('\n').trim()}</pre>{/if}

@@ -473,12 +473,12 @@
 		border-radius: var(--radius);
 		margin-bottom: 1rem;
 		overflow: clip;
-		scroll-margin-top: 1rem;
+		scroll-margin-top: calc(var(--sticky-top, 0px) + 1rem);
 	}
 	/* Sticky so a long diff keeps its file name in view; overflow: clip (not hidden) on .file is what allows it. */
 	.file-head {
 		position: sticky;
-		top: 0;
+		top: var(--sticky-top, 0px);
 		z-index: 2;
 		display: flex;
 		align-items: center;

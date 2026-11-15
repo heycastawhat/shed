@@ -9,6 +9,11 @@
 		['sidebar', 'Sidebar', 'Pinned repos and shortcuts down the side. Collapses to icons with [ .'],
 		['bar', 'Top bar', 'A compact bar across the top, with the full page width below.']
 	] as const;
+	// Drawn like Sink's layout cards: the shell, the sheet, and where things open.
+	const LAYOUT = [
+		['classic', 'Classic', 'Sidebar and one big sheet. Everything opens full page.'],
+		['tabs', 'Tabs', 'PRs, issues, files and commits you open stay as tabs, like a browser.']
+	] as const;
 	let form: HTMLFormElement;
 	let paletteForm: HTMLFormElement;
 	const CHOICES = [
@@ -67,6 +72,30 @@
 	</fieldset>
 </form>
 
+<fieldset class="layouts">
+	<legend class="muted">Layout</legend>
+	{#each LAYOUT as [value, label, hint] (value)}
+		<label class="layout">
+			<input type="radio" name="layout" {value} checked={prefs.layout === value} onchange={() => prefs.save({ layout: value })} />
+			<svg viewBox="0 0 120 80" aria-hidden="true">
+				<rect x="4" y="4" width="24" height="72" rx="3" class="side" />
+				<rect x="7" y="9" width="14" height="4" rx="2" class="ink" />
+				{#each [18, 26, 34] as y (y)}<rect x="7" {y} width="17" height="4" rx="2" class="bar" />{/each}
+				{#if value === 'tabs'}
+					<rect x="32" y="4" width="22" height="8" rx="4" class="tab" />
+					<rect x="57" y="4" width="22" height="8" rx="4" class="bar" />
+					<rect x="82" y="4" width="22" height="8" rx="4" class="bar" />
+				{/if}
+				<rect x="32" y={value === 'tabs' ? 15 : 4} width="84" height={value === 'tabs' ? 61 : 72} rx="6" class="sheet" />
+				<rect x="38" y={value === 'tabs' ? 21 : 11} width="40" height="5" rx="2.5" class="ink" />
+				{#each [0, 1, 2, 3] as i (i)}<rect x="38" y={(value === 'tabs' ? 31 : 22) + i * 9} width={70 - (i % 2) * 18} height="5" rx="2.5" class="bar" />{/each}
+			</svg>
+			<strong>{label}</strong>
+			<span class="muted">{hint}</span>
+		</label>
+	{/each}
+</fieldset>
+
 <fieldset class="nav">
 	<legend class="muted">Navigation</legend>
 	{#each NAV as [value, label, hint] (value)}
@@ -121,7 +150,8 @@
 		background: linear-gradient(90deg, #111214 65%, #8b8bf0 65%);
 	}
 	.nav,
-	.mode {
+	.mode,
+	.layouts {
 		margin-top: 1.75rem;
 	}
 	.themes {
@@ -171,6 +201,56 @@
 		height: 0.55rem;
 		margin-top: 0.25rem;
 		border-radius: 3px;
+	}
+	.layouts {
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	}
+	label.layout {
+		display: grid;
+		gap: 0.2rem;
+		align-content: start;
+		padding: 0.6rem 0.6rem 0.8rem;
+		border-color: transparent;
+		background: color-mix(in srgb, var(--fg) 4%, var(--surface));
+	}
+	label.layout:hover {
+		background: color-mix(in srgb, var(--fg) 7%, var(--surface));
+	}
+	label.layout:has(input:checked) {
+		background: var(--accent-container);
+	}
+	.layout input {
+		position: absolute;
+		opacity: 0;
+	}
+	.layout:has(input:focus-visible) {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.layout svg {
+		width: 100%;
+		margin-bottom: 0.35rem;
+		border-radius: 8px;
+		background: var(--shell);
+	}
+	.layout .muted {
+		font-size: 0.82rem;
+		line-height: 1.35;
+	}
+	.side {
+		fill: color-mix(in srgb, var(--fg) 5%, transparent);
+	}
+	.sheet {
+		fill: var(--bg);
+	}
+	.bar {
+		fill: color-mix(in srgb, var(--fg) 13%, transparent);
+	}
+	.ink {
+		fill: color-mix(in srgb, var(--fg) 40%, transparent);
+	}
+	.tab {
+		fill: color-mix(in srgb, var(--accent) 45%, transparent);
 	}
 	.swatch.sidebar {
 		background: linear-gradient(90deg, var(--accent) 28%, var(--surface) 28%);
