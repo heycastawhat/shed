@@ -57,6 +57,8 @@ The dev machine (aarch64, Fedora Aurora, no system node/bun/chromium) was set up
 3. There is no runner on this machine yet (`dev/runner` is gone), so PR checks stay "waiting"; that's enough for the auto-merge path in `writes.sh`.
 4. Check with `bun run check && bun run test`. End to end: `.agents/scripts/login.sh`, then `.agents/scripts/writes.sh` (every write action against throwaway PRs/issues) and `cd .agents/tmp && bun ../scripts/crawl.e2e.ts` (every route; `T3=1` to include the repo Agents tab).
 
+- **Shed sign-in (branch `shed`):** OIDC against the owner's Pocket ID on server (`https://auth.example.com`, client "Shed", callback `http://localhost:5173/auth/callback`). Pocket ID is passkey-only, so headless tests sign in with a one-time link: `ssh ada@192.0.2.245 'docker exec pocket-id /app/pocket-id one-time-access-token ada'` gives `…/lc/<code>`; open it, then `/login` (see `.agents/tmp/shed-login.ts`). Each use leaves an admin session on Pocket ID, so don't print the code and don't overdo it.
+  Until pages are moved to Shed, `FORGEJO_TOKEN` (a local-Forgejo token for ada) is used for every signed-in person's Forgejo calls (`locals.token` in the hook).
 - Admin login: user `ada`, password in `dev/forgejo/.admin-password`. OAuth client ID and secret are in `.env` (see `.env.example`).
 - The owner's real instance is **git.example.com** (Forgejo 15.0.5). Don't point forge at it or register anything there without asking: it's outward-facing.
 

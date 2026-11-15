@@ -13,16 +13,16 @@
 <h1>Account</h1>
 
 <section class="me">
-	<img src={data.me.avatar_url} alt="" />
+	{#if data.me.avatar_url}<img src={data.me.avatar_url} alt="" />{/if}
 	<div>
-		<strong>{data.me.full_name || data.me.login}</strong>
-		<div class="muted">@{data.me.login} on <a href={data.forgejo}>{new URL(data.forgejo).host}</a></div>
+		<strong>{data.me.name || data.me.login}</strong>
+		<div class="muted">@{data.me.login}, signed in with <a href={data.provider}>{new URL(data.provider).host}</a></div>
 	</div>
-	<a class="button" href="{data.forgejo}/user/settings">Edit profile in Forgejo</a>
+	<a class="button" href={data.provider}>Edit profile there</a>
 </section>
 
 <h2>Where you're signed in</h2>
-<p class="muted">Signing out here ends that browser's forge session. Agent keys aren't affected, and you stay signed in to Forgejo itself.</p>
+<p class="muted">Signing out here ends that browser's session. Agent keys aren't affected, and you stay signed in to your sign-in provider.</p>
 {#snippet row(s: (typeof data.sessions)[number])}
 	<li>
 		<div>

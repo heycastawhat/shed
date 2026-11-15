@@ -1,26 +1,11 @@
-import { error, type Cookies } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { FORGEJO_URL, FORGEJO_CLIENT_ID, FORGEJO_CLIENT_SECRET } from '$app/env/private';
-import { decrypt, encrypt, read, sha256, update } from './store.js';
-
-// Cookies on localhost are shared across ports, so use a name other dev apps won't collide with.
-const SESSION = 'forge_session';
+import { decrypt, encrypt, read, update } from './store.js';
 
 type Grant = { access_token: string; refresh_token: string; expires_in: number };
-const MONTH = 60 * 60 * 24 * 30;
 
 // Secure follows the request so plain-http dev and LAN setups still get cookies; behind the TLS proxy url.protocol is https.
 export const cookie = (url: URL, maxAge?: number) => ({ path: '/', httpOnly: true, sameSite: 'lax' as const, secure: url.protocol === 'https:', maxAge });
-
-export function authorizeUrl(redirectUri: string, state: string) {
-	const url = new URL('/login/oauth/authorize', FORGEJO_URL);
-	url.search = new URLSearchParams({
-		client_id: FORGEJO_CLIENT_ID,
-		redirect_uri: redirectUri,
-		response_type: 'code',
-		state
-	}).toString();
-	return url;
-}
 
 export async function grant(params: Record<string, string>): Promise<Grant> {
 	const res = await fetch(new URL('/login/oauth/access_token', FORGEJO_URL), {
@@ -63,67 +48,9 @@ export async function userToken(userId: number) {
 }
 
 // "Firefox on Linux", from the User-Agent, so the sessions list is recognisable.
-function describe(ua: string | null) {
-	if (!ua) return undefined;
+export function describeUa(ua: string | null) {
+	if (!ua) return '';
 	const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
 	const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
 	return os ? `${browser} on ${os}` : browser;
-}
-
-export async function startSession(cookies: Cookies, url: URL, g: Grant, ua: string | null = null) {
-	const res = await fetch(new URL('/api/v1/user', FORGEJO_URL), { headers: { authorization: `Bearer ${g.access_token}` } });
-	if (!res.ok) error(502, `Forgejo user lookup failed: ${res.status}`);
-	const user: { id: number; login: string } = await res.json();
-	await remember(user.id, user.login, g);
-	const id = crypto.getRandomValues(new Uint8Array(32)).toBase64({ alphabet: 'base64url', omitPadding: true });
-	const hash = await sha256(id);
-	const now = Date.now();
-	await update((d) => {
-		d.sessions = d.sessions.filter((s) => now - Date.parse(s.createdAt) < MONTH * 1000);
-		d.sessions.push({ hash, userId: user.id, createdAt: new Date(now).toISOString(), ua: describe(ua) });
-	});
-	cookies.set(SESSION, id, cookie(url, MONTH));
-}
-
-async function sessionUser(cookies: Cookies, url: URL) {
-	const id = cookies.get(SESSION);
-	if (!id) return;
-	const hash = await sha256(id);
-	const s = (await read()).sessions.find((s) => s.hash === hash && Date.now() - Date.parse(s.createdAt) < MONTH * 1000);
-	if (!s) cookies.delete(SESSION, cookie(url));
-	return s?.userId;
-}
-
-// Ids are a hash prefix: enough to pick a session without exposing anything that could be used as the cookie.
-export async function listSessions(cookies: Cookies, userId: number) {
-	const id = cookies.get(SESSION);
-	const mine = id && (await sha256(id));
-	return (await read()).sessions
-		.filter((s) => s.userId === userId && Date.now() - Date.parse(s.createdAt) < MONTH * 1000)
-		.map((s) => ({ id: s.hash.slice(0, 16), ua: s.ua ?? 'Unknown browser', createdAt: s.createdAt, current: s.hash === mine }))
-		.sort((a, b) => Number(b.current) - Number(a.current) || b.createdAt.localeCompare(a.createdAt));
-}
-
-// Ends one session by id, or every session but this one when id is omitted.
-export async function endSessions(cookies: Cookies, userId: number, id?: string) {
-	const cookie = cookies.get(SESSION);
-	const mine = cookie && (await sha256(cookie));
-	await update((d) => (d.sessions = d.sessions.filter((s) => s.userId !== userId || s.hash === mine || (id !== undefined && !s.hash.startsWith(id)))));
-}
-
-export async function clearSession(cookies: Cookies, url: URL) {
-	const id = cookies.get(SESSION);
-	cookies.delete(SESSION, cookie(url));
-	const hash = id && (await sha256(id));
-	if (hash) await update((d) => (d.sessions = d.sessions.filter((s) => s.hash !== hash)));
-}
-
-export async function sessionToken(cookies: Cookies, url: URL) {
-	const userId = await sessionUser(cookies, url);
-	if (!userId) return;
-	try {
-		return await userToken(userId);
-	} catch {
-		await clearSession(cookies, url);
-	}
 }

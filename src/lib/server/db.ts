@@ -49,7 +49,8 @@ const MIGRATIONS = [
 		ua text not null default '',
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 		last_seen_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-	);`
+	);`,
+	`alter table users add column avatar_url text not null default '';`
 ];
 
 export function openDb(path: string) {

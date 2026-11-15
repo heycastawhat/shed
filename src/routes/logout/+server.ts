@@ -1,7 +1,11 @@
 import { redirect } from '@sveltejs/kit';
-import { clearSession } from '#lib/server/auth.js';
+import { endSession } from '#lib/server/accounts.js';
+import { cookie } from '#lib/server/auth.js';
+import { db } from '#lib/server/shed.js';
 
-export async function POST({ cookies, url }) {
-	await clearSession(cookies, url);
+export function POST({ cookies, url }) {
+	const id = cookies.get('shed_session');
+	if (id) endSession(db, id);
+	cookies.delete('shed_session', cookie(url));
 	redirect(303, '/');
 }

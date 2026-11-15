@@ -1,8 +1,8 @@
-import { api, type User } from '#lib/server/forgejo.js';
 import { read } from '#lib/server/store.js';
 
 export async function load({ locals, cookies }) {
-	const user = locals.token ? await api<User>(locals.token, '/user') : null;
+	const u = locals.user;
+	const user = u ? { id: u.id, login: u.login, full_name: u.name, avatar_url: u.avatar_url, admin: !!u.admin } : null;
 	const d = await read();
 	return {
 		user,

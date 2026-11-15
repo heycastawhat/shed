@@ -1,12 +1,15 @@
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
-import { sessionToken } from '#lib/server/auth.js';
+import { FORGEJO_TOKEN } from '$app/env/private';
+import { sessionUser } from '#lib/server/accounts.js';
+import { db } from '#lib/server/shed.js';
 import { sweepMentions } from '#lib/server/mention.js';
 import { read } from '#lib/server/store.js';
 import { isTheme } from '#lib/themes.js';
 
-// Load forge.json before serving anything, so a corrupt file stops the server instead of failing every request.
+// Load forge.json and open shed.db (the import above) before serving anything, so a corrupt file stops the server instead of failing every request.
 export const init: ServerInit = async () => {
 	await read();
+	db.query('select 1').get();
 };
 
 const SECURITY_HEADERS = {
@@ -16,7 +19,9 @@ const SECURITY_HEADERS = {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
-	event.locals.token = await sessionToken(event.cookies, event.url);
+	event.locals.user = sessionUser(db, event.cookies.get('shed_session')) ?? undefined;
+	// Bridge while pages move from Forgejo to Shed: a signed-in person's Forgejo calls use this one token.
+	event.locals.token = event.locals.user && FORGEJO_TOKEN;
 	sweepMentions();
 	// Set on <html> while rendering so a chosen theme doesn't flash the OS one first.
 	const theme = event.cookies.get('forge_theme');

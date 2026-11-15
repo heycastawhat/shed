@@ -4,6 +4,7 @@ declare global {
 	namespace App {
 		// interface Error {}
 		interface Locals {
+			user?: import('#lib/server/accounts.js').UserRow;
 			token?: string;
 		}
 		// interface PageData {}
