@@ -1,7 +1,8 @@
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import { FORGEJO_TOKEN } from '$app/env/private';
 import { sessionUser } from '#lib/server/accounts.js';
-import { db } from '#lib/server/shed.js';
+import { gitHttp, isGitRequest } from '#lib/server/githttp.js';
+import { db, root } from '#lib/server/shed.js';
 import { sweepMentions } from '#lib/server/mention.js';
 import { read } from '#lib/server/store.js';
 import { isTheme } from '#lib/themes.js';
@@ -19,6 +20,7 @@ const SECURITY_HEADERS = {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+	if (isGitRequest(event.url)) return gitHttp(db, root, event.request, event.url);
 	event.locals.user = sessionUser(db, event.cookies.get('shed_session')) ?? undefined;
 	// Bridge while pages move from Forgejo to Shed: a signed-in person's Forgejo calls use this one token.
 	event.locals.token = event.locals.user && FORGEJO_TOKEN;
