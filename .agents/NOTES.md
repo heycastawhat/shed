@@ -14,7 +14,7 @@ SQLite for everything else). It began as "forge", a UI over Forgejo's API; on 20
 - Sign-in is any OIDC provider (the owner uses Pocket ID) with an allowlist; no passwords.
 - CI speaks **forgejo-runner's protocol**, so the stock runner and `.forgejo/workflows` work unchanged.
 - Theme: purple accent (`--accent`), primary actions and the Open badge use it; green/red only for diff lines and closed state.
-- UI redesign (Sink's visual language, tabs for PRs) is parked in PLAN.md "Later".
+- UI redesign (Sink's visual language, tabs for PRs) is under way: see Handoff.
 
 ## Layout
 
@@ -103,6 +103,23 @@ server: Fedora 44, x86_64, 15 GB RAM, ssh `ada@192.0.2.245` (key on this machine
 - Raw files, wiki files and release files are served with a sandbox CSP; html/js as text; SVG/XML as attachments.
 - Webhooks and T3 hosts may point at private IPs (homelab) but only http(s), never following redirects.
 - CI secrets are encrypted with `FORGE_SECRET` and only decrypted into a task.
+
+## Handoff (2026-11-16)
+
+Everything is on branch `shed`, committed, not pushed, not deployed. Open work, each its own thread:
+1. **UI redesign** (PLAN.md "Later"). Done: Material 3 palettes from seeds (`.agents/scripts/m3-palettes.ts` → `src/lib/themes.ts`; roles
+   `--shell`, `--on-accent`, `--accent-container`, `--on-accent-container`, mixed for hand-picked themes in `app.css`), Roboto Flex
+   (`.wordmark`, wide headings), shell = tinted sidebar + rounded `.sheet`, pill nav/buttons (`.tonal`, `.primary`), `--radius` 12px,
+   phone bottom tab bar. Started: Tabs layout — `prefs.tabs` (cookie `forge_tabs`, `/prefs`), `TabStrip.svelte` rendered in the sheet when on
+   (tabs per PR/issue/file/commit/run in localStorage, remembers sub-page and scroll); not yet switchable in Settings → Appearance and untested.
+   Still to do: Appearance "Layout" choice (Classic / Tabs) with preview cards like Sink; Split layout for lists (PR list beside the open PR);
+   settings as grouped cards; go through every page in light/dark/390px; keep code views dense.
+2. **Deploy** (`DEPLOY.md`): needs the owner's OK for each outward step (server, Cloudflare hostname, Forgejo token for `shed import`). x86 image
+   has never been built (this machine can't run x86).
+3. **Agents end to end**: `@agent` mentions and T3 tasks haven't been run against Shed (MCP keys pass `shed-mcp.sh`). Running them starts real
+   T3 tasks on the owner's T3 (:3773); ask first.
+4. **Small gaps**: renaming/transferring a repo doesn't update token repo lists, agent key scopes or pins (`forge.json`); `runs-on` only
+   resolves `${{ matrix.* }}`; release tags can still be created on mirrors; mobile polish.
 
 ## Working with the owner
 

@@ -6,6 +6,7 @@
 	import { untrack } from 'svelte';
 	import favicon from '#lib/assets/favicon.svg';
 	import Icon from '#lib/components/Icon.svelte';
+	import TabStrip from '#lib/components/TabStrip.svelte';
 	import Palette from '#lib/components/Palette.svelte';
 	import { Prefs, setPrefs } from '#lib/prefs.svelte.js';
 	import { themeCss } from '#lib/themes.js';
@@ -13,7 +14,7 @@
 
 	let { data, children } = $props();
 	// Seeded from the cookies once; after that the client state is the source of truth.
-	const prefs = untrack(() => new Prefs({ nav: data.nav, collapsed: data.collapsed }));
+	const prefs = untrack(() => new Prefs({ nav: data.nav, collapsed: data.collapsed, tabs: data.tabs }));
 	setPrefs(prefs);
 
 	let menu = $state<HTMLDetailsElement>();
@@ -215,7 +216,10 @@
 		</header>
 	{/if}
 
-	<div class="sheet"><main>{@render children()}</main></div>
+	<div class="sheet">
+		{#if data.user && prefs.tabs}<TabStrip />{/if}
+		<main>{@render children()}</main>
+	</div>
 	{#if data.user}
 		<!-- Phones: the main places as a bottom tab bar, as in Sink; the drawer keeps pins and settings. -->
 		<nav class="tabs" aria-label="Main">

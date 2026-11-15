@@ -10,6 +10,7 @@ export async function POST({ cookies, request, url }) {
 		if (patch.nav !== 'sidebar' && patch.nav !== 'bar') error(400, 'nav must be sidebar or bar');
 		cookies.set('forge_nav', patch.nav, cookie(url, YEAR));
 	}
+	if (patch.tabs !== undefined) cookies.set('forge_tabs', patch.tabs ? '1' : '0', cookie(url, YEAR));
 	if (patch.collapsed !== undefined) cookies.set('forge_nav_collapsed', patch.collapsed ? '1' : '0', cookie(url, YEAR));
 	return json({ ok: true });
 }

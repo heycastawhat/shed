@@ -6,14 +6,17 @@ export type NavMode = 'sidebar' | 'bar';
 export class Prefs {
 	nav = $state<NavMode>('sidebar');
 	collapsed = $state(false);
+	// Tabs layout: PRs, issues and files you open stay as tabs across the top, as in Sink's Tabs layout.
+	tabs = $state(false);
 	palette = $state(false);
 
-	constructor(initial: { nav: NavMode; collapsed: boolean }) {
+	constructor(initial: { nav: NavMode; collapsed: boolean; tabs?: boolean }) {
 		this.nav = initial.nav;
 		this.collapsed = initial.collapsed;
+		this.tabs = !!initial.tabs;
 	}
 
-	async save(patch: { nav?: NavMode; collapsed?: boolean }) {
+	async save(patch: { nav?: NavMode; collapsed?: boolean; tabs?: boolean }) {
 		Object.assign(this, patch);
 		await fetch('/prefs', { method: 'POST', body: JSON.stringify(patch) });
 	}

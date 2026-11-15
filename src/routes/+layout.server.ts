@@ -12,6 +12,7 @@ export async function load({ locals, cookies }) {
 		pins: user ? (d.pins[user.id] ?? []) : [],
 		unread: user ? db.query<{ n: number }, [number]>('select count(*) as n from notifications where user_id = ? and unread = 1').get(user.id)!.n : 0,
 		nav: cookies.get('forge_nav') === 'bar' ? ('bar' as const) : ('sidebar' as const),
-		collapsed: cookies.get('forge_nav_collapsed') === '1'
+		collapsed: cookies.get('forge_nav_collapsed') === '1',
+		tabs: cookies.get('forge_tabs') === '1'
 	};
 }
