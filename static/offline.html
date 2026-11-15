@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Shed: offline</title>
+		<style>
+			:root { color-scheme: light dark; font-family: system-ui, sans-serif; background: #f2ecf4; color: #1d1b20; }
+			@media (prefers-color-scheme: dark) { :root { background: #211f24; color: #e6e0e9; } button { background: #cfbdfe; color: #36275d; } }
+			body { min-height: 100dvh; margin: 0; display: grid; place-content: center; gap: 12px; padding: 16px; text-align: center; }
+			h1 { margin: 0; font-size: 20px; }
+			p { margin: 0; opacity: 0.75; }
+			button { justify-self: center; border: 0; border-radius: 999px; padding: 10px 20px; font: inherit; background: #65558f; color: #fff; }
+		</style>
+	</head>
+	<body>
+		<h1>Can't reach Shed</h1>
+		<p>Check your connection and try again.</p>
+		<button onclick="location.reload()">Try again</button>
+	</body>
+</html>
