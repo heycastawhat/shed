@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import type { Database } from 'bun:sqlite';
 import { getUser, signIn } from '../accounts.js';
 import { openDb } from '../db.js';
+import { git } from '../git.js';
 import { createRepo, repoDir } from '../repos.js';
 import { commitFiles } from '../write.js';
 import { testEnv } from '../test-env.js';
@@ -77,5 +78,13 @@ test("a pull mirror's refs can't be written through the API", async () => {
 	expect(await call(ada, 'DELETE', '/repos/ada/sample/branches/fix')).toMatchObject(why);
 	expect(await call(ada, 'POST', '/repos/ada/sample/tags', { tag_name: 'v1' })).toMatchObject(why);
 	expect(await call(ada, 'DELETE', '/repos/ada/sample/tags/v1')).toMatchObject(why);
+	// Releases are only metadata, so they're fine for tags the mirror already has; making a tag is refused.
+	await git(repoDir(root, repoId), ['tag', 'v0', 'main']);
+	expect(await call(ada, 'POST', '/repos/ada/sample/releases', { tag_name: 'v0' })).toMatchObject({ status: 201 });
+	expect(await call(ada, 'POST', '/repos/ada/sample/releases', { tag_name: 'v2' })).toMatchObject(why);
+	const draft = await call(ada, 'POST', '/repos/ada/sample/releases', { tag_name: 'v2', draft: true });
+	expect(draft.status).toBe(201);
+	expect(await call(ada, 'PATCH', `/repos/ada/sample/releases/${draft.json.id}`, { draft: false })).toMatchObject(why);
+	expect(await git(repoDir(root, repoId), ['tag', '-l'])).toBe('v0\n');
 	db.query('update repos set mirror_url = null where id = ?').run(repoId);
 });

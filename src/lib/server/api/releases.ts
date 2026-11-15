@@ -4,6 +4,7 @@ import { record } from '../activity.js';
 import { git } from '../git.js';
 import { afterPush, refSnapshot } from '../push.js';
 import { now, refSha, repoOf, userJson, type RepoCtx } from './common.js';
+import { notMirror } from './protect.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
 
 type ReleaseRow = { id: number; repo_id: number; tag: string; target: string; name: string; body: string; draft: number; prerelease: number; user_id: number; created_at: string; published_at: string | null };
@@ -57,7 +58,7 @@ route('GET', '/repos/:owner/:repo/releases/:id', (c) => {
 	return json(c, r, releaseOf(c, r));
 });
 
-// A release's tag is made from `target_commitish` if it doesn't exist yet.
+// A release's tag is made from `target_commitish` if it doesn't exist yet (not on a mirror, whose tags come from the repo it copies).
 route('POST', '/repos/:owner/:repo/releases', async (c) => {
 	const r = repoOf(c, 'write');
 	const u = me(c);
@@ -65,6 +66,7 @@ route('POST', '/repos/:owner/:repo/releases', async (c) => {
 	if (!/^[A-Za-z0-9._/-]{1,200}$/.test(b.tag_name ?? '') || b.tag_name.includes('..') || b.tag_name.startsWith('-')) error(422, 'Invalid tag name');
 	if (c.db.query('select 1 from releases where repo_id = ? and tag = ?').get(r.row.id, b.tag_name)) error(409, `There's already a release for ${b.tag_name}`);
 	if (!b.draft && !(await refSha(r.dir, `refs/tags/${b.tag_name}`))) {
+		notMirror(r.row);
 		const sha = (await refSha(r.dir, b.target_commitish || r.row.default_branch)) ?? error(404, `Can't find ${b.target_commitish}`);
 		const before = await refSnapshot(r.dir);
 		await git(r.dir, ['update-ref', `refs/tags/${b.tag_name}`, sha, '0'.repeat(40)]);
@@ -86,6 +88,7 @@ route('PATCH', '/repos/:owner/:repo/releases/:id', async (c) => {
 	const draft = b.draft ?? !!x.draft;
 	const tag = b.tag_name ?? x.tag;
 	if (!draft && !(await refSha(r.dir, `refs/tags/${tag}`))) {
+		notMirror(r.row);
 		const sha = (await refSha(r.dir, b.target_commitish ?? x.target)) ?? error(404, `Can't find ${x.target}`);
 		const before = await refSnapshot(r.dir);
 		await git(r.dir, ['update-ref', `refs/tags/${tag}`, sha, '0'.repeat(40)]);
