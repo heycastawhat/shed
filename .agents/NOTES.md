@@ -118,8 +118,8 @@ Everything is on branch `shed`, committed, not pushed, not deployed. Open work, 
    has never been built (this machine can't run x86).
 3. **Agents end to end**: done 2026-11-16 against real T3 (pairing, clone into T3, `@agent` on an issue with the summary posted back, approvals from
    Shed's task view, Fix with agent, a hub task); `agents-t3.test.ts` covers the same with a fake T3. Setup clones over SSH, so the T3 host needs its
-   key on the account and Shed's host key in `known_hosts` (T3's git is non-interactive). If T3's clone fails, Shed doesn't hear about it and
-   T3 keeps an empty project.
+   key on the account and Shed's host key in `known_hosts` (T3's git is non-interactive). A failed or running clone shows on the repo's
+   Agents tab (T3's `subscribeProjectClones`) with Try again.
 4. **Small gaps**: renaming/transferring a repo doesn't update token repo lists, agent key scopes or pins (`forge.json`); `runs-on` only
    resolves `${{ matrix.* }}`; release tags can still be created on mirrors; mobile polish.
 
