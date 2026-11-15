@@ -13,8 +13,12 @@ export function access(db: Database, userId: number | undefined, repo: RepoRow):
 	if (repo.owner_id === userId) return 'admin';
 	const u = db.query<{ admin: number }, [number]>('select admin from users where id = ?').get(userId);
 	if (u?.admin) return 'admin';
+	// In an org's repo, the org's owners administer it and its members can write.
+	const m = db.query<{ role: string }, [number, number]>('select role from org_members where org_id = ? and user_id = ?').get(repo.owner_id, userId);
+	if (m?.role === 'owner') return 'admin';
 	const c = db.query<{ permission: Level }, [number, number]>('select permission from collaborators where repo_id = ? and user_id = ?').get(repo.id, userId);
-	const level = c?.permission ?? 'none';
+	const levels: Level[] = [c?.permission ?? 'none', m ? 'write' : 'none'];
+	const level = levels.reduce((a, b) => (RANK[a] >= RANK[b] ? a : b));
 	return RANK[level] > RANK[pub] ? level : pub;
 }
 

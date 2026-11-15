@@ -1,19 +1,21 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit';
 import { api, request, type Repo, type User } from '#lib/server/forgejo.js';
 import { needsYou, openPush, recentPush } from '#lib/server/home.js';
+import { visibleRepos } from '#lib/server/shedrepo.js';
 import { update } from '#lib/server/store.js';
 import { decide } from '#lib/server/tools.js';
 
-export async function load({ locals }) {
-	if (!locals.token) return { needs: [], push: null, repos: [] };
+export async function load({ locals, url }) {
+	if (!locals.user) return { needs: [], push: null, repos: [] };
+	const repos = visibleRepos(locals.user.id, url.origin).slice(0, 6);
+	if (!locals.token) return { needs: [], push: null, repos };
 	const me = await api<User>(locals.token, '/user');
 	// These come from several API calls; a failure in one shouldn't blank the whole page.
-	const [needs, push, repos] = await Promise.all([
+	const [needs, push] = await Promise.all([
 		needsYou(locals.token, me).catch(() => []),
 		recentPush(locals.token, me).catch(() => null),
-		api<Repo[]>(locals.token, '/user/repos?limit=50').catch(() => [])
 	]);
-	return { needs, push, repos: repos.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 6) };
+	return { needs, push, repos };
 }
 
 async function act(token: string | undefined, run: (me: User, token: string) => Promise<unknown>) {

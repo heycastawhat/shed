@@ -1,8 +1,9 @@
-import { api, type Repo, type User } from '#lib/server/forgejo.js';
-import { feedEvents, type Feed } from '#lib/server/feed.js';
-
-type Owner = User & { description: string; website: string; location: string; created: string; followers_count: number; following_count: number; starred_repos_count: number };
-type Org = User & { name: string; description: string; website: string; location: string };
+import { error, redirect } from '@sveltejs/kit';
+import { toUser, type UserRow } from '#lib/server/accounts.js';
+import { heatmap, orgFeed, userFeed } from '#lib/server/activity.js';
+import { feedEvents } from '#lib/server/feed.js';
+import { db } from '#lib/server/shed.js';
+import { visibleRepos } from '#lib/server/shedrepo.js';
 // Contributions per day for the last 53 weeks, ending today, starting on a Sunday so the grid's rows are weekdays.
 function calendar(heat: { timestamp: number; contributions: number }[]) {
 	const day = (d: Date) => d.toLocaleDateString('en-CA');
@@ -15,19 +16,36 @@ function calendar(heat: { timestamp: number; contributions: number }[]) {
 	return days;
 }
 
-export async function load({ locals, params }) {
-	const [owner, repos, members] = await Promise.all([
-		api<Owner>(locals.token, `/users/${params.owner}`),
-		api<Repo[]>(locals.token, `/users/${params.owner}/repos?limit=50`),
-		// Only orgs have members; a user 404s here.
-		api<User[]>(locals.token, `/orgs/${params.owner}/members?limit=50`).catch(() => null)
-	]);
-	const org = !!members;
-	const [orgs, heat, feed] = await Promise.all([
-		org ? [] : api<Org[]>(locals.token, `/users/${params.owner}/orgs`).catch(() => []),
-		org ? [] : api<{ timestamp: number; contributions: number }[]>(locals.token, `/users/${params.owner}/heatmap`).catch(() => []),
-		api<Feed[]>(locals.token, org ? `/orgs/${params.owner}/activities/feeds?limit=40` : `/users/${params.owner}/activities/feeds?only-performed-by=true&limit=40`).catch(() => [])
-	]);
-	repos.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-	return { owner, repos, members, orgs, days: org ? null : calendar(heat), feed: feedEvents(feed) };
+export function load({ locals, params, url }) {
+	if (!locals.user) redirect(303, '/login');
+	const row = db.query<UserRow & { created_at: string; description: string; website: string; location: string }, [string]>("select * from users where login = ? and kind != 'agent'").get(params.owner);
+	if (!row) error(404, `No user or organization called ${params.owner}`);
+	const org = row.kind === 'org';
+	const repos = visibleRepos(locals.user.id, url.origin, row.id);
+	const visible = visibleRepos(locals.user.id, url.origin).map((r) => r.id);
+	const members = org ? db.query<UserRow, [number]>('select u.* from users u join org_members m on m.user_id = u.id where m.org_id = ? order by u.login').all(row.id).map(toUser) : null;
+	const orgs = org
+		? []
+		: db
+				.query<UserRow, [number]>("select u.* from users u join org_members m on m.org_id = u.id where m.user_id = ? and u.kind = 'org' order by u.login")
+				.all(row.id)
+				.map((g) => ({ ...toUser(g), name: g.login }));
+	const owner = {
+		...toUser(row),
+		description: row.description,
+		website: row.website,
+		location: row.location,
+		created: row.created_at,
+		followers_count: 0,
+		following_count: 0,
+		starred_repos_count: 0
+	};
+	return {
+		owner,
+		repos,
+		members,
+		orgs,
+		days: org ? null : calendar(heatmap(db, row.id)),
+		feed: feedEvents(org ? orgFeed(db, row.id, visible) : userFeed(db, row.id, visible))
+	};
 }

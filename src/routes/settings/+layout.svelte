@@ -5,6 +5,7 @@
 	const pages = $derived([
 		['/settings/account', 'Account', 0],
 		['/settings/appearance', 'Appearance', 0],
+		['/settings/tokens', 'Tokens', 0],
 		['/settings/agents', 'Agents', data.waiting]
 	] as const);
 </script>

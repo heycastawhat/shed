@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { RESERVED } from '#lib/reserved.js';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -30,7 +31,7 @@
 	});
 
 	const path = $derived(page.url.pathname);
-	const NOT_REPOS = new Set(['', 'changes', 'settings', 'login', 'logout', 'auth', 'mcp', 'pin', 'prefs', 'palette.json', 'repos', 'new', 'agents', 'explore', 'notifications', 'search', 'orgs', 'healthz']);
+	const NOT_REPOS = RESERVED;
 	const rail = $derived(prefs.nav === 'sidebar' && prefs.collapsed && !narrow);
 
 	const pinned = $derived(

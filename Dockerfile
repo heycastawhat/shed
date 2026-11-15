@@ -4,7 +4,9 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY . .
 # SvelteKit 3 validates env vars while analysing routes; they're read again at runtime, not baked in.
-RUN FORGEJO_URL=http://build FORGEJO_CLIENT_ID=- FORGEJO_CLIENT_SECRET=- FORGE_SECRET=build-time-placeholder-not-a-real-secret bun --bun run build
+RUN FORGEJO_URL=http://build FORGEJO_CLIENT_ID=- FORGEJO_CLIENT_SECRET=- FORGE_SECRET=build-time-placeholder-not-a-real-secret \
+	SHED_OIDC_ISSUER=http://build SHED_OIDC_CLIENT_ID=- SHED_OIDC_CLIENT_SECRET=- SHED_ALLOWED_USERS=user:build bun --bun run build \
+	&& bun build bin/shed.ts --target=bun --outfile build/shed.js
 
 FROM docker.io/oven/bun:1.3
 ARG AGENTS=claude
@@ -19,6 +21,7 @@ ENV PATH=$PATH:/opt/agents/node_modules/.bin
 WORKDIR /app
 COPY --from=build /app/build build
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
+RUN printf '#!/bin/sh\nexec bun /app/build/shed.js "$@"\n' > /usr/local/bin/shed && chmod 755 /usr/local/bin/shed
 RUN mkdir -p /data /home/bun/.t3/projects /home/bun/.claude /home/bun/.codex && chown -R bun:bun /data /home/bun
 USER bun
 RUN git config --global credential.helper 'store --file /home/bun/.t3/git-credentials'

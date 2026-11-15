@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { SHED_ALLOWED_USERS, SHED_DATA, SHED_OIDC_CLIENT_ID, SHED_OIDC_CLIENT_SECRET, SHED_OIDC_ISSUER } from '$app/env/private';
 import { openDb } from './db.js';
+import './activity.js';
 
 // The one database and data folder for this process. Opened on import, so a bad database stops the server at startup (hooks' init imports it).
 mkdirSync(SHED_DATA, { recursive: true });

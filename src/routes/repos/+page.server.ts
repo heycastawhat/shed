@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { api, type Repo } from '#lib/server/forgejo.js';
+import { visibleRepos } from '#lib/server/shedrepo.js';
 
-export async function load({ locals }) {
-	if (!locals.token) redirect(303, '/login');
-	return { repos: await api<Repo[]>(locals.token, '/user/repos?limit=50') };
+export function load({ locals, url }) {
+	if (!locals.user) redirect(303, '/login');
+	return { repos: visibleRepos(locals.user.id, url.origin).slice(0, 100) };
 }

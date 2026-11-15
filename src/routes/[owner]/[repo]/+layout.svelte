@@ -8,7 +8,8 @@
 	const base = $derived(`/${data.repo.full_name}`);
 	const pinned = $derived(data.pins.includes(data.repo.full_name));
 	const listing = $derived(page.route.id?.match(/\/(branches|releases)$/)?.[1]);
-	let proto = $state<'ssh' | 'https'>('ssh');
+	// svelte-ignore state_referenced_locally
+	let proto = $state<'ssh' | 'https'>(data.repo.ssh_url ? 'ssh' : 'https');
 	const url = $derived(proto === 'ssh' ? data.repo.ssh_url : data.repo.clone_url);
 	const section = $derived(
 		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity)/)?.[1] ??
@@ -77,7 +78,7 @@
 		<h2>This repository is empty</h2>
 		<p class="muted">Push an existing project to it:</p>
 		<div class="proto" role="group" aria-label="Remote type">
-			<button class:on={proto === 'ssh'} onclick={() => (proto = 'ssh')}>SSH</button>
+			{#if data.repo.ssh_url}<button class:on={proto === 'ssh'} onclick={() => (proto = 'ssh')}>SSH</button>{/if}
 			<button class:on={proto === 'https'} onclick={() => (proto = 'https')}>HTTPS</button>
 		</div>
 		<pre>git remote add origin {url}

@@ -1,8 +1,12 @@
 import type { Database } from 'bun:sqlite';
 import { error } from '@sveltejs/kit';
+import { RESERVED } from '../reserved.js';
 
 export type Claims = { sub: string; email?: string; email_verified?: boolean; preferred_username?: string; name?: string; picture?: string };
 export type UserRow = { id: number; login: string; kind: 'user' | 'org' | 'agent'; name: string; email: string | null; avatar_url: string; admin: number };
+
+export const avatar = (u: Pick<UserRow, 'login' | 'avatar_url'>) => u.avatar_url || `/avatars/${encodeURIComponent(u.login)}.svg`;
+export const toUser = (u: Pick<UserRow, 'id' | 'login' | 'name' | 'avatar_url'>) => ({ id: u.id, login: u.login, full_name: u.name, avatar_url: avatar(u) });
 
 const MONTH = 30 * 24 * 60 * 60 * 1000;
 const hash = (s: string) => new Bun.CryptoHasher('sha256').update(s).digest('hex');
@@ -32,8 +36,15 @@ export function isAllowed(list: string[], c: Claims) {
 // The provider's username becomes the login, made URL-safe and unique. Later sign-ins keep the login and refresh name, email and avatar.
 // The first person to sign in is the admin.
 export function signIn(db: Database, c: Claims) {
-	const existing = db.query<UserRow, [string]>('select * from users where oidc_sub = ?').get(c.sub);
 	const email = c.email && c.email_verified !== false ? c.email : null;
+	// Accounts made by the Forgejo importer have no sub yet; the first allowed sign-in with the same verified email, or failing that
+	// the same username, claims one.
+	const unclaimed = db.query<UserRow, [string | null, string]>(
+		"select * from users where oidc_sub is null and kind = 'user' and ((? is not null and email = ?1) or login = ?2) order by (email = ?1) desc limit 1"
+	);
+	const claim = db.query<{ id: number }, [string]>('select id from users where oidc_sub = ?').get(c.sub) ? null : unclaimed.get(email, c.preferred_username ?? '');
+	if (claim) db.query('update users set oidc_sub = ? where id = ?').run(c.sub, claim.id);
+	const existing = db.query<UserRow, [string]>('select * from users where oidc_sub = ?').get(c.sub);
 	if (existing) {
 		db.query('update users set name = ?, email = coalesce(?, email), avatar_url = ? where id = ?').run(c.name ?? existing.name, email, c.picture ?? '', existing.id);
 		return existing.id;
@@ -46,7 +57,7 @@ export function signIn(db: Database, c: Claims) {
 			.slice(0, 90) || 'user';
 	const taken = db.query<{ n: number }, [string]>('select count(*) as n from users where login = ?');
 	let login = base;
-	for (let i = 2; taken.get(login)!.n; i++) login = `${base}-${i}`;
+	for (let i = 2; taken.get(login)!.n || RESERVED.has(login.toLowerCase()); i++) login = `${base}-${i}`;
 	const first = db.query<{ n: number }, []>("select count(*) as n from users where kind = 'user'").get()!.n === 0;
 	return Number(
 		db

@@ -1,11 +1,14 @@
-import { api, type CommitDetail } from '#lib/server/forgejo.js';
-import { loadDiff } from '#lib/server/diff.js';
+import { error } from '@sveltejs/kit';
+import { parseDiff } from '#lib/diff.js';
+import { commit, commitDiff, resolve } from '#lib/server/browse.js';
+import { highlightDiff } from '#lib/server/highlight.js';
+import { db } from '#lib/server/shed.js';
+import { repoFor, toCommits } from '#lib/server/shedrepo.js';
 
 export async function load({ locals, params }) {
-	const base = `/repos/${params.owner}/${params.repo}/git/commits/${params.sha}`;
-	const [commit, files] = await Promise.all([
-		api<CommitDetail>(locals.token, `${base}?stat=false&verification=false&files=false`),
-		loadDiff(locals.token, `${base}.diff`)
-	]);
-	return { commit, files };
+	const { dir } = repoFor(locals, params.owner, params.repo);
+	const sha = await resolve(dir, params.sha);
+	if (!sha) error(404, `No commit ${params.sha}`);
+	const [c, diff] = await Promise.all([commit(dir, sha), commitDiff(dir, sha)]);
+	return { commit: toCommits(db, [c])[0], files: await highlightDiff(parseDiff(diff)) };
 }

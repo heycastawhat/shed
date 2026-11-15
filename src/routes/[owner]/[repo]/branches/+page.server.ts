@@ -1,40 +1,42 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit';
-import { api, request, type Pull } from '#lib/server/forgejo.js';
+import { aheadBehind, branches } from '#lib/server/browse.js';
+import { api, type Pull } from '#lib/server/forgejo.js';
+import { git, gitTry } from '#lib/server/git.js';
+import { afterPush, refSnapshot } from '#lib/server/push.js';
+import { db, root } from '#lib/server/shed.js';
+import { repoFor, toCommits } from '#lib/server/shedrepo.js';
 import { openPush } from '#lib/server/home.js';
 
-type BranchInfo = {
-	name: string;
-	protected: boolean;
-	user_can_push: boolean;
-	commit: { id: string; message: string; timestamp: string; author: { name: string; username: string } };
-};
+// Ahead/behind is cheap with git, but still one call per branch, so cap it for repos with hundreds of branches.
+const COMPARED = 50;
 
-// Each count is a full compare (commits and files), so only the most recent branches get one.
-const COMPARED = 20;
-
-export async function load({ locals, parent }) {
+export async function load({ locals, params, parent }) {
 	const { repo } = await parent();
-	const base = `/repos/${repo.full_name}`;
+	const { dir } = repoFor(locals, params.owner, params.repo);
 	const def = repo.default_branch;
-	const [all, pulls] = await Promise.all([api<BranchInfo[]>(locals.token, `${base}/branches?limit=100`), api<Pull[]>(locals.token, `${base}/pulls?state=open&limit=50`)]);
-	const branches = all.sort((a, b) => +(b.name === def) - +(a.name === def) || Date.parse(b.commit.timestamp) - Date.parse(a.commit.timestamp));
-	const count = (from: string, to: string) =>
-		api<{ total_commits: number }>(locals.token, `${base}/compare/${encodeURIComponent(from)}...${encodeURIComponent(to)}`).then((c) => c.total_commits, () => null);
-	const counts = await Promise.all(branches.slice(1, COMPARED + 1).map((b) => Promise.all([count(def, b.name), count(b.name, def)])));
+	const [all, pulls] = await Promise.all([
+		branches(dir),
+		// Bridge: PRs still live in Forgejo.
+		locals.token ? api<Pull[]>(locals.token, `/repos/${repo.full_name}/pulls?state=open&limit=50`).catch(() => []) : []
+	]);
+	const list = all.sort((a, b) => +(b.name === def) - +(a.name === def) || Date.parse(b.date) - Date.parse(a.date));
+	const defSha = list.find((b) => b.name === def)?.sha;
+	const counts = await Promise.all(list.slice(1, COMPARED + 1).map((b) => (defSha ? aheadBehind(dir, defSha, b.sha) : null)));
+	const users = toCommits(db, list.map((b) => ({ sha: b.sha, parents: [], author: b.author, email: b.email, date: b.date, committer: '', committerEmail: '', committed: '', message: b.subject })));
 	return {
-		branches: branches.map((b, i) => {
+		branches: list.map((b, i) => {
 			const pr = pulls.find((p) => p.head.ref === b.name);
-			const [ahead, behind] = counts[i - 1] ?? [null, null];
+			const c = counts[i - 1];
 			return {
 				name: b.name,
-				sha: b.commit.id,
-				message: b.commit.message,
-				date: b.commit.timestamp,
-				author: b.commit.author.username || b.commit.author.name,
+				sha: b.sha,
+				message: b.subject,
+				date: b.date,
+				author: users[i].author?.login ?? b.author,
 				pr: pr && { number: pr.number, title: pr.title },
-				ahead,
-				behind,
-				deletable: !!repo.permissions?.push && b.user_can_push && !b.protected && b.name !== def
+				ahead: c?.ahead ?? null,
+				behind: c?.behind ?? null,
+				deletable: !!repo.permissions?.push && b.name !== def
 			};
 		})
 	};
@@ -54,16 +56,15 @@ export const actions = {
 		redirect(303, `/${params.owner}/${params.repo}/pulls/${number}`);
 	},
 	delete: async ({ locals, params, request: req }) => {
-		const base = `/repos/${params.owner}/${params.repo}`;
+		const { row, dir } = repoFor(locals, params.owner, params.repo, 'write');
 		const name = await branch(req);
-		try {
-			const [repo, b] = await Promise.all([api<{ default_branch: string }>(locals.token, base), api<BranchInfo>(locals.token, `${base}/branches/${encodeURIComponent(name)}`)]);
-			if (name === repo.default_branch || b.protected) return fail(403, { error: `${name} is ${b.protected ? 'protected' : 'the default branch'}, so it can't be deleted` });
-			await request(locals.token, `${base}/branches/${encodeURIComponent(name)}`, { method: 'DELETE' });
-		} catch (e) {
-			if (isHttpError(e)) return fail(e.status, { error: e.body.message });
-			throw e;
-		}
+		if (name === row.default_branch) return fail(403, { error: `${name} is the default branch, so it can't be deleted` });
+		const sha = await gitTry(dir, ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]);
+		if (!sha) return fail(404, { error: `There's no branch called ${name}` });
+		// Compare-and-swap: if someone pushed to it since, the delete fails rather than losing their commit.
+		const before = await refSnapshot(dir);
+		await git(dir, ['update-ref', '-d', `refs/heads/${name}`, sha.trim()]);
+		await afterPush(db, root, row, locals.user!.id, before);
 		return { deleted: name };
 	}
 };

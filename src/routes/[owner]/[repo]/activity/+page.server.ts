@@ -1,7 +1,9 @@
-import { api } from '#lib/server/forgejo.js';
-import { feedEvents, type Feed } from '#lib/server/feed.js';
+import { repoFeed } from '#lib/server/activity.js';
+import { feedEvents } from '#lib/server/feed.js';
+import { db } from '#lib/server/shed.js';
+import { repoFor } from '#lib/server/shedrepo.js';
 
-export async function load({ locals, params }) {
-	const feed = await api<Feed[]>(locals.token, `/repos/${params.owner}/${params.repo}/activities/feeds?limit=50`).catch(() => []);
-	return { feed: feedEvents(feed, 50) };
+export function load({ locals, params }) {
+	const { row } = repoFor(locals, params.owner, params.repo);
+	return { feed: feedEvents(repoFeed(db, row.id), 50) };
 }

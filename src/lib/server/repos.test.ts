@@ -17,7 +17,7 @@ afterEach(() => rm(root, { recursive: true }));
 test('migrations run once and reopening is a no-op', () => {
 	db.close();
 	db = openDb(`${root}/shed.db`);
-	expect(db.query('pragma user_version').get()).toEqual({ user_version: 2 });
+	expect(db.query('pragma user_version').get()).toEqual({ user_version: 3 });
 });
 
 test('refuses a database from a newer build', () => {
@@ -50,4 +50,18 @@ test('delete moves the git data to trash', async () => {
 	expect(getRepo(db, 'ada', 'sample')).toBeNull();
 	expect(await readdir(`${root}/repos`)).toHaveLength(0);
 	expect(await readdir(`${root}/trash`)).toHaveLength(1);
+});
+
+test('commitFiles writes without a checkout and refuses a stale parent', async () => {
+	const { commitFiles } = await import('./write.js');
+	const id = await createRepo(db, root, ada, { name: 'w' });
+	const dir = repoDir(root, id);
+	const me = { name: 'Ada', email: 'j@x.nz' };
+	const first = await commitFiles(dir, { branch: 'main', parent: null, changes: [{ path: 'README.md', content: '# w\n' }, { path: 'src/a.ts', content: 'x' }], message: 'Init', author: me });
+	const second = await commitFiles(dir, { branch: 'main', parent: first, changes: [{ path: 'src/a.ts', content: null }, { path: 'b.txt', content: 'b' }], message: 'Edit', author: me });
+	expect(await git(dir, ['ls-tree', '-r', '--name-only', 'main'])).toBe('README.md\nb.txt\n');
+	expect(await git(dir, ['log', '--format=%s %an', 'main'])).toBe('Edit Ada\nInit Ada\n');
+	await expect(commitFiles(dir, { branch: 'main', parent: first, changes: [{ path: 'c', content: 'c' }], message: 'Stale', author: me })).rejects.toThrow();
+	await expect(commitFiles(dir, { branch: 'main', parent: second, changes: [{ path: '../x', content: 'c' }], message: 'Bad', author: me })).rejects.toThrow(/Invalid path/);
+	expect((await git(dir, ['rev-parse', 'main'])).trim()).toBe(second);
 });

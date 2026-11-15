@@ -50,7 +50,28 @@ const MIGRATIONS = [
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 		last_seen_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 	);`,
-	`alter table users add column avatar_url text not null default '';`
+	`alter table users add column avatar_url text not null default '';`,
+	`create table org_members (
+		org_id integer not null references users(id) on delete cascade,
+		user_id integer not null references users(id) on delete cascade,
+		role text not null default 'member' check (role in ('owner', 'member')),
+		primary key (org_id, user_id)
+	);
+	alter table users add column description text not null default '';
+	alter table users add column website text not null default '';
+	alter table users add column location text not null default '';
+	-- What people did, for profile and repo activity and the contribution heatmap. Shapes follow Forgejo's feed (op names, content).
+	create table activity (
+		id integer primary key,
+		user_id integer not null references users(id) on delete cascade,
+		repo_id integer references repos(id) on delete cascade,
+		op text not null,
+		ref text not null default '',
+		content text not null default '',
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create index activity_user on activity (user_id, created_at);
+	create index activity_repo on activity (repo_id, created_at);`
 ];
 
 export function openDb(path: string) {

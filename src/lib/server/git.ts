@@ -24,15 +24,15 @@ export function spawn(args: string[], input?: Input, env: Record<string, string>
 	});
 }
 
-async function run(args: string[], input?: Input) {
-	const proc = spawn(args, input);
+async function run(args: string[], input?: Input, env?: Record<string, string>) {
+	const proc = spawn(args, input, env);
 	const [out, err, code] = await Promise.all([new Response(proc.stdout).bytes(), new Response(proc.stderr).text(), proc.exited]);
 	if (code !== 0) throw new GitError(args[0] === '--git-dir' ? args.slice(2) : args, code, err);
 	return out;
 }
 
-export const gitBytes = (dir: string, args: string[], input?: Input) => run(['--git-dir', dir, ...args], input);
-export const git = async (dir: string, args: string[], input?: Input) => new TextDecoder().decode(await gitBytes(dir, args, input));
+export const gitBytes = (dir: string, args: string[], input?: Input, env?: Record<string, string>) => run(['--git-dir', dir, ...args], input, env);
+export const git = async (dir: string, args: string[], input?: Input, env?: Record<string, string>) => new TextDecoder().decode(await gitBytes(dir, args, input, env));
 
 // Like git(), but a non-zero exit (a missing ref or path, usually) gives null instead of throwing.
 export const gitTry = (dir: string, args: string[], input?: Input) => git(dir, args, input).catch((e) => (e instanceof GitError ? null : Promise.reject(e)));

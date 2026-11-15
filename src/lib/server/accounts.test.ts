@@ -63,3 +63,13 @@ test('tokens', () => {
 	expect(() => createToken(db, ada, { name: ' ', scopes: ['repo:read'] })).toThrow();
 	expect(() => createToken(db, ada, { name: 'x', scopes: ['admin' as 'repo:read'] })).toThrow();
 });
+
+test('a sign-in claims an imported account by email, else by username', () => {
+	const a = Number(db.query("insert into users (login, email) values ('ada', 'j@x.nz')").run().lastInsertRowid);
+	const b = Number(db.query("insert into users (login) values ('kim')").run().lastInsertRowid);
+	db.query("insert into users (login, kind) values ('kiwi', 'org')").run();
+	expect(signIn(db, { sub: 's1', preferred_username: 'adaua', email: 'j@x.nz' })).toBe(a);
+	expect(signIn(db, { sub: 's2', preferred_username: 'kim' })).toBe(b);
+	expect(db.query("select login from users where id = ?").get(signIn(db, { sub: 's3', preferred_username: 'kiwi' }))).toEqual({ login: 'kiwi-2' });
+	expect(signIn(db, { sub: 's1', preferred_username: 'adaua' })).toBe(a);
+});
