@@ -40,6 +40,8 @@ GIT_COMMITTER_NAME=shed agent
 GIT_COMMITTER_EMAIL=<same>
 ```
 
+Optionally `SHED_SMTP_URL=smtps://user:pass@mail.example.com:465` and `SHED_MAIL_FROM` for notification emails.
+
 Back up `FORGE_SECRET` outside the server (password manager).
 
 ## 3. Build and start
@@ -63,6 +65,8 @@ server publishes sites through Cloudflare Tunnel (`cloudflared` service). In the
 - Cloudflare caps request bodies at 100 MB on the free plan, so a push bigger than that over HTTPS fails; push big repos over SSH
   (LAN or Tailscale, port 2223), or the first time with `shed import`.
 - SSH doesn't go through the tunnel.
+- The container registry is at the same host (`docker login shed.example.com`); image layers over 100 MB hit the same Cloudflare cap,
+  so push big images over the LAN/Tailscale address on port 3080 (add it to the Docker daemon's insecure registries) or keep layers small.
 
 Smoke test: open `https://shed.example.com`, sign in with Pocket ID, open a repo, a PR and its Files tab.
 
@@ -109,7 +113,8 @@ docker compose exec shed sh -c 'echo https://ada:<token>@shed.example.com > ~/.t
 ## Updating, backups, rollback
 
 - Update: `git pull && docker compose build && docker compose up -d`.
-- Back up the `data` volume (`shed.db`, `repos/`, wikis, release files, CI logs, `ssh/host_ed25519`) and `FORGE_SECRET`.
+- Back up the `data` volume (`shed.db`, `repos/`, wikis, release files, CI logs and artifacts, `lfs/`, `packages/`, `avatars/`,
+  `ssh/host_ed25519`) and `FORGE_SECRET`.
   For a consistent copy of the database: `docker compose exec shed bun -e "require('bun:sqlite').Database.open('/data/shed.db').run(\"vacuum into '/data/backup.db'\")"`.
 - Rollback: check out the previous commit and rebuild. Migrations only add, but an older build refuses a database a newer one
   has migrated, so restore the matching backup to go back across a migration.

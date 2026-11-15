@@ -33,6 +33,11 @@ Backend (`src/lib/server/`):
   `actions.ts`, `hooks.ts`, `keys.ts`, `code.ts`, `search.ts`.
 - `actions/`: `proto*.ts` (runner.v1 protobuf via protobufjs), `rpc.ts` (Connect RPC at `/api/actions/…`), `workflows.ts` (triggers, matrix,
   single-job payloads like Forgejo's jobparser), `runs.ts` (runs/jobs state machine, statuses, PR events, cancel/rerun).
+- `lfs.ts` (Git LFS batch/basic transfer + locks at `<repo>.git/info/lfs`), `registry.ts` (OCI container registry at `/v2/`, generic packages
+  at `/api/packages/<owner>/generic/…`), `mirror.ts` (copy by URL, pull mirrors synced by the scheduler), `projects.ts` (boards),
+  `orgs.ts`/`avatars.ts`, `mail.ts` (notification email when `SHED_SMTP_URL` is set). `actions/artifacts.ts`: upload/download-artifact v3 (pipelines
+  API at `/api/actions_pipeline/`) and v4 (Twirp at `/twirp/…` + signed blob URLs; the runtime token is a signed JWT carrying run and job).
+  The scheduler (`startScheduler` in `actions/runs.ts`, started from `shed.ts`) ticks each minute: `on: schedule` crons, due mirrors, expired artifacts.
 - `markdown.ts`: markdown-it with raw HTML escaped (safe for `{@html}`), repo-relative links/images, heading anchors, task lists.
 - `importer.ts` + `bin/shed.ts import <forgejo url>`: users/orgs, repos (all refs), issues, PRs, reviews, line comments, labels, milestones,
   releases with files, wikis, collaborators. Re-runnable.
@@ -57,12 +62,16 @@ Dev machine: aarch64 Fedora Aurora; bun in `~/.bun/bin` (`export PATH=$HOME/.bun
   session on Pocket ID), see `.agents/tmp/shed-login.ts`.
 - Test data: `bin/shed.ts import http://localhost:3000` from the old local Forgejo (`dev/forgejo`, seeded by `.agents/scripts/seed.sh`) into
   `ada/sample` (PRs, issues, labels, milestones, release, wiki) and `kiwi/website`. Wipe `data/shed.db*`, `data/repos` etc. to start over.
-- CI: `dev/runner/forgejo-runner` (13.2.1, arm64) registered as `dev` with label `host`; `cd dev/runner && ./forgejo-runner daemon`.
+- CI: `dev/runner/forgejo-runner` (13.2.1, arm64) registered as `dev` with label `host`; start it with
+  `cd dev/runner && PATH=$PWD/bin:$HOME/.bun/bin:$PATH ./forgejo-runner daemon` (`bin/node` → bun, so JS actions run). Artifact actions on
+  Forgejo-style setups: `https://code.forgejo.org/forgejo/upload-artifact@v4` (GitHub's v4 refuses non-GitHub hosts) or `actions/upload-artifact@v3`.
+- `dev/lfs/git-lfs` (3.8.1) for LFS tests; podman for registry tests (`podman login --tls-verify=false localhost:5173`).
   Test scripts open many PRs and each runs `ci.yml` (a 20 s job), so a backlog builds; closing a PR cancels its runs.
 - Checks: `bun run check` (0 errors/warnings) and `bun test src` (real git clients against in-process HTTP and SSH servers, a real-ish CI
   flow is tested by hand with the runner). End to end against the dev server:
   `FJ=localhost:5173 JP=<ada token> RP=<reviewer token> JAR=shed bash .agents/scripts/writes.sh` (needs `.agents/tmp/shed.jar` with a
-  `shed_session` line) and `JT=… RT=… bash .agents/scripts/shed-merges.sh` (merge styles, conflicts, auto-merge, revisions, resolve, protection).
+  `shed_session` line) and `JT=… RT=… bash .agents/scripts/shed-merges.sh` (merge styles, conflicts, auto-merge, revisions, resolve, protection)
+  and `JT=… bash .agents/scripts/shed-mcp.sh` (agent keys and every MCP tool). Tests that load env-reading modules mock it with `test-env.ts`.
 - Pages and screenshots: `cd .agents/tmp && bun shed-pages.ts "$COOKIE" name=/path /path …` (status, console errors, overflow, `shot-name.png`).
 - Commands that hit localhost need the sandbox off. `git` here has no identity: commit with `-c user.name=the owner -c user.email=owner@example.com`.
 
