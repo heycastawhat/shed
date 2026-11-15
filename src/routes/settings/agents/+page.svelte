@@ -230,7 +230,7 @@
 		margin: 1rem 0;
 		padding: 1rem;
 		border: 1px solid var(--accent);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.waiting h2 {
@@ -289,7 +289,7 @@
 		margin: 1rem 0 0;
 		padding: 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.newkey h3 {
@@ -411,7 +411,7 @@
 		list-style: none;
 		padding: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.list li {
 		display: flex;

@@ -169,7 +169,7 @@
 	.card {
 		min-width: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.comment:target .card {
 		border-color: var(--accent);
@@ -222,7 +222,7 @@
 		min-width: 10rem;
 		padding: 0.25rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
 	}

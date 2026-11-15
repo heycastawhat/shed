@@ -1,13 +1,20 @@
+@import '@fontsource-variable/roboto-flex';
+
+/* Colours come from the palettes in src/lib/themes.ts (injected by the root layout). These derive the Material roles for palettes that
+   don't set them, and hold what isn't themed. */
 :root {
-	--bg: #ffffff;
-	--fg: #1a1b1e;
-	--muted: #6b7079;
-	--border: #e3e5e8;
-	--accent: #5b5bd6;
-	--surface: #f6f7f9;
+	--shell: color-mix(in srgb, var(--accent) 5%, var(--surface));
+	--on-accent: var(--bg);
+	--accent-container: color-mix(in srgb, var(--accent) 16%, var(--bg));
+	--on-accent-container: var(--fg);
 	--warn: #b45309;
+	--radius: 12px;
+	--radius-sheet: 28px;
+	--font: 'Roboto Flex Variable', system-ui, sans-serif;
 	color-scheme: light dark;
-	font-family: system-ui, sans-serif;
+	font-family: var(--font);
+	font-size: 15px;
+	-webkit-font-smoothing: antialiased;
 }
 
 /* Theme follows the OS unless Settings → Appearance sets data-theme on <html>. */
@@ -19,23 +26,32 @@
 }
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
-		--bg: #111214;
-		--fg: #e6e7ea;
-		--muted: #8b9099;
-		--border: #26282c;
-		--accent: #8b8bf0;
-		--surface: #18191c;
 		--warn: #f59e0b;
 	}
 }
 :root[data-theme='dark'] {
-	--bg: #111214;
-	--fg: #e6e7ea;
-	--muted: #8b9099;
-	--border: #26282c;
-	--accent: #8b8bf0;
-	--surface: #18191c;
 	--warn: #f59e0b;
+}
+
+/* Roboto Flex's width axis gives headings their own voice, as in Sink. */
+h1,
+h2,
+.wordmark {
+	font-stretch: 115%;
+	letter-spacing: -0.01em;
+}
+h1 {
+	font-weight: 750;
+}
+h2 {
+	font-weight: 680;
+}
+.wordmark {
+	font-size: 1.45rem;
+	font-weight: 820;
+	font-stretch: 132%;
+	letter-spacing: -0.02em;
+	color: var(--accent);
 }
 
 pre,
@@ -46,7 +62,7 @@ td {
 
 body {
 	margin: 0;
-	background: var(--bg);
+	background: var(--shell);
 	color: var(--fg);
 }
 
@@ -55,13 +71,15 @@ a {
 	text-decoration: none;
 }
 
+/* Buttons are Material pills: outlined by default, tonal for .tonal, filled for .primary. */
 button,
 .button {
 	font: inherit;
-	padding: 0.35rem 0.8rem;
+	font-weight: 500;
+	padding: 0.38rem 0.95rem;
 	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: var(--surface);
+	border-radius: 999px;
+	background: transparent;
 	color: var(--fg);
 	cursor: pointer;
 	transition:
@@ -71,7 +89,22 @@ button,
 }
 button:hover:not(:disabled),
 .button:hover {
-	border-color: color-mix(in srgb, var(--fg) 30%, var(--border));
+	background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+button.tonal,
+.button.tonal {
+	border-color: transparent;
+	background: var(--accent-container);
+	color: var(--on-accent-container);
+}
+button.tonal:hover:not(:disabled),
+.button.tonal:hover {
+	background: color-mix(in srgb, var(--on-accent-container) 8%, var(--accent-container));
+}
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+textarea {
+	border-radius: 10px;
 }
 :focus-visible {
 	outline: 2px solid var(--accent);
@@ -213,15 +246,17 @@ textarea {
 	--hunk-bg: #161b2e;
 }
 
-button.primary {
+button.primary,
+.button.primary {
 	background: var(--accent);
 	border-color: var(--accent);
-	color: var(--bg);
+	color: var(--on-accent);
 	font-weight: 600;
 }
-button.primary:hover:not(:disabled) {
-	border-color: var(--accent);
-	filter: brightness(1.1);
+button.primary:hover:not(:disabled),
+.button.primary:hover {
+	background: var(--accent);
+	filter: brightness(1.08);
 }
 button.primary:disabled {
 	opacity: 0.5;

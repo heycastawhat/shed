@@ -34,7 +34,7 @@
 		margin: 0;
 		padding: 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		min-width: 0;
 	}
 	legend {

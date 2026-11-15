@@ -88,7 +88,7 @@
 		margin-bottom: 1rem;
 		padding: 0.25rem 0.25rem 0.25rem 0.75rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		color: var(--muted);
 	}
 	.find:focus-within {
@@ -114,7 +114,7 @@
 		margin-bottom: 0.9rem;
 		padding: 0.2rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.filters a {
@@ -142,7 +142,7 @@
 		margin: 0;
 		padding: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.list li {

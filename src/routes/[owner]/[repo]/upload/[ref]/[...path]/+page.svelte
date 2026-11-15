@@ -80,7 +80,7 @@
 		gap: 0.4rem;
 		padding: 2.5rem 1rem;
 		border: 1px dashed var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		text-align: center;
 		color: var(--muted);
 		cursor: pointer;
@@ -112,7 +112,7 @@
 		margin: 0;
 		padding: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.files li {
 		display: flex;

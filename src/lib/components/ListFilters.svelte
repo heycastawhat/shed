@@ -86,7 +86,7 @@
 		gap: 0.35rem;
 		padding: 0.3rem 0.6rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 		color: var(--muted);
 		font-size: 0.9rem;
@@ -117,7 +117,7 @@
 		margin: 0;
 		padding: 0.25rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 		box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
 	}

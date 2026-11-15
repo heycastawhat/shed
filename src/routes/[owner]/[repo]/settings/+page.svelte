@@ -131,7 +131,7 @@
 		margin: 0 0 1.5rem;
 		padding: 0.7rem 1rem;
 		border: 1px solid var(--warn);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: color-mix(in srgb, var(--warn) 10%, transparent);
 	}
 	.style {

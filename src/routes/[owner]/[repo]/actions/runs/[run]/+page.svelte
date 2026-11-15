@@ -164,13 +164,14 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.45rem 0.6rem;
-		border-radius: 6px;
+		border-radius: 999px;
 		color: var(--fg);
 		text-decoration: none;
 	}
 	nav a.on,
 	nav a:hover {
-		background: color-mix(in srgb, var(--fg) 9%, transparent);
+		background: var(--accent-container);
+		color: var(--on-accent-container);
 	}
 	h4 {
 		margin: 1rem 0.6rem 0.3rem;
@@ -215,7 +216,7 @@
 	}
 	.log {
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 		overflow: hidden;
 	}

@@ -57,7 +57,7 @@
 		font-size: 1.05rem;
 		padding: 0.5rem 0.75rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		color: var(--fg);
 	}
@@ -67,7 +67,7 @@
 	}
 	.compose {
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.compose:focus-within {

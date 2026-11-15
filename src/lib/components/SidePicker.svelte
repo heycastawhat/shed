@@ -105,7 +105,7 @@
 		padding: 0.25rem;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.picker button {

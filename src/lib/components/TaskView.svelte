@@ -294,7 +294,7 @@
 		margin: 0 1rem 1rem;
 		padding: 0.8rem 1rem;
 		border: 1px solid var(--warn);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: color-mix(in srgb, var(--warn) 8%, var(--bg));
 		display: grid;
 		gap: 0.5rem;
@@ -419,7 +419,7 @@
 		gap: 0.6rem;
 		padding: 0.5rem 0.7rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		cursor: pointer;
 	}
@@ -437,7 +437,7 @@
 	.other {
 		padding: 0.45rem 0.7rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		color: var(--fg);
 		font: inherit;

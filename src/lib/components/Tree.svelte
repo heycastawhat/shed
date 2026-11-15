@@ -120,7 +120,7 @@
 		min-width: 10rem;
 		padding: 0.3rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
 	}
@@ -135,7 +135,7 @@
 	.tree,
 	.readme {
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.tree {
 		list-style: none;

@@ -147,12 +147,13 @@
 		align-items: center;
 		gap: 0.3rem;
 		padding: 0.3rem 0.5rem;
-		border-radius: 6px;
+		border-radius: 999px;
 		color: var(--fg);
 	}
 	nav a:hover,
 	nav a.on {
-		background: color-mix(in srgb, var(--fg) 9%, transparent);
+		background: var(--accent-container);
+		color: var(--on-accent-container);
 	}
 	nav a.muted {
 		color: var(--muted);
@@ -165,7 +166,7 @@
 		padding: 2.5rem 1rem;
 		color: var(--muted);
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.empty strong {
 		color: var(--fg);

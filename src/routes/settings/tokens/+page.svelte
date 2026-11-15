@@ -69,7 +69,7 @@
 		padding: 1rem;
 		margin-bottom: 1.5rem;
 		border: 1px solid var(--accent);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.token {
 		font-size: 0.95rem;
@@ -125,7 +125,7 @@
 		padding: 0;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.list li {
 		display: flex;

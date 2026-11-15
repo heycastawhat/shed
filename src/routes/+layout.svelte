@@ -133,13 +133,14 @@
 	{#if data.user}
 		<header class="mobile">
 			<button class="icon" onclick={() => (drawer = true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
-			<a class="brand" href="/">Shed</a>
+			<a class="brand wordmark" href="/">Shed</a>
 			<button class="icon" onclick={() => (prefs.palette = true)} aria-label="Search and commands"><Icon name="search" size={20} /></button>
 			<a class="icon" href="/new" aria-label="New repository"><Icon name="plus" size={20} /></a>
 		</header>
 		{#if drawer}<div class="scrim" role="presentation" onclick={() => (drawer = false)}></div>{/if}
 		<aside aria-label="Main" class:open={drawer} class:extra={prefs.nav === 'bar'}>
-			<a class="brand" href="/">Shed</a>
+			<a class="brand wordmark" href="/">Shed</a>
+			<a class="new button tonal" href="/new"><Icon name="plus" /><span class="label">New</span></a>
 			{@render search()}
 			<nav>
 				{#each items as it (it.href)}
@@ -185,7 +186,7 @@
 	{#if !data.user || prefs.nav === 'bar'}
 		<header class="topbar">
 			<div class="bar">
-				<a class="brand" href="/">Shed</a>
+				<a class="brand wordmark" href="/">Shed</a>
 				{#if data.user}
 					<nav>
 						{#each items as it (it.href)}
@@ -214,7 +215,18 @@
 		</header>
 	{/if}
 
-	<main>{@render children()}</main>
+	<div class="sheet"><main>{@render children()}</main></div>
+	{#if data.user}
+		<!-- Phones: the main places as a bottom tab bar, as in Sink; the drawer keeps pins and settings. -->
+		<nav class="tabs" aria-label="Main">
+			{#each items.slice(0, 5) as it (it.href)}
+				<a href={it.href} class:on={it.on} aria-current={it.on ? 'page' : undefined}>
+					<span class="pill"><Icon name={it.icon} size={20} />{#if it.badge}<b class="badge">{it.badge}</b>{/if}</span>
+					<span>{it.label}</span>
+				</a>
+			{/each}
+		</nav>
+	{/if}
 </div>
 
 <Palette />
@@ -222,7 +234,7 @@
 <style>
 	.shell.side {
 		display: grid;
-		grid-template-columns: 15rem 1fr;
+		grid-template-columns: 16rem 1fr;
 		min-height: 100vh;
 	}
 	.shell.side.rail {
@@ -236,18 +248,28 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
-		padding: 0.9rem 0.6rem;
-		border-right: 1px solid var(--border);
-		background: var(--surface);
+		padding: 1rem 0.9rem 1rem 0.6rem;
+		background: var(--shell);
 		overflow-y: auto;
 	}
 	.brand {
 		display: flex;
 		align-items: center;
-		padding: 0.1rem 0.45rem 0.7rem;
-		font-weight: 700;
-		font-size: 1.1rem;
-		color: var(--fg);
+		padding: 0.1rem 0.6rem 0.8rem;
+	}
+	.new {
+		display: inline-flex;
+		align-items: center;
+		align-self: flex-start;
+		gap: 0.5rem;
+		margin: 0 0 0.9rem 0.2rem;
+		padding: 0.55rem 1.2rem 0.55rem 1rem;
+		border-radius: 16px;
+	}
+	.rail .new {
+		align-self: center;
+		margin-inline: 0;
+		padding: 0.55rem;
 	}
 	.search {
 		display: flex;
@@ -255,10 +277,13 @@
 		gap: 0.5rem;
 		width: 100%;
 		margin-bottom: 0.6rem;
-		padding: 0.4rem 0.55rem;
+		padding: 0.5rem 0.8rem;
+		border: 0;
+		border-radius: 999px;
 		color: var(--muted);
-		background: var(--bg);
+		background: color-mix(in srgb, var(--fg) 6%, transparent);
 		text-align: left;
+		font-weight: 400;
 	}
 	.search .label:not(kbd) {
 		flex: 1;
@@ -288,22 +313,19 @@
 	aside nav a {
 		display: flex;
 		align-items: center;
-		gap: 0.65rem;
-		padding: 0.42rem 0.55rem;
-		border-radius: 7px;
-		color: var(--muted);
-	}
-	aside nav a:hover {
-		background: color-mix(in srgb, var(--fg) 5%, transparent);
-		color: var(--fg);
-	}
-	aside nav a.on {
-		background: color-mix(in srgb, var(--fg) 9%, transparent);
+		gap: 0.75rem;
+		padding: 0.6rem 0.9rem;
+		border-radius: 999px;
 		color: var(--fg);
 		font-weight: 500;
 	}
-	aside nav a.on :global(svg) {
-		color: var(--accent);
+	aside nav a:hover {
+		background: color-mix(in srgb, var(--fg) 6%, transparent);
+	}
+	aside nav a.on {
+		background: var(--accent-container);
+		color: var(--on-accent-container);
+		font-weight: 650;
 	}
 	.chord {
 		margin-left: auto;
@@ -314,7 +336,7 @@
 		padding: 0 0.45rem;
 		border-radius: 999px;
 		background: var(--accent);
-		color: var(--bg);
+		color: var(--on-accent);
 		font-size: 0.72rem;
 	}
 	.add {
@@ -375,7 +397,6 @@
 		gap: 0.3rem;
 		margin-top: auto;
 		padding-top: 0.7rem;
-		border-top: 1px solid var(--border);
 	}
 	.collapse {
 		padding: 0.3rem;
@@ -428,7 +449,7 @@
 
 	/* Top bar mode. */
 	.topbar {
-		border-bottom: 1px solid var(--border);
+		background: var(--shell);
 	}
 	.bar {
 		display: flex;
@@ -530,7 +551,7 @@
 		min-width: 12rem;
 		padding: 0.5rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
 	}
@@ -569,16 +590,28 @@
 	.item:hover {
 		background: var(--surface);
 	}
+	/* The page is one big rounded sheet on the tinted shell, as in Sink. */
+	.sheet {
+		min-width: 0;
+		margin: 0.5rem;
+		min-height: calc(100vh - 1rem);
+		box-sizing: border-box;
+		background: var(--bg);
+		border-radius: var(--radius-sheet);
+	}
+	.side .sheet {
+		margin-left: 0;
+	}
 	main {
-		max-width: 960px;
+		max-width: 1040px;
 		width: 100%;
 		margin: 0 auto;
-		padding: 2rem 1.5rem;
+		padding: 2rem 2rem 3rem;
 		box-sizing: border-box;
 		min-width: 0;
 	}
-	.side main {
-		margin: 0 auto;
+	.tabs {
+		display: none;
 	}
 
 	/* Phones: either nav mode becomes a slim bar with the sidebar as an off-canvas drawer. */
@@ -598,7 +631,6 @@
 			align-items: center;
 			gap: 0.25rem;
 			padding: 0.4rem 0.5rem;
-			border-bottom: 1px solid var(--border);
 		}
 		.mobile .brand {
 			flex: 1;
@@ -648,7 +680,55 @@
 			display: none;
 		}
 		main {
-			padding: 1rem;
+			padding: 1.1rem 1rem 1.5rem;
+		}
+		.sheet,
+		.side .sheet {
+			margin: 0;
+			min-height: calc(100dvh - 3.3rem);
+			border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+			padding-bottom: 5rem;
+		}
+		.tabs {
+			display: grid;
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+			position: fixed;
+			z-index: 20;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			padding: 0.45rem 0.25rem calc(0.45rem + env(safe-area-inset-bottom));
+			background: var(--shell);
+		}
+		.tabs a {
+			display: grid;
+			justify-items: center;
+			gap: 0.2rem;
+			color: var(--muted);
+			font-size: 0.72rem;
+			font-weight: 550;
+		}
+		.tabs .pill {
+			position: relative;
+			display: grid;
+			place-items: center;
+			width: 3.5rem;
+			height: 2rem;
+			border-radius: 999px;
+		}
+		.tabs a.on {
+			color: var(--fg);
+		}
+		.tabs a.on .pill {
+			background: var(--accent-container);
+			color: var(--on-accent-container);
+		}
+		.tabs .badge {
+			position: absolute;
+			top: -0.1rem;
+			right: 0.4rem;
+			padding: 0 0.3rem;
+			font-size: 0.62rem;
 		}
 	}
 

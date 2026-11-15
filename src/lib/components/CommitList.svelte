@@ -73,7 +73,7 @@
 		padding: 0;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	li {
 		padding: 0.7rem 1rem;
@@ -88,7 +88,7 @@
 		border-radius: 0 0 8px 8px;
 	}
 	li:only-child {
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	li + li {
 		border-top: 1px solid var(--border);

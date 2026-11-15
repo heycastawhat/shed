@@ -153,7 +153,7 @@
 	.compose {
 		margin-top: 1.5rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.compose:focus-within {
@@ -197,7 +197,7 @@
 		margin-top: 1.5rem;
 		padding: 0.75rem 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.error {

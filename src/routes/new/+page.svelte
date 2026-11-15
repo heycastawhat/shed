@@ -150,7 +150,7 @@
 		gap: 0.6rem;
 		padding: 0.6rem 0.8rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		cursor: pointer;
 	}
 	.check {

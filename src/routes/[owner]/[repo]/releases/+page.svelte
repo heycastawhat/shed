@@ -68,7 +68,7 @@
 		margin-bottom: 0.9rem;
 		padding: 0.2rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.filters a {
@@ -122,7 +122,7 @@
 		scroll-margin-top: 4rem;
 		padding: 1rem 1.2rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.release + .release {
 		margin-top: 1rem;
@@ -197,7 +197,7 @@
 		margin: 0;
 		padding: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		font-size: 0.92rem;
 	}
 	.tags li {

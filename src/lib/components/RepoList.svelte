@@ -41,7 +41,7 @@
 		padding: 0;
 		margin-top: 1.25rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	li {
 		padding: 0.9rem 1rem;

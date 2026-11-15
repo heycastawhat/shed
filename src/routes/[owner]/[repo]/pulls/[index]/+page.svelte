@@ -410,7 +410,7 @@
 	.card {
 		min-width: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.who {
@@ -433,7 +433,7 @@
 	.merge {
 		margin-top: 1.5rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.merge p {
@@ -598,7 +598,7 @@
 	.compose {
 		margin-top: 1.5rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	textarea {
@@ -641,7 +641,7 @@
 		margin-top: 1.5rem;
 		padding: 0.75rem 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.state {

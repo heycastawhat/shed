@@ -42,7 +42,7 @@ docker push {page.url.host}/{data.owner}/my-image:latest</pre>
 		padding: 0;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.list li {
 		display: flex;
@@ -67,7 +67,7 @@ docker push {page.url.host}/{data.owner}/my-image:latest</pre>
 	}
 	.empty {
 		border: 1px dashed var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		padding: 1.5rem;
 	}
 	pre {

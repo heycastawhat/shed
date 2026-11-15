@@ -91,7 +91,7 @@
 		gap: 0.2rem 0.5rem;
 		padding: 0.6rem 0.75rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		color: var(--fg);
 	}
 	aside a.on {

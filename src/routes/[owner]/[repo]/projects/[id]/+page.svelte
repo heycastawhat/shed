@@ -167,7 +167,7 @@
 		gap: 0.5rem;
 		padding: 0.6rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.column.over {

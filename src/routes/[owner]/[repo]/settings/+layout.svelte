@@ -35,14 +35,15 @@
 	}
 	nav a {
 		padding: 0.4rem 0.7rem;
-		border-radius: 6px;
+		border-radius: 999px;
 		color: var(--fg);
 	}
 	nav a:hover {
 		background: var(--surface);
 	}
 	nav a.active {
-		background: color-mix(in srgb, var(--fg) 9%, transparent);
+		background: var(--accent-container);
+		color: var(--on-accent-container);
 		font-weight: 500;
 	}
 	.content {
@@ -70,7 +71,7 @@
 		gap: 0.9rem;
 		padding: 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.content :global(.field) {
 		display: grid;
@@ -133,7 +134,7 @@
 		padding: 0;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.content :global(.list > li) {
 		display: flex;

@@ -1,3 +1,4 @@
+// The last four are Material 3 roles; palettes that don't set them get them mixed from the others in app.css.
 type Vars = {
 	bg: string;
 	surface: string;
@@ -5,29 +6,51 @@ type Vars = {
 	muted: string;
 	border: string;
 	accent: string;
+	shell?: string;
+	onAccent?: string;
+	accentContainer?: string;
+	onAccentContainer?: string;
 };
-export type Theme = { name: string; light: Vars; dark: Vars };
+export type Theme = { name: string; seed?: string; light: Vars; dark: Vars };
 
-// `forge` is app.css's own palette; the rest override it through `data-palette` on <html>.
+// `forge` (Shed) is the default; the rest apply through `data-palette` on <html>. The seeded ones are Material 3 tonal-spot palettes
+// made from one colour by .agents/scripts/m3-palettes.ts, as Sink makes its theme; the named ones are hand-picked.
 export const THEMES: Record<string, Theme> = {
 	forge: {
 		name: 'Shed',
-		light: {
-			bg: '#ffffff',
-			surface: '#f6f7f9',
-			fg: '#1a1b1e',
-			muted: '#6b7079',
-			border: '#e3e5e8',
-			accent: '#5b5bd6'
-		},
-		dark: {
-			bg: '#111214',
-			surface: '#18191c',
-			fg: '#e6e7ea',
-			muted: '#8b9099',
-			border: '#26282c',
-			accent: '#8b8bf0'
-		}
+		seed: '#6750A4',
+		light: {bg: '#fafafc', surface: '#f8f2fa', shell: '#f2ecf4', fg: '#1d1b20', muted: '#49454e', border: '#dfdce2', accent: '#65558f', onAccent: '#ffffff', accentContainer: '#e8def8', onAccentContainer: '#4a4458'},
+		dark: {bg: '#1c1923', surface: '#1d1b20', shell: '#211f24', fg: '#e6e0e9', muted: '#cac4cf', border: '#3b373f', accent: '#cfbdfe', onAccent: '#36275d', accentContainer: '#4a4458', onAccentContainer: '#e8def8'}
+	},
+	teal: {
+		name: 'Teal',
+		seed: '#006A6A',
+		light: {bg: '#f7fbfb', surface: '#eff5f4', shell: '#e9efee', fg: '#161d1d', muted: '#3f4948', border: '#d8dfde', accent: '#006a6a', onAccent: '#ffffff', accentContainer: '#cce8e7', onAccentContainer: '#324b4b'},
+		dark: {bg: '#111d1d', surface: '#161d1d', shell: '#1a2121', fg: '#dde4e3', muted: '#bec9c8', border: '#323b3a', accent: '#80d5d4', onAccent: '#003737', accentContainer: '#324b4b', onAccentContainer: '#cce8e7'}
+	},
+	red: {
+		name: 'Red',
+		seed: '#B3261E',
+		light: {bg: '#fcfaf9', surface: '#fff0ee', shell: '#fceae7', fg: '#231918', muted: '#534341', border: '#e8dad8', accent: '#904a42', onAccent: '#ffffff', accentContainer: '#ffdad5', onAccentContainer: '#5d3f3b'},
+		dark: {bg: '#241816', surface: '#231918', shell: '#271d1c', fg: '#f1dedc', muted: '#d8c2be', border: '#433534', accent: '#ffb4aa', onAccent: '#561e18', accentContainer: '#5d3f3b', onAccentContainer: '#ffdad5'}
+	},
+	orange: {
+		name: 'Orange',
+		seed: '#8B5000',
+		light: {bg: '#fbfaf8', surface: '#fff1e7', shell: '#faebe0', fg: '#211a14', muted: '#51453a', border: '#e6dbd3', accent: '#865319', onAccent: '#ffffff', accentContainer: '#ffdcbe', onAccentContainer: '#59422d'},
+		dark: {bg: '#23190f', surface: '#211a14', shell: '#261e18', fg: '#efe0d5', muted: '#d5c3b5', border: '#42372d', accent: '#fdb975', onAccent: '#4a2800', accentContainer: '#59422d', onAccentContainer: '#ffdcbe'}
+	},
+	green: {
+		name: 'Green',
+		seed: '#386A20',
+		light: {bg: '#f9faf9', surface: '#f2f5ea', shell: '#edefe5', fg: '#191d16', muted: '#43483e', border: '#dbded6', accent: '#446732', onAccent: '#ffffff', accentContainer: '#d8e7cb', onAccentContainer: '#3e4a35'},
+		dark: {bg: '#171d13', surface: '#191d16', shell: '#1d211a', fg: '#e1e4d9', muted: '#c3c8bb', border: '#353a31', accent: '#a9d291', onAccent: '#173807', accentContainer: '#3e4a35', onAccentContainer: '#d8e7cb'}
+	},
+	blue: {
+		name: 'Blue',
+		seed: '#0061A4',
+		light: {bg: '#f9fafc', surface: '#f2f3fa', shell: '#eceef4', fg: '#191c20', muted: '#43474e', border: '#dbdde2', accent: '#36618e', onAccent: '#ffffff', accentContainer: '#d7e3f8', onAccentContainer: '#3b4858'},
+		dark: {bg: '#151b23', surface: '#191c20', shell: '#1d2024', fg: '#e1e2e8', muted: '#c3c6cf', border: '#35393f', accent: '#a0cafd', onAccent: '#003258', accentContainer: '#3b4858', onAccentContainer: '#d7e3f8'}
 	},
 	catppuccin: {
 		name: 'Catppuccin',
@@ -130,14 +153,14 @@ export const isTheme = (t: string | undefined): t is string => !!t && t !== 'for
 
 const block = (v: Vars) =>
 	Object.entries(v)
-		.map(([k, c]) => `--${k}:${c};`)
+		.map(([k, c]) => `--${k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}:${c};`)
 		.join('');
 
 // Same light/dark override pattern as app.css, one selector deeper so a palette beats the default.
 export const themeCss = Object.entries(THEMES)
-	.filter(([id]) => id !== 'forge')
 	.map(([id, t]) => {
-		const p = `:root[data-palette='${id}']`;
+		// The default palette goes on :root itself (with :where so any data-palette one wins).
+		const p = id === 'forge' ? `:root:where(:not([data-palette]))` : `:root[data-palette='${id}']`;
 		return `${p}{${block(t.light)}}@media (prefers-color-scheme: dark){${p}:not([data-theme='light']){${block(t.dark)}}}${p}[data-theme='dark']{${block(t.dark)}}`;
 	})
 	.join('');

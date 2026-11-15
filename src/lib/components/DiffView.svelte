@@ -423,7 +423,7 @@
 		margin: 0 0 1.5rem;
 		padding: 0.4rem 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		font-family: var(--mono);
 		font-size: 0.85rem;
 	}
@@ -470,7 +470,7 @@
 	}
 	.file {
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		margin-bottom: 1rem;
 		overflow: clip;
 		scroll-margin-top: 1rem;
@@ -609,7 +609,7 @@
 		margin: 0.5rem 1rem;
 		max-width: 760px;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		overflow: hidden;
 	}
@@ -726,7 +726,7 @@
 	}
 	.outdated .comment {
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		margin-bottom: 0.5rem;
 	}
 	.expand {

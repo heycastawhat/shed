@@ -98,7 +98,7 @@
 		margin-bottom: 1rem;
 		padding: 0.6rem 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 		font-size: 0.9rem;
 	}
@@ -114,7 +114,7 @@
 		bottom: 1rem;
 		margin-top: 1rem;
 		border: 1px solid var(--accent);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 		background: var(--bg);
 		box-shadow: 0 4px 24px rgb(0 0 0 / 0.25);

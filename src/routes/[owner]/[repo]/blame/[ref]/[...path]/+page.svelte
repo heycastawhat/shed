@@ -42,7 +42,7 @@
 <style>
 	.file {
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.bar {

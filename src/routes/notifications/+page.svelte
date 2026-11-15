@@ -88,7 +88,7 @@
 		gap: 0.2rem;
 		padding: 0.2rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.filters a {
@@ -108,7 +108,7 @@
 	section {
 		margin-bottom: 1.25rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	h2 {
@@ -193,7 +193,7 @@
 		gap: 0.4rem;
 		padding: 3rem 1rem;
 		border: 1px dashed var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		text-align: center;
 	}
 	.error {

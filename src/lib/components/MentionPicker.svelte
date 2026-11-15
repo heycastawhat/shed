@@ -128,7 +128,7 @@
 		list-style: none;
 		background: var(--surface);
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		box-shadow: 0 6px 20px color-mix(in srgb, var(--fg) 14%, transparent);
 	}
 	li {

@@ -102,7 +102,7 @@
 		gap: 0.2rem;
 		padding: 0.2rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.filters a {
@@ -145,7 +145,7 @@
 		padding: 0;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	li {
 		display: flex;

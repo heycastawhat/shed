@@ -153,7 +153,7 @@
 		gap: 0.6rem;
 		padding: 0.75rem 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 		color: var(--muted);
 	}
@@ -194,7 +194,7 @@
 		margin-top: 1rem;
 		padding: 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.open {
 		display: grid;
@@ -205,7 +205,7 @@
 	}
 	.main {
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.main:focus-within {
 		border-color: var(--accent);

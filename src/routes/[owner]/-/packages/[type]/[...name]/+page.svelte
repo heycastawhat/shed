@@ -80,7 +80,7 @@
 		padding: 0.75rem 1rem;
 		background: var(--surface);
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow-x: auto;
 	}
 	.list {
@@ -88,7 +88,7 @@
 		padding: 0;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.list li {
 		display: flex;

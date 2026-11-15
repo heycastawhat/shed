@@ -234,7 +234,7 @@
 	.heat {
 		padding: 0.9rem 1rem 0.75rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.scroll {
 		display: flex;
@@ -322,7 +322,7 @@
 		flex-direction: column;
 		padding: 0.85rem 1rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.top {
 		display: flex;
@@ -384,7 +384,7 @@
 		padding: 2rem;
 		text-align: center;
 		border: 1px dashed var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 
 	@media (max-width: 760px) {

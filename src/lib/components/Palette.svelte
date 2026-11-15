@@ -182,7 +182,7 @@
 		align-items: baseline;
 		gap: 0.7rem;
 		padding: 0.5rem 0.7rem;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		cursor: pointer;
 	}
 	li.active {

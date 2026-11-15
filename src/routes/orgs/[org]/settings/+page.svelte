@@ -86,7 +86,7 @@
 	header img {
 		width: 40px;
 		height: 40px;
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	h1 {
 		margin: 0;
@@ -152,7 +152,7 @@
 		padding: 0;
 		margin: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.list li {
 		display: flex;
@@ -190,7 +190,7 @@
 		gap: 0.5rem;
 		padding: 1rem;
 		border: 1px solid color-mix(in srgb, var(--del-fg) 50%, var(--border));
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.danger-zone .lead {
 		margin: 0;

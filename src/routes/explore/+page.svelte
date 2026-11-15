@@ -59,7 +59,7 @@
 		gap: 0.2rem;
 		padding: 0.2rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--surface);
 	}
 	.filters a {
@@ -84,7 +84,7 @@
 		min-width: 12rem;
 		padding: 0 0.6rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		color: var(--muted);
 	}
 	.find:focus-within {
@@ -119,7 +119,7 @@
 		gap: 0.6rem;
 		padding: 0.75rem;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		color: var(--fg);
 	}
 	.people a:hover {

@@ -196,7 +196,7 @@ git push -u origin {data.repo.default_branch}</pre>
 	.empty {
 		padding: 1.5rem;
 		border: 1px dashed var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.empty h2 {
 		margin: 0 0 0.3rem;
