@@ -5,9 +5,7 @@ The goals are a faster, nicer UI, better code review, and CI built in. It's for 
 
 ## Decisions (don't re-litigate)
 
-- **Headless first, not a fork.** Forgejo does git hosting, auth, storage and CI (Actions). This app only reads and writes through `/api/v1`.
-  If the API blocks a feature (e.g. true stacked diffs, comments that survive a force-push), the agreed fallback
-  is to **hard-fork Forgejo** and add endpoints. Don't do that unprompted.
+- **Shed replaces Forgejo (decided 2026-11-15).** forge began as a headless UI over Forgejo's API; the owner decided to own the backend instead (own git storage, PRs, CI), as Sink does. The design is `PLAN.md`. Until the new backend lands, the code below still talks to Forgejo.
 - Stack: **Bun + SvelteKit 3 + Svelte 5 runes + TypeScript**, Shiki for highlighting. No CSS framework.
 - Markdown is rendered by Forgejo (`POST /markdown`), so output matches Forgejo and is sanitised by it.
 - Theme: purple accent (`--accent`). The user found stock GitHub green jarring, so **primary actions and the Open badge use the accent**.
