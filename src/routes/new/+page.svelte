@@ -7,6 +7,7 @@
 </script>
 
 <h1>New repository</h1>
+<p class="muted">Or <a href="/new/migrate">copy one from another server</a>.</p>
 
 <form
 	method="POST"

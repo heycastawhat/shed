@@ -340,6 +340,7 @@ export function startScheduler(db: Database, root: string) {
 		const now = new Date();
 		now.setUTCSeconds(0, 0);
 		tickSchedules(db, root, now).catch((e) => console.error('schedule', e));
+		void Promise.all([import('../mirror.js'), import('../store.js')]).then(([m, crypt]) => m.syncDueMirrors(db, root, crypt)).catch((e) => console.error('mirror', e));
 		// Hourly: expired artifacts go (their rows stay, marked expired, so run pages still list them).
 		if (now.getUTCMinutes() === 0)
 			for (const a of db.query<{ id: number }, []>("select id from artifacts where expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now') and status = 'done'").all()) {

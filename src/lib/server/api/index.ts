@@ -10,5 +10,6 @@ import './actions.js';
 import './hooks.js';
 import './code.js';
 import './keys.js';
+import './mirror.js';
 import './search.js';
 export { dispatch } from './router.js';

@@ -23,6 +23,7 @@ export type RepoRow = {
 	archived: number;
 	created_at: string;
 	updated_at: string;
+	mirror_url?: string | null;
 };
 
 const SELECT = 'select r.*, u.login as owner from repos r join users u on u.id = r.owner_id';

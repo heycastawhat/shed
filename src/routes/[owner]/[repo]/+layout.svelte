@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import FileFinder from '#lib/components/FileFinder.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import { ago } from '#lib/time.js';
 	import RepoActions from '#lib/components/RepoActions.svelte';
 	import { refPath } from '#lib/repo.js';
 
@@ -40,6 +41,13 @@
 		<RepoActions repo={data.repo.full_name} social={data.social} signedIn={!!data.user} />
 	</h1>
 	{#if data.forkedFrom}<p class="forked"><Icon name="fork" size={13} />forked from <a href="/{data.forkedFrom.owner}/{data.forkedFrom.name}">{data.forkedFrom.owner}/{data.forkedFrom.name}</a></p>{/if}
+	{#if data.mirror}
+		<div class="forked">
+			<Icon name="refresh" size={13} />mirror of <a href={data.mirror.url} rel="noreferrer">{data.mirror.url.replace(/^https?:\/\//, '')}</a>
+			{#if data.mirror.error}· <span class="mirror-error" title={data.mirror.error}>last sync failed</span>{:else if data.mirror.updated_at}· synced {ago(data.mirror.updated_at)}{/if}
+			{#if data.repo.permissions.push}<form method="POST" action="/{data.repo.full_name}/sync" class="sync"><button>Sync now</button></form>{/if}
+		</div>
+	{/if}
 	{#if data.repo.description}<p>{data.repo.description}</p>{/if}
 	<nav>
 		<div class="tabs">
@@ -100,6 +108,17 @@ git push -u origin {data.repo.default_branch}</pre>
 {/if}
 
 <style>
+	.mirror-error {
+		color: var(--del-fg);
+	}
+	.sync {
+		display: inline;
+	}
+	.sync button {
+		font: inherit;
+		font-size: 0.85em;
+		padding: 0.05rem 0.4rem;
+	}
 	.head {
 		margin-bottom: 1.5rem;
 		container-type: inline-size;

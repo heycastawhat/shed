@@ -39,6 +39,7 @@ export async function gitHttp(db: Database, root: string, request: Request, url:
 		return repo && atLeast(level, 'read') ? deny(403, `This token can't push to ${owner}/${name}`) : deny(404, 'Repository not found');
 	}
 	if (need === 'write' && repo.archived) return deny(403, `${owner}/${name} is archived`);
+	if (need === 'write' && repo.mirror_url) return deny(403, `${owner}/${name} is a mirror; push to the repo it copies`);
 
 	const dir = repoDir(root, repo.id);
 	const protocol = request.headers.get('git-protocol') ?? '';

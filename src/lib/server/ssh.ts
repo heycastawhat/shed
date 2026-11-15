@@ -82,6 +82,7 @@ export function startSsh(db: Database, root: string, port: number, host = '0.0.0
 					const push = cmd.service === 'git-receive-pack';
 					if (push && !atLeast(level, 'write')) return fail(`You can't push to ${cmd.owner}/${cmd.repo}`);
 					if (push && repo.archived) return fail(`${cmd.owner}/${cmd.repo} is archived`);
+					if (push && repo.mirror_url) return fail(`${cmd.owner}/${cmd.repo} is a mirror; push to the repo it copies`);
 					const dir = repoDir(root, repo.id);
 					const before = push ? await refSnapshot(dir) : null;
 					// Branch protection runs as a pre-receive hook, as for HTTPS pushes (see pushcheck.ts).
