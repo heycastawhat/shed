@@ -25,6 +25,8 @@ export const variables = defineEnvVars({
 	SHED_ALLOWED_USERS: { description: 'Who may sign in: comma-separated email:…, user:… (provider username) or sub:…', schema: (v) => parseAllowlist(v).join(',') },
 	SHED_ACTIONS_URL: { description: 'Where `uses: actions/checkout@v4` style actions are fetched from (default https://data.forgejo.org)', schema: (v) => (v ? url('SHED_ACTIONS_URL')(v) : 'https://data.forgejo.org') },
 	SHED_RUNNER_TOKEN: { description: 'Optional fixed registration token for forgejo-runner (otherwise make one in Settings → Runners)', schema: (v) => v || undefined },
+	SHED_SSH_PORT: { description: 'Port for git over SSH (0 turns it off)', schema: (v) => (v === undefined || v === '' ? 2222 : Number(v)) },
+	SHED_SSH_URL: { description: 'How clone URLs name the SSH server, e.g. ssh://git@git.example.com:2222 (default: this host and SHED_SSH_PORT)', schema: (v) => v?.replace(/\/+$/, '') || undefined },
 	SHED_DATA: { description: 'Directory for shed.db and the git repos', schema: (v) => v || 'data' },
 	FORGE_DATA: { description: 'Directory for forge.json (agent keys and activity)', schema: (v) => v || 'data' },
 	T3_URL: { description: 'Optional T3 Code server every user gets, e.g. http://localhost:3773. More hosts are added in Settings → Agents', schema: (v) => (v ? url('T3_URL')(v) : undefined) },

@@ -3,6 +3,10 @@ import { toUser, type UserRow } from './accounts.js';
 import type { Repo } from './forgejo.js';
 import type { RepoRow } from './repos.js';
 
+// Where SSH clone URLs point, set once the server knows its host name; empty when SSH is off.
+let sshBase = '';
+export const setSshBase = (b: string) => (sshBase = b);
+
 export function toRepo(row: RepoRow, owner: UserRow, level: Level, empty: boolean, origin: string): Repo {
 	const full = `${row.owner}/${row.name}`;
 	return {
@@ -15,7 +19,7 @@ export function toRepo(row: RepoRow, owner: UserRow, level: Level, empty: boolea
 		default_branch: row.default_branch,
 		owner: toUser(owner),
 		clone_url: `${origin}/${full}.git`,
-		ssh_url: '',
+		ssh_url: sshBase ? `${sshBase}/${full}.git` : '',
 		html_url: `${origin}/${full}`,
 		empty,
 		open_pr_counter: 0,

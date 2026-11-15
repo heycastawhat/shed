@@ -385,7 +385,17 @@ const MIGRATIONS = [
 		value text not null,
 		primary key (repo_id, name)
 	);
-	alter table repos add column next_run integer not null default 1;`
+	alter table repos add column next_run integer not null default 1;`,
+	`create table ssh_keys (
+		id integer primary key,
+		user_id integer not null references users(id) on delete cascade,
+		name text not null,
+		type text not null,
+		key text not null,
+		fingerprint text not null unique,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		last_used_at text
+	);`
 ];
 
 export function openDb(path: string) {

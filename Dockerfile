@@ -26,6 +26,6 @@ RUN mkdir -p /data /home/bun/.t3/projects /home/bun/.claude /home/bun/.codex && 
 USER bun
 RUN git config --global credential.helper 'store --file /home/bun/.t3/git-credentials'
 ENV NODE_ENV=production PORT=3000 FORGE_DATA=/data SHED_DATA=/data BODY_SIZE_LIMIT=Infinity CLAUDE_CONFIG_DIR=/home/bun/.claude
-EXPOSE 3000
+EXPOSE 3000 2222
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD ["bun", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 ENTRYPOINT ["docker-entrypoint.sh"]

@@ -1,45 +1,46 @@
-# Deploying forge
+# Deploying Shed
 
-Target: `https://forge.example.com` on server (`/opt/stacks/forge`, docker compose), backed by `https://git.example.com` (Forgejo 15.0.5).
-Nothing here has been done yet; each step needs the owner's OK because it touches outward-facing systems.
+Target: `https://shed.example.com` on server (`/opt/stacks/shed`, docker compose), signing in with Pocket ID (`https://auth.example.com`),
+replacing Forgejo at `git.example.com` once it's been used for a while. Nothing here has been done yet; each step needs the owner's OK
+because it touches outward-facing systems.
 
-## 1. Register the OAuth app on Forgejo
+## 1. Sign-in (done)
 
-On git.example.com: **Settings → Applications → OAuth2 applications → Create**.
-
-- Name: `forge`
-- Redirect URI: `https://forge.example.com/auth/callback` (exactly this; no trailing slash)
-- Confidential client: **on**
-
-Keep the client ID and secret for step 2. Forgejo refresh tokens are single-use and shared per user per app, so don't reuse this app for anything else.
+Pocket ID already has an OIDC client called **Shed** with callback URLs `https://shed.example.com/auth/callback` (and
+`http://localhost:5173/auth/callback` for local testing). Its client ID and secret are in the dev machine's `.env`
+(`SHED_OIDC_CLIENT_ID`, `SHED_OIDC_CLIENT_SECRET`). Pocket ID gives client secrets an expiry date: check it on the client's page.
 
 ## 2. Check out and configure
 
 ```sh
 ssh server
-sudo mkdir -p /opt/stacks/forge && sudo chown $USER /opt/stacks/forge
-git clone https://git.example.com/ada/forge.git /opt/stacks/forge   # or rsync the repo
-cd /opt/stacks/forge
+sudo mkdir -p /opt/stacks/shed && sudo chown $USER /opt/stacks/shed
+git clone -b shed https://git.example.com/ada/forge.git /opt/stacks/shed   # or rsync the checkout
+cd /opt/stacks/shed
 cp .env.example .env
 ```
 
 Edit `.env`:
 
 ```sh
-FORGEJO_URL=https://git.example.com
-FORGEJO_CLIENT_ID=<from step 1>
-FORGEJO_CLIENT_SECRET=<from step 1>
-# 32+ random bytes. Never change it and never lose it: it encrypts every session's Forgejo grant and every agent key.
-FORGE_SECRET=<output of: head -c 32 /dev/urandom | base64>
+SHED_OIDC_ISSUER=https://auth.example.com
+SHED_OIDC_CLIENT_ID=<from step 1>
+SHED_OIDC_CLIENT_SECRET=<from step 1>
+SHED_ALLOWED_USERS=user:ada
+# 32+ random bytes. Never change it, never lose it: it encrypts CI secrets and T3 host tokens.
+FORGE_SECRET=<head -c 32 /dev/urandom | base64>
+# A fixed runner registration token (or make one in Settings later).
+SHED_RUNNER_TOKEN=<head -c 24 /dev/urandom | base64 | tr -d '/+='>
+# How SSH clone URLs look from outside (server's port 2222 is Forgejo's, so Shed's SSH is on 2223).
+SHED_SSH_URL=ssh://git@server:2223
 # So agents can commit.
-GIT_AUTHOR_NAME=forge agent
-GIT_AUTHOR_EMAIL=<an address Forgejo knows, or a noreply>
-GIT_COMMITTER_NAME=forge agent
+GIT_AUTHOR_NAME=shed agent
+GIT_AUTHOR_EMAIL=<an address, or a noreply>
+GIT_COMMITTER_NAME=shed agent
 GIT_COMMITTER_EMAIL=<same>
-# Leave T3_URL / T3_TOKEN empty: the container sets them for its bundled T3 Code.
 ```
 
-Back up `FORGE_SECRET` somewhere outside the server (password manager).
+Back up `FORGE_SECRET` outside the server (password manager).
 
 ## 3. Build and start
 
@@ -47,54 +48,72 @@ Back up `FORGE_SECRET` somewhere outside the server (password manager).
 AGENTS=claude docker compose build      # claude | codex | both
 docker compose up -d
 docker compose ps                       # wait for "healthy" (GET /healthz)
-docker compose logs -f forge
+docker compose logs -f shed
 ```
 
-The image builds on server itself, so it matches server's CPU architecture. It was build-tested with podman on arm64.
-forge listens on host port **3080**.
+The image builds on server, so it matches its CPU (x86_64; it has only been built on arm64 so far). Web on host port **3080**,
+git over SSH on **2223** (`SHED_HTTP_PORT` / `SHED_SSH_HOST_PORT` change them).
 
-## 4. Reverse proxy
+## 4. Public hostname
 
-Point `forge.example.com` at `http://<server>:3080` with TLS terminated at the proxy. The proxy must pass the original `Host` header
-(the OAuth redirect URI is built from it) and should set `X-Forwarded-For`. Allow large-ish request bodies (diff comments, file edits): 10 MB is plenty.
+server publishes sites through Cloudflare Tunnel (`cloudflared` service). In the Cloudflare dashboard add a public hostname
+`shed.example.com` → `http://localhost:3080`. Cloudflare passes `Host` and terminates TLS, which is what Shed expects
+(cookies are `Secure`, the OAuth callback is built from the host).
 
-forge assumes it is served over **https** (session cookies are `Secure`). Only if it's ever served over plain http, add `PROTOCOL_HEADER=x-forwarded-proto` to `.env` and have the proxy set that header.
+- Cloudflare caps request bodies at 100 MB on the free plan, so a push bigger than that over HTTPS fails; push big repos over SSH
+  (LAN or Tailscale, port 2223), or the first time with `shed import`.
+- SSH doesn't go through the tunnel.
 
-Smoke test: open `https://forge.example.com`, log in (you'll see Forgejo's consent screen once), open a repo, a PR and its Files tab.
+Smoke test: open `https://shed.example.com`, sign in with Pocket ID, open a repo, a PR and its Files tab.
 
-## 5. Agents (optional)
+## 5. Move repos over from Forgejo
+
+Make a Forgejo token that can read everything (Forgejo → Settings → Applications, scopes read:repository, read:user,
+read:organization, read:issue), then:
 
 ```sh
-docker compose exec -it forge claude                      # then /login
-docker compose exec -it forge codex login --device-auth   # if built with codex
-# Let T3 clones push: a Forgejo token with write:repository.
-docker compose exec forge sh -c 'echo https://ada:<token>@git.example.com > ~/.t3/git-credentials'
+docker compose exec -e FORGEJO_TOKEN=<token> shed shed import https://git.example.com            # every repo the token can see
+docker compose exec -e FORGEJO_TOKEN=<token> shed shed import https://git.example.com ada/forge  # or just some
 ```
 
-Then in forge: Settings → Agents shows the bundled T3 as a host. Repos need a T3 project with the same name ("Clone into T3 Code" on a repo's Agents tab does it).
-"Open in T3 Code" links point at `127.0.0.1:3773` inside the container and won't open from a browser unless T3 is published (`T3_HOST=0.0.0.0` plus a port mapping, behind auth).
+It copies owners (users, orgs and members), repos with all branches and tags, issues, PRs (with reviews and line comments),
+labels, milestones, releases with their files, wikis and collaborators. It's safe to run again: it fetches new commits and only
+adds issues and PRs it doesn't have. Your Forgejo account becomes yours in Shed when you first sign in (same email, else same
+username).
 
-## Updating
+Then point remotes at Shed: `git remote set-url origin https://shed.example.com/<owner>/<repo>.git` (password: a token from
+Settings → Tokens) or `ssh://git@server:2223/<owner>/<repo>.git` (add a key in Settings → SSH keys).
+
+## 6. CI
+
+Shed speaks forgejo-runner's protocol, so the usual runner works and `.forgejo/workflows/*.yml` run unchanged:
 
 ```sh
-cd /opt/stacks/forge && git pull && docker compose build && docker compose up -d
+forgejo-runner register --no-interactive --instance https://shed.example.com --token <SHED_RUNNER_TOKEN> --name server --labels docker:docker://node:20-bookworm,ubuntu-latest:docker://node:20-bookworm
+forgejo-runner daemon
 ```
 
-Sessions and keys survive as long as the `data` volume and `FORGE_SECRET` do.
+(Run it in its own compose stack with the Docker socket, as Forgejo's docs describe.) Actions like `actions/checkout@v4` come
+from `https://data.forgejo.org` unless `SHED_ACTIONS_URL` says otherwise. Secrets and variables are per repo (API for now:
+`PUT /api/v1/repos/<o>/<r>/actions/secrets/<NAME>`).
 
-## Backups
+## 7. Agents (optional)
 
-Back up the `data` volume (`forge.json`: sessions, agent keys, approvals, hosts) and `FORGE_SECRET`. The `t3`, `projects`, `claude` and `codex` volumes
-hold agent state and clones; losing them means logging the agents in again and re-cloning.
+```sh
+docker compose exec -it shed claude                      # then /login
+docker compose exec -it shed codex login --device-auth   # if built with codex
+# Let T3 clones push: a Shed token with push access.
+docker compose exec shed sh -c 'echo https://ada:<token>@shed.example.com > ~/.t3/git-credentials'
+```
 
-## Rollback
+## Updating, backups, rollback
 
-`git checkout <previous commit> && docker compose build && docker compose up -d`. `forge.json` has no migrations, so older builds read it as-is.
+- Update: `git pull && docker compose build && docker compose up -d`.
+- Back up the `data` volume (`shed.db`, `repos/`, wikis, release files, CI logs, `ssh/host_ed25519`) and `FORGE_SECRET`.
+  For a consistent copy of the database: `docker compose exec shed bun -e "require('bun:sqlite').Database.open('/data/shed.db').run(\"vacuum into '/data/backup.db'\")"`.
+- Rollback: check out the previous commit and rebuild. Migrations only add, but an older build refuses a database a newer one
+  has migrated, so restore the matching backup to go back across a migration.
 
-## Forgejo 15 notes
+## Turning Forgejo off
 
-Tested against a local Forgejo 15.0.5 (`.agents/scripts/seed.sh`, `writes.sh`, `crawl.e2e.ts`): every page and write path works. Differences from 17:
-
-- No `POST /actions/runs/{id}/rerun`: "Re-run failed checks" reports that this Forgejo can't re-run them. Re-run from Forgejo's own run page.
-- No job logs in the API (on any version): the Actions tab and the merge card's checks link to Forgejo's run page for logs.
-- The markdown API doesn't expand `[[Wiki Links]]`; forge's wiki rewrites them before rendering.
+Once everything has lived in Shed for a few weeks: re-run the import one last time, stop Forgejo's stack, and keep its volume for a while.

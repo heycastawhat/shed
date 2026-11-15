@@ -6,7 +6,9 @@
 		['/settings/account', 'Account', 0],
 		['/settings/appearance', 'Appearance', 0],
 		['/settings/tokens', 'Tokens', 0],
-		['/settings/agents', 'Agents', data.waiting]
+		['/settings/keys', 'SSH keys', 0],
+		['/settings/agents', 'Agents', data.waiting],
+		...(data.user?.admin ? ([['/admin', 'Admin', 0]] as const) : [])
 	] as const);
 </script>
 
