@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<uses-permission android:name="android.permission.INTERNET" />
+
+	<application
+		android:name=".ShedApp"
+		android:enableOnBackInvokedCallback="true"
+		android:icon="@mipmap/ic_launcher"
+		android:label="Shed"
+		android:roundIcon="@mipmap/ic_launcher"
+		android:supportsRtl="true"
+		android:theme="@style/Theme.Shed">
+		<activity
+			android:name=".MainActivity"
+			android:exported="true"
+			android:launchMode="singleTask"
+			android:windowSoftInputMode="adjustResize">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+			<!-- Where Shed's /login/app sends the browser tab back to, with a one-time code. -->
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="shed" android:host="callback" />
+			</intent-filter>
+		</activity>
+	</application>
+
+	<queries>
+		<intent>
+			<action android:name="android.support.customtabs.action.CustomTabsService" />
+		</intent>
+	</queries>
+</manifest>
