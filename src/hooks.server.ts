@@ -3,6 +3,7 @@ import { getUser, sessionUser, tokenAuth } from '#lib/server/accounts.js';
 import { dispatch } from '#lib/server/api/index.js';
 import { internalToken } from '#lib/server/api/internal.js';
 import { gitHttp, isGitRequest } from '#lib/server/githttp.js';
+import { isLfsRequest, lfs } from '#lib/server/lfs.js';
 import { db, root, startBackground, setOrigin, setSshHost } from '#lib/server/shed.js';
 import { runnerRpc } from '#lib/server/actions/rpc.js';
 import { actionsCtx, signingKey } from '#lib/server/actions/secrets.js';
@@ -28,6 +29,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	setOrigin(event.url.origin);
 	setSshHost(event.url.hostname);
 	if (isGitRequest(event.url)) return gitHttp(db, root, event.request, event.url);
+	if (isLfsRequest(event.url)) return lfs(db, root, event.request, event.url);
 	const twirp = event.url.pathname.match(/^\/twirp\/github\.actions\.results\.api\.v1\.ArtifactService\/(\w+)$/);
 	if (twirp) return artifactTwirp(db, root, event.url.origin, signingKey, event.request, twirp[1]);
 	if (event.url.pathname.startsWith('/api/actions_pipeline/')) return artifactPipeline(db, root, event.url.origin, signingKey, event.request, event.url);

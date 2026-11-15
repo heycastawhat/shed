@@ -414,7 +414,23 @@ const MIGRATIONS = [
 	alter table repos add column mirror_url text;
 	alter table repos add column mirror_interval integer not null default 0;
 	alter table repos add column mirror_updated_at text;
-	alter table repos add column mirror_error text;`
+	alter table repos add column mirror_error text;`,
+	// Git LFS: which objects each repo has (the files live once under SHED_DATA/lfs, by oid), and file locks.
+	`create table lfs_objects (
+		repo_id integer not null references repos(id) on delete cascade,
+		oid text not null,
+		size integer not null,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		primary key (repo_id, oid)
+	);
+	create table lfs_locks (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		path text not null,
+		user_id integer not null references users(id) on delete cascade,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		unique (repo_id, path)
+	);`
 ];
 
 export function openDb(path: string) {
