@@ -262,3 +262,88 @@ button.primary:disabled {
 	opacity: 0.5;
 	cursor: default;
 }
+
+/* Settings pages: Sink's grouped cards. A card has a heading, maybe a muted line under it, then rows (what it is on the left, the
+   control on the right) or a list of things, each divided by a hairline. */
+.settings-card {
+	display: grid;
+	gap: 0.9rem;
+	margin: 0 0 1rem;
+	padding: 1.25rem 1.4rem;
+	border-radius: 24px;
+	background: color-mix(in srgb, var(--accent) 4%, color-mix(in srgb, var(--fg) 2.5%, var(--bg)));
+}
+.settings-card > h2 {
+	margin: 0;
+	font-size: 1.1rem;
+}
+.settings-card > * + h2 {
+	margin-top: 0.5rem;
+}
+.settings-card > h2:has(+ p) {
+	margin-bottom: -0.55rem;
+}
+.settings-card p {
+	margin: 0;
+}
+.setting-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 0.6rem 1.5rem;
+}
+.setting-row > .grow {
+	display: grid;
+	gap: 0.1rem;
+	flex: 1 1 16rem;
+	min-width: 0;
+}
+.setting-title {
+	font-weight: 600;
+}
+.settings-card .small {
+	font-size: 0.85rem;
+}
+.setting-row + .setting-row,
+.settings-list > li + li {
+	padding-top: 0.9rem;
+	border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.settings-list {
+	display: grid;
+	gap: 0.9rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.settings-list > li {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 1rem;
+}
+.settings-list > li > div {
+	display: grid;
+	gap: 0.15rem;
+	min-width: 0;
+}
+/* A form in a card: labelled fields stacked, the button under them. */
+.settings-form {
+	display: grid;
+	gap: 0.9rem;
+	max-width: 36rem;
+}
+.settings-form label:not(.check) {
+	display: grid;
+	gap: 0.3rem;
+}
+.settings-form > button {
+	justify-self: start;
+}
+@media (max-width: 700px) {
+	.settings-card {
+		padding: 1.1rem;
+		border-radius: 20px;
+	}
+}

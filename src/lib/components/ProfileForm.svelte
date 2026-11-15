@@ -59,9 +59,6 @@
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);
 		gap: 1.5rem;
-		padding: 1rem;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
 	}
 	.avatar {
 		display: grid;

@@ -17,15 +17,15 @@
 	<h1><a href="/{o.username}">{o.full_name || o.username}</a> <span class="muted">/ Settings</span></h1>
 </header>
 
-<section>
+<section class="settings-card">
 	<h2>Profile</h2>
-	<p class="lead">What people see on the organization's page.</p>
+	<p class="muted">What people see on the organization's page.</p>
 	<ProfileForm profile={o} avatar={o.avatar_url} uploaded={/^\/avatars\/\d+\.img/.test(o.avatar_url)} login={o.username} org {form} />
 </section>
 
-<section>
+<section class="settings-card">
 	<h2>Members</h2>
-	<p class="lead">Members can push to every repository the organization owns. Owners administer them and run these settings.</p>
+	<p class="muted">Members can push to every repository the organization owns. Owners administer them and run these settings.</p>
 	<form class="add" method="POST" action="?/member" use:enhance>
 		<label class="field">Login <input name="login" required autocomplete="off" placeholder="someone" /></label>
 		<label class="field"
@@ -35,7 +35,7 @@
 		<button class="primary">Add</button>
 	</form>
 	{#if msg('member')?.error}<p class="error" role="alert">{msg('member')?.error}</p>{/if}
-	<ul class="list">
+	<ul class="settings-list">
 		{#each data.members as m (m.id)}
 			{@const me = m.id === data.user?.id}
 			<li>
@@ -59,14 +59,14 @@
 	</ul>
 </section>
 
-<section>
+<section class="settings-card danger-card">
 	<h2>Danger zone</h2>
 	<form class="danger-zone" method="POST" action="?/delete" use:enhance={keep}>
 		<h3>Delete this organization</h3>
 		{#if data.repos}
-			<p class="lead">It still owns {data.repos} repositor{data.repos === 1 ? 'y' : 'ies'}. Transfer or delete {data.repos === 1 ? 'it' : 'them'} first, from each repository's settings.</p>
+			<p class="muted">It still owns {data.repos} repositor{data.repos === 1 ? 'y' : 'ies'}. Transfer or delete {data.repos === 1 ? 'it' : 'them'} first, from each repository's settings.</p>
 		{:else}
-			<p class="lead">Removes the organization and its memberships. Its name becomes free for anyone to take.</p>
+			<p class="muted">Removes the organization and its memberships. Its name becomes free for anyone to take.</p>
 			<div class="row">
 				<label class="field"><span>Type <strong>{o.username}</strong> to confirm</span><input name="confirm" bind:value={confirm} autocomplete="off" /></label>
 				<button class="danger" disabled={confirm.trim().toLowerCase() !== o.username.toLowerCase()}>Delete organization</button>
@@ -103,20 +103,9 @@
 	section {
 		max-width: 48rem;
 	}
-	section + section {
-		margin-top: 2rem;
-	}
-	h2 {
-		margin: 0 0 0.25rem;
-		font-size: 1.15rem;
-	}
 	h3 {
 		margin: 0;
 		font-size: 1rem;
-	}
-	.lead {
-		margin: 0 0 1rem;
-		color: var(--muted);
 	}
 	.field {
 		display: grid;
@@ -140,29 +129,14 @@
 		align-items: end;
 		gap: 0.5rem;
 	}
-	.add {
-		margin-bottom: 0.75rem;
-	}
 	.add .field:first-child,
 	.row .field {
 		flex: 1 1 12rem;
 	}
-	.list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-	}
-	.list li {
-		display: flex;
+	.settings-list li {
 		flex-wrap: wrap;
-		align-items: center;
+		justify-content: start;
 		gap: 0.5rem 0.75rem;
-		padding: 0.6rem 1rem;
-	}
-	.list li + li {
-		border-top: 1px solid var(--border);
 	}
 	.who {
 		display: flex;
@@ -185,15 +159,12 @@
 		gap: 0.4rem;
 		margin-left: auto;
 	}
+	.danger-card {
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--del-fg) 45%, transparent);
+	}
 	.danger-zone {
 		display: grid;
 		gap: 0.5rem;
-		padding: 1rem;
-		border: 1px solid color-mix(in srgb, var(--del-fg) 50%, var(--border));
-		border-radius: var(--radius);
-	}
-	.danger-zone .lead {
-		margin: 0;
 	}
 	.error {
 		margin: 0 0 0.75rem;

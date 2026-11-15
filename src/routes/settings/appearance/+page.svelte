@@ -38,83 +38,89 @@
 </script>
 
 <h1>Appearance</h1>
-<form bind:this={paletteForm} method="POST" action="?/palette" use:enhance={() => async ({ update }) => update({ reset: false, invalidateAll: false })}>
-	<fieldset class="themes">
-		<legend class="muted">Theme</legend>
-		{#each Object.entries(THEMES) as [id, t] (id)}
-			<label class="theme">
-				<input type="radio" name="palette" value={id} checked={data.palette === id} onchange={() => pick(id)} />
-				<span class="preview">
-					{#each [t.light, t.dark] as v, i (i)}
-						<span style:background={v.bg} style:border-color={v.border}>
-							<i style:background={v.surface}></i>
-							<b style:background={v.fg}></b>
-							<b style:background={v.muted} style:width="60%"></b>
-							<em style:background={v.accent}></em>
-						</span>
-					{/each}
-				</span>
-				<strong>{t.name}</strong>
+<section class="settings-card">
+	<h2 id="theme">Theme</h2>
+	<form bind:this={paletteForm} method="POST" action="?/palette" use:enhance={() => async ({ update }) => update({ reset: false, invalidateAll: false })}>
+		<fieldset class="themes" aria-labelledby="theme">
+			{#each Object.entries(THEMES) as [id, t] (id)}
+				<label class="theme">
+					<input type="radio" name="palette" value={id} checked={data.palette === id} onchange={() => pick(id)} />
+					<span class="preview">
+						{#each [t.light, t.dark] as v, i (i)}
+							<span style:background={v.bg} style:border-color={v.border}>
+								<i style:background={v.surface}></i>
+								<b style:background={v.fg}></b>
+								<b style:background={v.muted} style:width="60%"></b>
+								<em style:background={v.accent}></em>
+							</span>
+						{/each}
+					</span>
+					<strong>{t.name}</strong>
+				</label>
+			{/each}
+		</fieldset>
+	</form>
+
+	<h2 id="mode">Mode</h2>
+	<form bind:this={form} method="POST" action="?/theme" use:enhance={() => async ({ update }) => update({ reset: false, invalidateAll: false })}>
+		<fieldset class="modes" aria-labelledby="mode">
+			{#each CHOICES as [value, label, hint] (value)}
+				<label class:chosen={data.theme === value}>
+					<input type="radio" name="theme" {value} checked={data.theme === value} onchange={() => choose(value)} />
+					<span class="swatch {value}"></span>
+					<span><strong>{label}</strong><span class="muted">{hint}</span></span>
+				</label>
+			{/each}
+		</fieldset>
+	</form>
+
+</section>
+
+<section class="settings-card">
+	<h2 id="layout">Layout</h2>
+	<p class="muted">On wide screens; phones keep their own.</p>
+	<fieldset class="layouts" aria-labelledby="layout">
+		{#each LAYOUT as [value, label, hint] (value)}
+			<label class="layout">
+				<input type="radio" name="layout" {value} checked={prefs.layout === value} onchange={() => prefs.save({ layout: value })} />
+				<svg viewBox="0 0 120 80" aria-hidden="true">
+					<rect x="4" y="4" width="24" height="72" rx="3" class="side" />
+					<rect x="7" y="9" width="14" height="4" rx="2" class="ink" />
+					{#each [18, 26, 34] as y (y)}<rect x="7" {y} width="17" height="4" rx="2" class="bar" />{/each}
+					{#if value === 'tabs'}
+						<rect x="32" y="4" width="22" height="8" rx="4" class="tab" />
+						<rect x="57" y="4" width="22" height="8" rx="4" class="bar" />
+						<rect x="82" y="4" width="22" height="8" rx="4" class="bar" />
+					{/if}
+					{#if value === 'split'}
+						<rect x="32" y="4" width="84" height="72" rx="6" class="sheet" />
+						{#each [0, 1, 2, 3, 4] as i (i)}<rect x="36" y={9 + i * 13} width="26" height="10" rx="3" class={i === 1 ? 'tab' : 'card'} />{/each}
+						<rect x="66" y="8" width="46" height="64" rx="4" class="open" />
+						<rect x="71" y="14" width="26" height="5" rx="2.5" class="ink" />
+						{#each [0, 1, 2] as i (i)}<rect x="71" y={25 + i * 9} width={36 - (i % 2) * 12} height="5" rx="2.5" class="bar" />{/each}
+					{:else}
+						<rect x="32" y={value === 'tabs' ? 15 : 4} width="84" height={value === 'tabs' ? 61 : 72} rx="6" class="sheet" />
+						<rect x="38" y={value === 'tabs' ? 21 : 11} width="40" height="5" rx="2.5" class="ink" />
+						{#each [0, 1, 2, 3] as i (i)}<rect x="38" y={(value === 'tabs' ? 31 : 22) + i * 9} width={70 - (i % 2) * 18} height="5" rx="2.5" class="bar" />{/each}
+					{/if}
+				</svg>
+				<strong>{label}</strong>
+				<span class="muted">{hint}</span>
 			</label>
 		{/each}
 	</fieldset>
-</form>
 
-<form class="mode" bind:this={form} method="POST" action="?/theme" use:enhance={() => async ({ update }) => update({ reset: false, invalidateAll: false })}>
-	<fieldset>
-		<legend class="muted">Mode</legend>
-		{#each CHOICES as [value, label, hint] (value)}
-			<label class:chosen={data.theme === value}>
-				<input type="radio" name="theme" {value} checked={data.theme === value} onchange={() => choose(value)} />
+	<h2 id="nav">Navigation</h2>
+	<fieldset class="nav" aria-labelledby="nav">
+		{#each NAV as [value, label, hint] (value)}
+			<label>
+				<input type="radio" name="nav" {value} checked={prefs.nav === value} onchange={() => prefs.save({ nav: value })} />
 				<span class="swatch {value}"></span>
 				<span><strong>{label}</strong><span class="muted">{hint}</span></span>
 			</label>
 		{/each}
 	</fieldset>
-</form>
-
-<fieldset class="layouts">
-	<legend class="muted">Layout</legend>
-	{#each LAYOUT as [value, label, hint] (value)}
-		<label class="layout">
-			<input type="radio" name="layout" {value} checked={prefs.layout === value} onchange={() => prefs.save({ layout: value })} />
-			<svg viewBox="0 0 120 80" aria-hidden="true">
-				<rect x="4" y="4" width="24" height="72" rx="3" class="side" />
-				<rect x="7" y="9" width="14" height="4" rx="2" class="ink" />
-				{#each [18, 26, 34] as y (y)}<rect x="7" {y} width="17" height="4" rx="2" class="bar" />{/each}
-				{#if value === 'tabs'}
-					<rect x="32" y="4" width="22" height="8" rx="4" class="tab" />
-					<rect x="57" y="4" width="22" height="8" rx="4" class="bar" />
-					<rect x="82" y="4" width="22" height="8" rx="4" class="bar" />
-				{/if}
-				{#if value === 'split'}
-					<rect x="32" y="4" width="84" height="72" rx="6" class="sheet" />
-					{#each [0, 1, 2, 3, 4] as i (i)}<rect x="36" y={9 + i * 13} width="26" height="10" rx="3" class={i === 1 ? 'tab' : 'card'} />{/each}
-					<rect x="66" y="8" width="46" height="64" rx="4" class="open" />
-					<rect x="71" y="14" width="26" height="5" rx="2.5" class="ink" />
-					{#each [0, 1, 2] as i (i)}<rect x="71" y={25 + i * 9} width={36 - (i % 2) * 12} height="5" rx="2.5" class="bar" />{/each}
-				{:else}
-					<rect x="32" y={value === 'tabs' ? 15 : 4} width="84" height={value === 'tabs' ? 61 : 72} rx="6" class="sheet" />
-					<rect x="38" y={value === 'tabs' ? 21 : 11} width="40" height="5" rx="2.5" class="ink" />
-					{#each [0, 1, 2, 3] as i (i)}<rect x="38" y={(value === 'tabs' ? 31 : 22) + i * 9} width={70 - (i % 2) * 18} height="5" rx="2.5" class="bar" />{/each}
-				{/if}
-			</svg>
-			<strong>{label}</strong>
-			<span class="muted">{hint}</span>
-		</label>
-	{/each}
-</fieldset>
-
-<fieldset class="nav">
-	<legend class="muted">Navigation</legend>
-	{#each NAV as [value, label, hint] (value)}
-		<label>
-			<input type="radio" name="nav" {value} checked={prefs.nav === value} onchange={() => prefs.save({ nav: value })} />
-			<span class="swatch {value}"></span>
-			<span><strong>{label}</strong><span class="muted">{hint}</span></span>
-		</label>
-	{/each}
-</fieldset>
+</section>
 
 <style>
 	fieldset {
@@ -122,10 +128,6 @@
 		gap: 0.6rem;
 		padding: 0;
 		border: 0;
-	}
-	legend {
-		margin-bottom: 0.6rem;
-		padding: 0;
 	}
 	label {
 		display: flex;
@@ -158,13 +160,23 @@
 	.swatch.dark {
 		background: linear-gradient(90deg, #111214 65%, #8b8bf0 65%);
 	}
-	.nav,
-	.mode,
-	.layouts {
-		margin-top: 1.75rem;
+	.modes {
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	}
+	.nav {
+		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	}
+	label {
+		background: var(--bg);
 	}
 	.themes {
 		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	}
+	@media (max-width: 700px) {
+		.themes,
+		.layouts {
+			grid-template-columns: 1fr 1fr;
+		}
 	}
 	label.theme {
 		display: grid;
@@ -220,10 +232,9 @@
 		align-content: start;
 		padding: 0.6rem 0.6rem 0.8rem;
 		border-color: transparent;
-		background: color-mix(in srgb, var(--fg) 4%, var(--surface));
 	}
 	label.layout:hover {
-		background: color-mix(in srgb, var(--fg) 7%, var(--surface));
+		background: color-mix(in srgb, var(--fg) 4%, var(--bg));
 	}
 	label.layout:has(input:checked) {
 		background: var(--accent-container);

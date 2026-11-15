@@ -20,46 +20,52 @@
 	</section>
 {/if}
 
-<form class="create" method="POST" action="?/create" use:enhance>
-	<label>Name <input name="name" required placeholder="laptop" /></label>
-	<fieldset>
-		<legend>Can</legend>
-		<label class="check"><input type="checkbox" name="scope" value="repo:read" checked /> Read repos (clone, fetch)</label>
-		<label class="check"><input type="checkbox" name="scope" value="repo:write" /> Write repos (push)</label>
-	</fieldset>
-	<label>Only these repos <input name="repos" placeholder="all repos, or e.g. ada/sample kiwi/website" /></label>
-	<label
-		>Expires
-		<select name="days">
-			<option value="30">in 30 days</option>
-			<option value="90">in 90 days</option>
-			<option value="365">in a year</option>
-			<option value="0">never</option>
-		</select>
-	</label>
-	{#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
-	<button class="primary">Create token</button>
-</form>
+<section class="settings-card">
+	<h2>New token</h2>
+	<form class="settings-form" method="POST" action="?/create" use:enhance>
+		<label>Name <input name="name" required placeholder="laptop" /></label>
+		<fieldset>
+			<legend>Can</legend>
+			<label class="check"><input type="checkbox" name="scope" value="repo:read" checked /> Read repos (clone, fetch)</label>
+			<label class="check"><input type="checkbox" name="scope" value="repo:write" /> Write repos (push)</label>
+		</fieldset>
+		<label>Only these repos <input name="repos" placeholder="all repos, or e.g. ada/sample kiwi/website" /></label>
+		<label
+			>Expires
+			<select name="days">
+				<option value="30">in 30 days</option>
+				<option value="90">in 90 days</option>
+				<option value="365">in a year</option>
+				<option value="0">never</option>
+			</select>
+		</label>
+		{#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
+		<button class="primary">Create token</button>
+	</form>
+</section>
 
 {#if data.tokens.length}
-	<ul class="list">
-		{#each data.tokens as t (t.id)}
-			<li>
-				<div>
-					<strong>{t.name}</strong>
-					<span class="muted">{t.scopes.map((s) => (s === 'repo:write' ? 'push' : 'clone')).join(' + ')} · {t.repos.includes('*') ? 'all repos' : t.repos.join(', ')}</span>
-					<div class="muted small">
-						created {ago(t.created_at)} · {t.last_used_at ? `last used ${ago(t.last_used_at)}` : 'never used'}
-						{#if t.expires_at}· {Date.parse(t.expires_at) < Date.now() ? 'expired' : `expires ${new Date(t.expires_at).toLocaleDateString('en-NZ')}`}{/if}
+<section class="settings-card">
+		<h2>Your tokens</h2>
+		<ul class="settings-list">
+			{#each data.tokens as t (t.id)}
+				<li>
+					<div>
+						<strong>{t.name}</strong>
+						<span class="muted">{t.scopes.map((s) => (s === 'repo:write' ? 'push' : 'clone')).join(' + ')} · {t.repos.includes('*') ? 'all repos' : t.repos.join(', ')}</span>
+						<div class="muted small">
+							created {ago(t.created_at)} · {t.last_used_at ? `last used ${ago(t.last_used_at)}` : 'never used'}
+							{#if t.expires_at}· {Date.parse(t.expires_at) < Date.now() ? 'expired' : `expires ${new Date(t.expires_at).toLocaleDateString('en-NZ')}`}{/if}
+						</div>
 					</div>
-				</div>
-				<form method="POST" action="?/revoke" use:enhance>
-					<input type="hidden" name="id" value={t.id} />
-					<button>Revoke</button>
-				</form>
-			</li>
-		{/each}
-	</ul>
+					<form method="POST" action="?/revoke" use:enhance>
+						<input type="hidden" name="id" value={t.id} />
+						<button>Revoke</button>
+					</form>
+				</li>
+			{/each}
+		</ul>
+</section>
 {/if}
 
 <style>
@@ -78,16 +84,6 @@
 	}
 	.new code {
 		word-break: break-all;
-	}
-	.create {
-		display: grid;
-		gap: 0.9rem;
-		max-width: 32rem;
-		margin-bottom: 2rem;
-	}
-	.create label:not(.check) {
-		display: grid;
-		gap: 0.3rem;
 	}
 	input:not([type='checkbox']),
 	select {
@@ -116,34 +112,6 @@
 	}
 	legend {
 		margin-bottom: 0.3rem;
-	}
-	.create button {
-		justify-self: start;
-	}
-	.list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-	}
-	.list li {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 1rem;
-		padding: 0.75rem 1rem;
-	}
-	.list li + li {
-		border-top: 1px solid var(--border);
-	}
-	.list li > div {
-		display: grid;
-		gap: 0.15rem;
-		min-width: 0;
-	}
-	.small {
-		font-size: 0.85rem;
 	}
 	.error {
 		color: var(--del-fg);
