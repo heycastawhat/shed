@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import YAML from 'yaml';
-import { expandMatrix, fires, matches, parseWorkflow, planJobs } from './workflows.js';
+import { expandMatrix, fires, inputsOf, matches, parseWorkflow, planJobs, runsOn } from './workflows.js';
 
 test('filter patterns', () => {
 	expect(matches(['main'], 'main')).toBe(true);
@@ -58,4 +58,36 @@ jobs:
 	expect(single.jobs.test.strategy.matrix).toEqual({ node: [22] });
 	expect(single.env).toEqual({ A: '1' });
 	expect(single.on).toEqual({ push: null });
+});
+
+test('runs-on resolves matrix, vars, inputs, fromJSON and lists', () => {
+	const ctx = { matrix: { os: 'arm', set: ['a', 'b'] }, vars: { RUNNER: 'host', LABELS: '["x","y"]' }, inputs: { pool: 'big' } };
+	expect(runsOn('host', ctx)).toEqual(['host']);
+	expect(runsOn('${{ matrix.os }}', ctx)).toEqual(['arm']);
+	expect(runsOn('${{ matrix.set }}', ctx)).toEqual(['a', 'b']);
+	expect(runsOn('${{ vars.RUNNER }}', ctx)).toEqual(['host']);
+	expect(runsOn('${{ fromJSON(vars.LABELS) }}', ctx)).toEqual(['x', 'y']);
+	expect(runsOn(`\${{ fromJSON('["p", "q"]') }}`, ctx)).toEqual(['p', 'q']);
+	expect(runsOn(['self-hosted', '${{ inputs.pool }}', '${{ github.event.inputs.pool }}-2'], ctx)).toEqual(['self-hosted', 'big', 'big-2']);
+	expect(runsOn({ group: 'g', labels: ['${{ vars.RUNNER }}'] }, ctx)).toEqual(['host']);
+	expect(runsOn('${{ vars.MISSING }}', ctx)).toEqual(['']);
+	expect(runsOn("${{ matrix.os == 'arm' && 'a' || 'b' }}", ctx)).toEqual(["${{ matrix.os == 'arm' && 'a' || 'b' }}"]);
+});
+
+test('dispatch inputs fall back to the declared defaults and reach runs-on', () => {
+	const w = parseWorkflow(`
+on:
+  workflow_dispatch:
+    inputs:
+      pool: { default: small }
+      size: { default: '1' }
+jobs:
+  build:
+    name: build on \${{ inputs.pool }}
+    runs-on: \${{ inputs.pool }}
+    steps: [{ run: echo }]
+`);
+	expect(inputsOf(w, { size: '2' })).toEqual({ pool: 'small', size: '2' });
+	expect(planJobs(w, { inputs: inputsOf(w, { pool: 'big' }) })[0]).toMatchObject({ name: 'build on big', runsOn: ['big'] });
+	expect(inputsOf(parseWorkflow('on: push\njobs: {}'), undefined)).toEqual({});
 });
