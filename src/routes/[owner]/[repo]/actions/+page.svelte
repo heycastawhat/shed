@@ -18,13 +18,30 @@
 
 <svelte:head><title>Actions · {data.repo.full_name}</title></svelte:head>
 
+{#if data.dispatchable.length && data.repo.permissions.push}
+	<details class="dispatch">
+		<summary>Run a workflow</summary>
+		{#each data.dispatchable as w (w.id)}
+			<form method="POST" action="?/dispatch">
+				<input type="hidden" name="workflow" value={w.id} />
+				<strong>{w.name}</strong>
+				<label>Branch <select name="ref">{#each data.branches as b (b)}<option selected={b === data.repo.default_branch}>{b}</option>{/each}</select></label>
+				{#each Object.entries(w.inputs) as [name, input] (name)}
+					<label>{name} <input name="input:{name}" value={String((input as { default?: unknown })?.default ?? '')} /></label>
+				{/each}
+				<button class="primary">Run</button>
+			</form>
+		{/each}
+	</details>
+{/if}
+
 <ul class="runs">
 	{#each data.runs as r (r.id)}
 		{@const [icon, tone] = STATE[r.status] ?? ['clock', 'off']}
 		<li>
 			<span class="state {tone}" title={r.status}><Icon name={icon} size={15} /></span>
 			<div class="main">
-				<a href={r.url} target="_blank" rel="noreferrer"><strong>{r.title}</strong><Icon name="external" size={12} /></a>
+				<a href="/{data.repo.full_name}/actions/runs/{r.number}"><strong>{r.title}</strong></a>
 				<div class="meta">
 					{r.workflow} #{r.number} · {r.event} by <a href="/{r.who}">{r.who}</a> · <code>{r.ref}</code> ·
 					<a href="/{data.repo.full_name}/commit/{r.sha}"><code>{r.sha.slice(0, 7)}</code></a>
@@ -47,6 +64,38 @@
 <Pager page={data.page} total={data.total} size={data.size} />
 
 <style>
+	.dispatch {
+		margin-bottom: 1rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 0.6rem 1rem;
+	}
+	.dispatch summary {
+		cursor: pointer;
+		font-weight: 500;
+	}
+	.dispatch form {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding-top: 0.75rem;
+	}
+	.dispatch label {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.dispatch input,
+	.dispatch select {
+		font: inherit;
+		padding: 0.3rem 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg);
+		color: var(--fg);
+		min-width: 0;
+	}
 	.runs {
 		list-style: none;
 		padding: 0;

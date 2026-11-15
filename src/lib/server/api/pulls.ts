@@ -17,6 +17,7 @@ import { commitsJson } from './repos.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
 import { reviewCommentJson, reviewJson, issueJson, type CommentRow, type PullRow, type ReviewRow } from './shapes.js';
 import { combinedStatus, latest, onStatus, overall } from './statuses.js';
+import { onCiStatus, pullEvent } from '../actions/runs.js';
 
 const Z = '0'.repeat(40);
 const SELECT = 'select i.*, p.* from issues i join pulls p on p.issue_id = i.id';
@@ -24,7 +25,7 @@ const SELECT = 'select i.*, p.* from issues i join pulls p on p.issue_id = i.id'
 export function pullOf(c: Ctx, r: RepoCtx, number = Number(c.params.index)) {
 	return c.db.query<PullRow, [number, number]>(`${SELECT} where i.repo_id = ? and i.number = ?`).get(r.row.id, number) ?? error(404, `Pull request #${number} not found`);
 }
-const pullById = (c: Ctx, id: number) => c.db.query<PullRow, [number]>(`${SELECT} where i.id = ?`).get(id)!;
+export const pullById = (c: Ctx, id: number) => c.db.query<PullRow, [number]>(`${SELECT} where i.id = ?`).get(id)!;
 
 // Where the head branch lives: the PR's own repo, or a fork.
 function headDir(c: Ctx, r: RepoCtx, p: PullRow) {
@@ -123,6 +124,7 @@ route('POST', '/repos/:owner/:repo/pulls', async (c) => {
 	if (headRepo.id !== r.row.id) await git(r.dir, ['update-ref', '-d', `refs/shed/tmp/${u.id}`]);
 	for (const login of b.reviewers ?? []) requestReview(c, r, p, login, false);
 	crossReference(c, r, p, b.body ?? '');
+	await pullEvent(c.db, c.root, c.origin, r.row, p, 'opened', u.id);
 	return pullJson(c, r, p);
 });
 
@@ -471,6 +473,7 @@ export async function doMerge(c: Ctx, r: RepoCtx, p: PullRow, o: { style: MergeS
 	record(c.db, { userId: u.id, repoId: r.row.id, op: 'merge_pull_request', content: JSON.stringify([String(p.number), p.title]) });
 	notify(c, r, p, 'merged it', '');
 	await afterPush(c.db, c.root, r.row, u.id, before);
+	await pullEvent(c.db, c.root, c.origin, r.row, pullById(c, p.id), 'closed', u.id);
 	if (o.deleteBranch && !p.head_repo_id && p.head !== r.row.default_branch && !protectionFor(c.db, r.row.id, p.head)) {
 		const still = c.db.query(`${SELECT} where i.repo_id = ? and i.state = 'open' and p.base = ?`).get(r.row.id, p.head);
 		if (!still) {
@@ -547,12 +550,22 @@ async function tryAutoMerge(c: Ctx, r: RepoCtx, issueId: number) {
 	const as: Ctx = { ...c, user: by, token: null };
 	await doMerge(as, { ...r, level: access(c.db, by.id, r.row) }, p, { style: p.auto_merge as MergeStyle, ...o }).catch((e) => console.error('auto-merge', r.full, p.number, e));
 }
-onStatus((c, repoId, sha) => {
+onCiStatus((db, repoId, sha) => {
+	const c: Ctx = { db, root: '', origin: '', user: null, token: null, method: 'POST', url: new URL('http://shed/'), params: {}, request: new Request('http://shed/'), body: async () => ({}) as never };
+	void import('../shed.js').then(({ root, origin }) => {
+		c.root = root;
+		c.origin = origin();
+		for (const fn of statusHooks) fn(c, repoId, sha);
+	});
+});
+const statusHooks: ((c: Ctx, repoId: number, sha: string) => void)[] = [];
+statusHooks.push((c, repoId, sha) => {
 	const row = c.db.query<RepoRow, [number]>('select r.*, u.login as owner from repos r join users u on u.id = r.owner_id where r.id = ?').get(repoId)!;
 	const r: RepoCtx = { row, level: 'admin', dir: repoDir(c.root, repoId), full: `${row.owner}/${row.name}` };
 	for (const p of c.db.query<{ id: number }, [number, string]>("select i.id from issues i join pulls p on p.issue_id = i.id where i.repo_id = ? and p.head_sha = ? and p.auto_merge is not null and i.state = 'open'").all(repoId, sha))
 		void tryAutoMerge(c, r, p.id);
 });
+onStatus((c, repoId, sha) => statusHooks.forEach((fn) => fn(c, repoId, sha)));
 
 // --- pushes: new revisions on PR heads, merges noticed on bases ---
 
@@ -579,6 +592,7 @@ onPush(async ({ db, root, repo, userId, updates }) => {
 			db.query('insert into revisions (issue_id, head_sha, before_sha, base_sha, user_id, forced) values (?, ?, ?, ?, ?, ?)').run(p.id, u.after, p.head_sha, baseSha, userId, +forced);
 			const commits = forced ? [] : (await git(r.dir, ['rev-list', `${p.head_sha}..${u.after}`])).split('\n').filter(Boolean);
 			event(db, p.id, userId, 'pull_push', { is_force_push: forced, commit_ids: commits, before: p.head_sha, after: u.after });
+			await pullEvent(db, root, (await import('../shed.js').catch(() => ({ origin: () => '' }))).origin(), r.row, pullById(c, p.id), 'synchronize', userId);
 			// Approvals of an older head lapse when the base branch's rule says so.
 			if (protectionFor(db, r.row.id, p.base)?.dismiss_stale) db.query("update reviews set dismissed = 1 where issue_id = ? and state = 'APPROVED' and commit_sha != ?").run(p.id, u.after);
 		}

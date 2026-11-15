@@ -6,4 +6,5 @@ import './statuses.js';
 import './protect.js';
 import './notify.js';
 import './releases.js';
+import './actions.js';
 export { dispatch } from './router.js';

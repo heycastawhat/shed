@@ -140,15 +140,13 @@ export const actions = {
 			merge_when_checks_succeed: form.has('when_checks_pass')
 		});
 	},
-	// Status links carry the run's number in the repo; the rerun endpoint wants its global id.
+	// Status links carry the run's number in the repo; re-run just the failed jobs of each.
 	rerun: async ({ locals, params, request: req }) => {
-		const wanted = new Set((await req.formData()).getAll('run').map(String));
-		const base = `/repos/${params.owner}/${params.repo}/actions`;
+		const runs = new Set((await req.formData()).getAll('run').map(String));
 		try {
-			const { workflow_runs } = await api<{ workflow_runs: { id: number; index_in_repo: number }[] }>(locals.token, `${base}/runs?limit=50`);
-			for (const r of workflow_runs.filter((r) => wanted.has(String(r.index_in_repo)))) await request(locals.token, `${base}/runs/${r.id}/rerun`, { method: 'POST' });
+			for (const n of runs) await request(locals.token, `/repos/${params.owner}/${params.repo}/actions/runs/${n}/rerun?failed=true`, { method: 'POST' });
 		} catch (e) {
-			if (isHttpError(e)) return fail(e.status, { action: 'rerun', error: e.status === 404 ? "This Forgejo can't re-run checks from forge; use Logs → Re-run" : e.body.message });
+			if (isHttpError(e)) return fail(e.status, { action: 'rerun', error: e.body.message });
 			throw e;
 		}
 	},

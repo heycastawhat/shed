@@ -300,7 +300,92 @@ const MIGRATIONS = [
 		status integer,
 		response text not null default '',
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-	);`
+	);`,
+	// CI: forgejo-runner registers runners, takes tasks (one job each) and streams logs back.
+	`create table runners (
+		id integer primary key,
+		uuid text not null unique,
+		token_hash text not null,
+		name text not null,
+		labels text not null default '[]',
+		version text not null default '',
+		-- null: available to every repo (an admin's runner); else only this repo's jobs.
+		repo_id integer references repos(id) on delete cascade,
+		ephemeral integer not null default 0,
+		last_online text,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table runner_tokens (
+		id integer primary key,
+		token text not null unique,
+		repo_id integer references repos(id) on delete cascade,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table runs (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		number integer not null,
+		workflow text not null,
+		name text not null,
+		title text not null,
+		event text not null,
+		event_payload text not null default '{}',
+		ref text not null,
+		sha text not null,
+		user_id integer references users(id),
+		issue_id integer references issues(id) on delete set null,
+		status text not null default 'waiting',
+		attempt integer not null default 1,
+		started_at text,
+		stopped_at text,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		unique (repo_id, number)
+	);
+	create index runs_repo on runs (repo_id, id);
+	create table jobs (
+		id integer primary key,
+		run_id integer not null references runs(id) on delete cascade,
+		job_key text not null,
+		name text not null,
+		needs text not null default '[]',
+		runs_on text not null default '[]',
+		payload text not null,
+		status text not null default 'blocked',
+		result text,
+		outputs text not null default '{}',
+		uses_always integer not null default 0,
+		attempt integer not null default 1,
+		task_id integer,
+		started_at text,
+		stopped_at text
+	);
+	create index jobs_status on jobs (status);
+	create table tasks (
+		id integer primary key,
+		job_id integer not null references jobs(id) on delete cascade,
+		runner_id integer references runners(id) on delete set null,
+		token_hash text not null unique,
+		status text not null default 'running',
+		steps text not null default '[]',
+		log_length integer not null default 0,
+		started_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		stopped_at text,
+		updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table action_secrets (
+		repo_id integer not null references repos(id) on delete cascade,
+		name text not null,
+		value text not null,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		primary key (repo_id, name)
+	);
+	create table action_vars (
+		repo_id integer not null references repos(id) on delete cascade,
+		name text not null,
+		value text not null,
+		primary key (repo_id, name)
+	);
+	alter table repos add column next_run integer not null default 1;`
 ];
 
 export function openDb(path: string) {

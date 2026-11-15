@@ -144,9 +144,11 @@ export async function editIssue(c: Ctx, r: RepoCtx, i: IssueRow, b: { title?: st
 		event(c.db, i.id, u.id, closed ? 'close' : 'reopen');
 		record(c.db, { userId: u.id, repoId: r.row.id, op: `${closed ? 'close' : 'reopen'}_${i.is_pull ? 'pull_request' : 'issue'}`, content: JSON.stringify([String(i.number), i.title]) });
 		notify(c, r, i, closed ? 'closed it' : 'reopened it', '');
-		if (i.is_pull && !closed) {
-			const { refreshPull } = await import('./pulls.js');
-			await refreshPull(c, r, i.id);
+		if (i.is_pull) {
+			const { refreshPull, pullById } = await import('./pulls.js');
+			if (!closed) await refreshPull(c, r, i.id);
+			const { pullEvent } = await import('../actions/runs.js');
+			await pullEvent(c.db, c.root, c.origin, r.row, pullById(c, i.id), closed ? 'closed' : 'reopened', u.id);
 		}
 	}
 	if (triage && b.assignees) {

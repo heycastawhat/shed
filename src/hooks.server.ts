@@ -4,6 +4,8 @@ import { dispatch } from '#lib/server/api/index.js';
 import { internalToken } from '#lib/server/api/internal.js';
 import { gitHttp, isGitRequest } from '#lib/server/githttp.js';
 import { db, root, setOrigin } from '#lib/server/shed.js';
+import { runnerRpc } from '#lib/server/actions/rpc.js';
+import { actionsCtx } from '#lib/server/actions/secrets.js';
 import { sweepMentions } from '#lib/server/mention.js';
 import { read } from '#lib/server/store.js';
 import { isTheme } from '#lib/themes.js';
@@ -23,6 +25,7 @@ const SECURITY_HEADERS = {
 export const handle: Handle = async ({ event, resolve }) => {
 	setOrigin(event.url.origin);
 	if (isGitRequest(event.url)) return gitHttp(db, root, event.request, event.url);
+	if (event.url.pathname.startsWith('/api/actions/')) return runnerRpc(actionsCtx(event.url.origin), event.request, event.url.pathname.slice('/api/actions/'.length));
 	// The REST API for scripts and tools: a Shed token as `token …`, `Bearer …` or a Basic password. Cookies don't count, so no CSRF.
 	if (event.url.pathname.startsWith('/api/v1/')) {
 		const h = event.request.headers.get('authorization') ?? '';

@@ -1,4 +1,5 @@
-import { api, type User } from '#lib/server/forgejo.js';
+import { fail, isHttpError } from '@sveltejs/kit';
+import { api, request, type User } from '#lib/server/forgejo.js';
 
 type Run = {
 	id: number;
@@ -40,5 +41,23 @@ export async function load({ locals, params, url }) {
 		created: r.created,
 		url: r.html_url
 	}));
-	return { runs, page, total, size: SIZE };
+	const { workflows } = await api<{ workflows: { id: string; name: string; dispatch: boolean; inputs: Record<string, unknown> }[] }>(locals.token, `/repos/${params.owner}/${params.repo}/actions/workflows`).catch(() => ({ workflows: [] }));
+	return { runs, page, total, size: SIZE, dispatchable: workflows.filter((w) => w.dispatch) };
 }
+
+export const actions = {
+	dispatch: async ({ locals, params, request: req }) => {
+		const form = await req.formData();
+		const inputs = Object.fromEntries([...form.entries()].filter(([k]) => k.startsWith('input:')).map(([k, v]) => [k.slice(6), String(v)]));
+		try {
+			await request(locals.token, `/repos/${params.owner}/${params.repo}/actions/workflows/${encodeURIComponent(String(form.get('workflow')))}/dispatches`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ ref: form.get('ref'), inputs })
+			});
+		} catch (e) {
+			if (isHttpError(e)) return fail(e.status, { error: e.body.message });
+			throw e;
+		}
+	}
+};

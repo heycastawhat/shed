@@ -31,6 +31,8 @@
 	"type": "module",
 	"dependencies": {
 		"@mingcute/svelte": "^3.0.2",
-		"markdown-it": "^15.0.3"
+		"markdown-it": "^15.0.3",
+		"protobufjs": "^8.8.1",
+		"yaml": "^2.9.1"
 	}
 }

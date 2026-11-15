@@ -23,6 +23,8 @@ export const variables = defineEnvVars({
 	SHED_OIDC_CLIENT_ID: { description: 'OIDC client ID; the redirect URI is <shed URL>/auth/callback', schema: required('SHED_OIDC_CLIENT_ID') },
 	SHED_OIDC_CLIENT_SECRET: { description: 'OIDC client secret', schema: required('SHED_OIDC_CLIENT_SECRET') },
 	SHED_ALLOWED_USERS: { description: 'Who may sign in: comma-separated email:…, user:… (provider username) or sub:…', schema: (v) => parseAllowlist(v).join(',') },
+	SHED_ACTIONS_URL: { description: 'Where `uses: actions/checkout@v4` style actions are fetched from (default https://data.forgejo.org)', schema: (v) => (v ? url('SHED_ACTIONS_URL')(v) : 'https://data.forgejo.org') },
+	SHED_RUNNER_TOKEN: { description: 'Optional fixed registration token for forgejo-runner (otherwise make one in Settings → Runners)', schema: (v) => v || undefined },
 	SHED_DATA: { description: 'Directory for shed.db and the git repos', schema: (v) => v || 'data' },
 	FORGE_DATA: { description: 'Directory for forge.json (agent keys and activity)', schema: (v) => v || 'data' },
 	T3_URL: { description: 'Optional T3 Code server every user gets, e.g. http://localhost:3773. More hosts are added in Settings → Agents', schema: (v) => (v ? url('T3_URL')(v) : undefined) },

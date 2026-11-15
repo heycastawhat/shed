@@ -124,6 +124,15 @@ export function createToken(db: Database, userId: number, t: { name: string; sco
 }
 
 export function tokenAuth(db: Database, token: string): TokenAuth | null {
+	// A CI task's token: write access to its own repo while the task runs, acting as whoever triggered the run.
+	if (token.startsWith('shedt_')) {
+		const t = db
+			.query<{ id: number; user_id: number | null; owner_id: number; repo: string }, [string]>(
+				"select t.id, r.user_id, rp.owner_id, u.login || '/' || rp.name as repo from tasks t join jobs j on j.id = t.job_id join runs r on r.id = j.run_id join repos rp on rp.id = r.repo_id join users u on u.id = rp.owner_id where t.token_hash = ? and t.status in ('running', 'cancelling')"
+			)
+			.get(hash(token));
+		return t ? { userId: t.user_id ?? t.owner_id, tokenId: -t.id, scopes: ['repo:read', 'repo:write'], repos: [t.repo] } : null;
+	}
 	if (!token.startsWith('shed_')) return null;
 	const t = db.query<{ id: number; user_id: number; scopes: string; repos: string; expires_at: string | null }, [string]>('select * from tokens where hash = ?').get(hash(token));
 	if (!t || (t.expires_at && Date.parse(t.expires_at) < Date.now())) return null;
