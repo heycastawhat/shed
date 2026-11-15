@@ -6,27 +6,14 @@ import { getUser, signIn } from '../accounts.js';
 import { openDb } from '../db.js';
 import { createRepo, repoDir } from '../repos.js';
 import { commitFiles } from '../write.js';
+import { testEnv } from '../test-env.js';
 
 // Branch rules apply to the writes Shed makes for people (file edits, branch create/delete), as they do to git pushes.
 
 let root: string, db: Database, ada: number, other: number, repoId: number;
 let dispatch: typeof import('./index.js').dispatch;
 const scratch = `${tmpdir()}/shed-protect-env-${crypto.randomUUID()}`;
-mock.module('$app/env/private', () => ({
-	FORGE_DATA: scratch,
-	FORGE_SECRET: 'x'.repeat(40),
-	T3_URL: '',
-	T3_TOKEN: '',
-	SHED_DATA: scratch,
-	SHED_ALLOWED_USERS: 'user:ada',
-	SHED_OIDC_ISSUER: 'http://oidc',
-	SHED_OIDC_CLIENT_ID: 'x',
-	SHED_OIDC_CLIENT_SECRET: 'x',
-	SHED_SSH_PORT: '',
-	SHED_SSH_URL: '',
-	SHED_ACTIONS_URL: '',
-	SHED_RUNNER_TOKEN: ''
-}));
+mock.module('$app/env/private', testEnv);
 const author = { name: 'Ada', email: 'ada@x' };
 const b64 = (s: string) => new TextEncoder().encode(s).toBase64();
 

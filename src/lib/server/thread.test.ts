@@ -1,7 +1,8 @@
 import { expect, mock, test } from 'bun:test';
+import { testEnv } from './test-env.js';
 
 // thread.ts reaches Kit's env through forgejo.ts; only its pure helpers are tested here.
-mock.module('$app/env/private', () => ({ FORGE_DATA: '/nonexistent', FORGE_SECRET: 'x'.repeat(40), T3_URL: '', T3_TOKEN: '', SHED_DATA: `/tmp/shed-thread-test-${crypto.randomUUID()}`, SHED_ALLOWED_USERS: 'user:x', SHED_OIDC_ISSUER: 'http://x', SHED_OIDC_CLIENT_ID: 'x', SHED_OIDC_CLIENT_SECRET: 'x', SHED_SSH_PORT: '', SHED_SSH_URL: '', SHED_ACTIONS_URL: '', SHED_RUNNER_TOKEN: '' }));
+mock.module('$app/env/private', testEnv);
 const { groupReactions, shapeEvent } = await import('./thread.js');
 
 const user = { id: 1, login: 'ada', full_name: '', avatar_url: '' };

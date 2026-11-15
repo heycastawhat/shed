@@ -7,27 +7,14 @@ import { openDb } from '../db.js';
 import { git } from '../git.js';
 import { createRepo, getRepo, repoDir } from '../repos.js';
 import { commitFiles } from '../write.js';
+import { testEnv } from '../test-env.js';
 
 // PRs from forks: opening one, and "Update branch" writing to the fork's branch.
 
 let root: string, db: Database, ada: number, other: number, third: number, baseDir: string, forkDir: string;
 let dispatch: typeof import('./index.js').dispatch;
 const scratch = `${tmpdir()}/shed-forkpr-env-${crypto.randomUUID()}`;
-mock.module('$app/env/private', () => ({
-	FORGE_DATA: scratch,
-	FORGE_SECRET: 'x'.repeat(40),
-	T3_URL: '',
-	T3_TOKEN: '',
-	SHED_DATA: scratch,
-	SHED_ALLOWED_USERS: 'user:ada',
-	SHED_OIDC_ISSUER: 'http://oidc',
-	SHED_OIDC_CLIENT_ID: 'x',
-	SHED_OIDC_CLIENT_SECRET: 'x',
-	SHED_SSH_PORT: '',
-	SHED_SSH_URL: '',
-	SHED_ACTIONS_URL: '',
-	SHED_RUNNER_TOKEN: ''
-}));
+mock.module('$app/env/private', testEnv);
 const author = { name: 'Ada', email: 'ada@x' };
 
 async function call(as: number, method: string, path: string, body?: unknown) {
