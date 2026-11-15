@@ -24,7 +24,10 @@ function discover(issuer: string) {
 }
 
 // What the browser carries from /login to the callback, in a short-lived httpOnly cookie.
-export type Pending = { state: string; nonce: string; verifier: string };
+export type Pending = { state: string; nonce: string; verifier: string; next?: string };
+
+// Where to go after signing in: a path on this site only, never another origin.
+export const safeNext = (s: string | null | undefined) => (s && /^\/(?![/\\])/.test(s) ? s : undefined);
 
 export async function authorize(p: Provider, redirectUri: string) {
 	const d = await discover(p.issuer).catch((e) => error(502, `Can't reach the sign-in provider: ${e.message}`));
