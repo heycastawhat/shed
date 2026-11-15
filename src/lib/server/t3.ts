@@ -139,7 +139,7 @@ async function rpc<T>(host: Host, tag: string, payload: unknown, firstChunkOnly 
 	});
 }
 
-export type Snapshot = { threads: AgentThread[]; projects: { id: string; title: string }[] };
+export type Snapshot = { threads: AgentThread[]; archivedThreads?: AgentThread[]; projects: { id: string; title: string }[] };
 
 export async function shell(host: Host) {
 	const { snapshot } = await rpc<{ snapshot: Snapshot }>(

@@ -11,14 +11,21 @@ import { read, update, type Mention } from './store.js';
 type Where = { owner: string; repo: string; index: string };
 type Line = { path: string; line: string };
 
-// Replies go where the mention was: the conversation, or the line comment's thread.
+const post = (token: string, path: string, body: unknown) => request(token, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+// Replies go where the mention was: the conversation, or the line comment's thread. A line the agent's push took out of the diff
+// can't take a line comment any more, so that reply goes to the conversation and names the line.
 async function reply(token: string, repo: string, number: number, line: Line | undefined, body: string) {
-	const [side, n] = line?.line.split(':') ?? [];
-	await request(token, line ? `/repos/${repo}/pulls/${number}/reviews` : `/repos/${repo}/issues/${number}/comments`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify(line ? { event: 'COMMENT', body: '', comments: [{ path: line.path, body, [side === 'old' ? 'old_position' : 'new_position']: Number(n) }] } : { body })
-	});
+	if (line) {
+		const [side, n] = line.line.split(':');
+		try {
+			return await post(token, `/repos/${repo}/pulls/${number}/reviews`, { event: 'COMMENT', body: '', comments: [{ path: line.path, body, [side === 'old' ? 'old_position' : 'new_position']: Number(n) }] });
+		} catch (e) {
+			if (!isHttpError(e) || e.status !== 422) throw e;
+			body = `On ${line.path}, ${side === 'old' ? 'old line' : 'line'} ${n}:\n\n${body}`;
+		}
+	}
+	await post(token, `/repos/${repo}/issues/${number}/comments`, { body });
 }
 
 // The few diff lines up to the commented one, as the agent would see them in a review.
@@ -114,7 +121,7 @@ function summary(text: string) {
 
 // Posts the result of every finished mention task. Runs from the request hook at most every 15s; a mention is marked done
 // before anything is awaited, so overlapping runs can't post twice.
-async function check() {
+export async function checkMentions() {
 	const open = (await read()).mentions.filter((m) => !m.done);
 	for (const userId of new Set(open.map((m) => m.userId))) {
 		const hosts = await hostsFor(userId);
@@ -124,7 +131,7 @@ async function check() {
 			const snap = await shell(host).catch(() => null);
 			if (!snap) continue;
 			for (const m of mine) {
-				const t = snap.threads.find((t) => t.id === m.thread);
+				const t = [...snap.threads, ...(snap.archivedThreads ?? [])].find((t) => t.id === m.thread);
 				if (t && !t.deletedAt && (t.activeRunId || t.pendingRuntimeRequest || !t.latestRunId)) continue;
 				if (m.done) continue;
 				m.done = true;
@@ -154,5 +161,5 @@ let last = 0;
 export function sweepMentions() {
 	if (Date.now() - last < 15_000) return;
 	last = Date.now();
-	check().catch((e) => console.error('@agent sweep', e));
+	checkMentions().catch((e) => console.error('@agent sweep', e));
 }

@@ -6,10 +6,8 @@ import { hostWithProject, startTask } from './t3.js';
 export async function fixWithAgent(token: string | undefined, owner: string, repo: string, index: string, form: FormData) {
 	const pr = `/repos/${owner}/${repo}/pulls/${index}`;
 	await requirePush(token, `${owner}/${repo}`);
-	const [pull, c] = await Promise.all([
-		api<Pull>(token, pr),
-		api<ReviewComment>(token, `${pr}/reviews/${form.get('review')}/comments/${form.get('comment')}`)
-	]);
+	const [pull, list] = await Promise.all([api<Pull>(token, pr), api<ReviewComment[]>(token, `${pr}/reviews/${form.get('review')}/comments`)]);
+	const c = list.find((c) => String(c.id) === form.get('comment')) ?? error(404, 'Comment not found');
 	const branch = pull.head.ref;
 	const text = [
 		`Address this review comment on pull request #${pull.number} ("${pull.title}") in ${owner}/${repo}.`,
