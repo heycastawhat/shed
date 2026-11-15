@@ -484,7 +484,8 @@ const MIGRATIONS = [
 		issue_id integer references issues(id) on delete cascade,
 		note text not null default '',
 		position real not null default 0
-	);`
+	);`,
+	`alter table users add column notify_email integer not null default 1;`
 ];
 
 export function openDb(path: string) {

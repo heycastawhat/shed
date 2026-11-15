@@ -17,6 +17,17 @@
 <p class="muted">What people see on <a href="/{data.me.login}">your profile</a>. You're @{data.me.login}, signed in with <a href={data.provider}>{new URL(data.provider).host}</a>; a name or picture set here stays when you sign in again.</p>
 <ProfileForm profile={data.profile} avatar={data.me.avatar_url || `/avatars/${data.me.login}.svg`} uploaded={data.uploaded} login={data.me.login} {form} />
 
+<h2>Email</h2>
+{#if data.mail && data.me.email}
+	<form method="POST" action="?/emails" use:enhance class="emails">
+		{#if !data.notifyEmail}<input type="hidden" name="on" value="1" />{/if}
+		<span>Notifications {data.notifyEmail ? 'are' : "aren't"} emailed to <strong>{data.me.email}</strong>.</span>
+		<button>{data.notifyEmail ? 'Stop emails' : 'Email me'}</button>
+	</form>
+{:else}
+	<p class="muted">{data.mail ? 'Your sign-in provider gave no verified email, so notifications stay in Shed.' : "This Shed doesn't send email (no SHED_SMTP_URL), so notifications stay in Shed."}</p>
+{/if}
+
 <h2>Where you're signed in</h2>
 <p class="muted">Signing out here ends that browser's session. Agent keys aren't affected, and you stay signed in to your sign-in provider.</p>
 {#snippet row(s: (typeof data.sessions)[number])}
@@ -105,5 +116,12 @@
 		border: 1px solid var(--accent);
 		border-radius: 999px;
 		color: var(--accent);
+	}
+	.emails {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
 	}
 </style>

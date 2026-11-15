@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
-import { SHED_ALLOWED_USERS, SHED_DATA, SHED_OIDC_CLIENT_ID, SHED_OIDC_CLIENT_SECRET, SHED_OIDC_ISSUER, SHED_SSH_PORT, SHED_SSH_URL } from '$app/env/private';
+import { SHED_ALLOWED_USERS, SHED_DATA, SHED_OIDC_CLIENT_ID, SHED_OIDC_CLIENT_SECRET, SHED_OIDC_ISSUER, SHED_SSH_PORT, SHED_SSH_URL, SHED_SMTP_URL, SHED_MAIL_FROM } from '$app/env/private';
+import { setMailer } from './mail.js';
 import { setSshBase } from './shedrepo-shape.js';
 import { startSsh } from './ssh.js';
 import { openDb } from './db.js';
@@ -9,6 +10,7 @@ import { startScheduler } from './actions/runs.js';
 // The one database and data folder for this process. Opened on import, so a bad database stops the server at startup (hooks' init imports it).
 mkdirSync(SHED_DATA, { recursive: true });
 export const root = SHED_DATA;
+setMailer(SHED_SMTP_URL, SHED_MAIL_FROM);
 export const db = openDb(`${SHED_DATA}/shed.db`);
 export const provider = { issuer: SHED_OIDC_ISSUER, clientId: SHED_OIDC_CLIENT_ID, clientSecret: SHED_OIDC_CLIENT_SECRET };
 export const allowlist = SHED_ALLOWED_USERS.split(',');

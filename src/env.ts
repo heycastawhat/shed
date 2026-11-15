@@ -27,6 +27,8 @@ export const variables = defineEnvVars({
 	SHED_RUNNER_TOKEN: { description: 'Optional fixed registration token for forgejo-runner (otherwise make one in Settings → Runners)', schema: (v) => v || undefined },
 	SHED_SSH_PORT: { description: 'Port for git over SSH (0 turns it off)', schema: (v) => (v === undefined || v === '' ? 2222 : Number(v)) },
 	SHED_SSH_URL: { description: 'How clone URLs name the SSH server, e.g. ssh://git@git.example.com:2222 (default: this host and SHED_SSH_PORT)', schema: (v) => v?.replace(/\/+$/, '') || undefined },
+	SHED_SMTP_URL: { description: 'Optional SMTP server for notification emails, e.g. smtps://user:pass@mail.example.com:465', schema: (v) => v || undefined },
+	SHED_MAIL_FROM: { description: 'From address for notification emails, e.g. Shed <shed@example.com>', schema: (v) => v || undefined },
 	SHED_DATA: { description: 'Directory for shed.db and the git repos', schema: (v) => v || 'data' },
 	FORGE_DATA: { description: 'Directory for forge.json (agent keys and activity)', schema: (v) => v || 'data' },
 	T3_URL: { description: 'Optional T3 Code server every user gets, e.g. http://localhost:3773. More hosts are added in Settings → Agents', schema: (v) => (v ? url('T3_URL')(v) : undefined) },

@@ -2,12 +2,13 @@ import { error } from '@sveltejs/kit';
 import { access, atLeast } from '../access.js';
 import type { RepoRow } from '../repos.js';
 import { bool, now, type RepoCtx } from './common.js';
+import { mailEnabled, sendMail } from '../mail.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
 import type { IssueRow } from './shapes.js';
 
 // Who hears about activity on an issue or PR: its subscribers (author, commenters, assignees), people watching the repo, and anyone
 // @mentioned who can read it. Never the person who did it.
-export function notify(c: Ctx, r: RepoCtx, i: IssueRow, _what: string, text: string) {
+export function notify(c: Ctx, r: RepoCtx, i: IssueRow, what: string, text: string) {
 	const actor = c.user?.id;
 	const ids = new Set<number>();
 	for (const s of c.db.query<{ user_id: number; subscribed: number }, [number]>('select user_id, subscribed from subscriptions where issue_id = ?').all(i.id)) if (s.subscribed) ids.add(s.user_id);
@@ -22,6 +23,19 @@ export function notify(c: Ctx, r: RepoCtx, i: IssueRow, _what: string, text: str
 		c.db
 			.query("insert into notifications (user_id, issue_id, repo_id, unread, updated_at) values (?, ?, ?, 1, ?) on conflict (user_id, issue_id) do update set unread = 1, updated_at = excluded.updated_at")
 			.run(id, i.id, r.row.id, now());
+		if (mailEnabled()) {
+			const u = c.db.query<{ email: string | null; notify_email: number }, [number]>('select email, notify_email from users where id = ?').get(id);
+			if (u?.email && u.notify_email) {
+				const kind = i.is_pull ? 'pulls' : 'issues';
+				const link = `${c.origin}/${r.full}/${kind}/${i.number}`;
+				// Threading headers keep one conversation per issue in mail clients.
+				const thread = `<${r.full}/${kind}/${i.number}@shed>`;
+				sendMail(u.email, `[${r.full}] ${i.title} (#${i.number})`, `${c.user?.login ?? 'Someone'} ${what}.\n\n${text.trim()}${text.trim() ? '\n\n' : ''}${link}\n\nTurn these emails off in Settings → Account.`, {
+					'In-Reply-To': thread,
+					References: thread
+				});
+			}
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ import { endSessions, listSessions } from '#lib/server/accounts.js';
 import { AVATAR_MAX } from '#lib/server/avatars.js';
 import { api } from '#lib/server/forgejo.js';
 import { send } from '#lib/server/issue.js';
+import { mailEnabled } from '#lib/server/mail.js';
 import { db, provider } from '#lib/server/shed.js';
 
 type Settings = { full_name: string; description: string; website: string; location: string };
@@ -14,6 +15,8 @@ export async function load({ locals, cookies }) {
 		profile: await api<Settings>(locals.token, '/user/settings'),
 		uploaded: locals.user.avatar_url.startsWith('/avatars/'),
 		provider: provider.issuer,
+		mail: mailEnabled(),
+		notifyEmail: !!db.query<{ n: number }, [number]>('select notify_email as n from users where id = ?').get(locals.user.id)?.n,
 		sessions: listSessions(db, locals.user.id, cookies.get('shed_session'))
 	};
 }
@@ -29,6 +32,10 @@ export const actions = {
 		if (!(file instanceof File) || !file.size) return fail(422, { action: 'avatar', error: 'Choose an image' });
 		if (file.size > AVATAR_MAX) return fail(413, { action: 'avatar', error: 'Avatars can be up to 1 MB' });
 		return send('avatar', locals.token, '/user/avatar', 'POST', { image: new Uint8Array(await file.arrayBuffer()).toBase64() });
+	},
+	emails: async ({ locals, request }) => {
+		if (!locals.user) redirect(303, '/login');
+		db.query('update users set notify_email = ? where id = ?').run((await request.formData()).has('on') ? 1 : 0, locals.user.id);
 	},
 	removeAvatar: ({ locals }) => send('avatar', locals.token, '/user/avatar', 'DELETE'),
 	end: async ({ locals, cookies, request }) => {
