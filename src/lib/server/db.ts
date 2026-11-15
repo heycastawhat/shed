@@ -430,6 +430,38 @@ const MIGRATIONS = [
 		user_id integer not null references users(id) on delete cascade,
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 		unique (repo_id, path)
+	);`,
+	// Packages: a container registry (OCI distribution) and generic files, owned by a user or org. Blobs are stored once by digest;
+	// an owner can only read blobs that were pushed to one of its packages.
+	`create table packages (
+		id integer primary key,
+		owner_id integer not null references users(id) on delete cascade,
+		type text not null check (type in ('container', 'generic')),
+		name text not null,
+		private integer not null default 1,
+		repo_id integer references repos(id) on delete set null,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		unique (owner_id, type, name)
+	);
+	create table package_versions (
+		id integer primary key,
+		package_id integer not null references packages(id) on delete cascade,
+		version text not null,
+		digest text not null,
+		media_type text not null default '',
+		size integer not null default 0,
+		user_id integer references users(id),
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		unique (package_id, version)
+	);
+	create table package_blobs (
+		owner_id integer not null references users(id) on delete cascade,
+		digest text not null,
+		size integer not null,
+		media_type text not null default '',
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		primary key (owner_id, digest)
 	);`
 ];
 

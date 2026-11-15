@@ -11,5 +11,7 @@ import './hooks.js';
 import './code.js';
 import './keys.js';
 import './mirror.js';
+import './packages.js';
+import './orgs.js';
 import './search.js';
 export { dispatch } from './router.js';
