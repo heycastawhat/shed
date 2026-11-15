@@ -3,9 +3,10 @@ import { getUser, sessionUser, tokenAuth } from '#lib/server/accounts.js';
 import { dispatch } from '#lib/server/api/index.js';
 import { internalToken } from '#lib/server/api/internal.js';
 import { gitHttp, isGitRequest } from '#lib/server/githttp.js';
-import { db, root, serveSsh, setOrigin, setSshHost } from '#lib/server/shed.js';
+import { db, root, startBackground, setOrigin, setSshHost } from '#lib/server/shed.js';
 import { runnerRpc } from '#lib/server/actions/rpc.js';
-import { actionsCtx } from '#lib/server/actions/secrets.js';
+import { actionsCtx, signingKey } from '#lib/server/actions/secrets.js';
+import { artifactBlob, artifactPipeline, artifactTwirp } from '#lib/server/actions/artifacts.js';
 import { sweepMentions } from '#lib/server/mention.js';
 import { read } from '#lib/server/store.js';
 import { isTheme } from '#lib/themes.js';
@@ -14,7 +15,7 @@ import { isTheme } from '#lib/themes.js';
 export const init: ServerInit = async () => {
 	await read();
 	db.query('select 1').get();
-	serveSsh();
+	startBackground();
 };
 
 const SECURITY_HEADERS = {
@@ -27,6 +28,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	setOrigin(event.url.origin);
 	setSshHost(event.url.hostname);
 	if (isGitRequest(event.url)) return gitHttp(db, root, event.request, event.url);
+	const twirp = event.url.pathname.match(/^\/twirp\/github\.actions\.results\.api\.v1\.ArtifactService\/(\w+)$/);
+	if (twirp) return artifactTwirp(db, root, event.url.origin, signingKey, event.request, twirp[1]);
+	if (event.url.pathname.startsWith('/api/actions_pipeline/')) return artifactPipeline(db, root, event.url.origin, signingKey, event.request, event.url);
+	if (event.url.pathname.startsWith('/_apis/shed/artifacts/')) return artifactBlob(db, root, signingKey, event.request, event.url);
 	if (event.url.pathname.startsWith('/api/actions/')) return runnerRpc(actionsCtx(event.url.origin), event.request, event.url.pathname.slice('/api/actions/'.length));
 	// The REST API for scripts and tools: a Shed token as `token …`, `Bearer …` or a Basic password. Cookies don't count, so no CSRF.
 	if (event.url.pathname.startsWith('/api/v1/')) {

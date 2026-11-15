@@ -29,6 +29,7 @@
 		return () => clearInterval(t);
 	});
 	let open = $state<Record<number, boolean>>({});
+	const size = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
 	const isOpen = (s: { id: number; result: string | null }) => open[s.id] ?? (s.result === 'failure' || !s.result);
 </script>
 
@@ -73,6 +74,12 @@
 				<span class="muted small">{took(j.started_at, j.completed_at)}</span>
 			</a>
 		{/each}
+		{#if data.artifacts.length}
+			<h4>Artifacts</h4>
+			{#each data.artifacts as a (a.name)}
+				{#if a.expired}<span class="muted small art">{a.name} (expired)</span>{:else}<a class="art" href={a.archive_download_url} download><Icon name="download" size={14} />{a.name}<span class="muted small">{size(a.size)}</span></a>{/if}
+			{/each}
+		{/if}
 	</nav>
 
 	{#if data.job}
@@ -154,6 +161,16 @@
 	nav a.on,
 	nav a:hover {
 		background: color-mix(in srgb, var(--fg) 9%, transparent);
+	}
+	h4 {
+		margin: 1rem 0.6rem 0.3rem;
+		font-size: 0.8rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--muted);
+	}
+	.art {
+		gap: 0.4rem;
 	}
 	.name {
 		flex: 1;

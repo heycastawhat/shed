@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { mkdir, appendFile } from 'node:fs/promises';
+import { appendFile, mkdir, rm } from 'node:fs/promises';
 import YAML from 'yaml';
 import { git } from '../git.js';
 import { onPush } from '../push.js';
@@ -295,3 +295,58 @@ export function dispatchPayload(inputs: Record<string, string>, repo: RepoRow, o
 
 // The workflow file as the runner gets it, for the run page's "workflow" view.
 export const jobYaml = (j: JobRow) => YAML.parse(j.payload);
+
+// Scheduled workflows: once a minute, each repo's default branch is checked for `on: schedule` crons that match (UTC).
+const schedules = new Map<number, { sha: string; crons: { workflow: string; match: (d: Date) => boolean }[] }>();
+export async function tickSchedules(db: Database, root: string, now = new Date()) {
+	const { parseCron } = await import('./cron.js');
+	for (const repo of db.query<RepoRow, []>('select r.*, u.login as owner from repos r join users u on u.id = r.owner_id where r.archived = 0').all()) {
+		const dir = repoDir(root, repo.id);
+		const sha = (await git(dir, ['rev-parse', '--verify', '--quiet', `refs/heads/${repo.default_branch}`]).catch(() => '')).trim();
+		if (!sha) continue;
+		let entry = schedules.get(repo.id);
+		if (entry?.sha !== sha) {
+			const crons: { workflow: string; match: (d: Date) => boolean }[] = [];
+			for (const f of await workflowFiles(dir, sha)) {
+				try {
+					const on = parseWorkflow(f.text).on as Record<string, unknown> | undefined;
+					const list = on && typeof on === 'object' && !Array.isArray(on) ? (on.schedule as { cron?: string }[] | undefined) : undefined;
+					for (const s of list ?? []) if (s?.cron) crons.push({ workflow: f.path, match: parseCron(s.cron) });
+				} catch (e) {
+					console.error('schedule', repo.name, f.path, (e as Error).message);
+				}
+			}
+			schedules.set(repo.id, (entry = { sha, crons }));
+		}
+		const due = new Set(entry.crons.filter((c) => c.match(now)).map((c) => c.workflow));
+		for (const workflow of due)
+			await trigger(db, root, repo.id, {
+				event: 'schedule',
+				ref: `refs/heads/${repo.default_branch}`,
+				sha,
+				userId: null,
+				title: `Scheduled run`,
+				payload: { schedule: '', repository: { full_name: `${repo.owner}/${repo.name}` } },
+				only: workflow
+			});
+	}
+}
+
+export function startScheduler(db: Database, root: string) {
+	const g = globalThis as { shedCron?: boolean };
+	if (g.shedCron) return;
+	g.shedCron = true;
+	const tick = () => {
+		const now = new Date();
+		now.setUTCSeconds(0, 0);
+		tickSchedules(db, root, now).catch((e) => console.error('schedule', e));
+		// Hourly: expired artifacts go (their rows stay, marked expired, so run pages still list them).
+		if (now.getUTCMinutes() === 0)
+			for (const a of db.query<{ id: number }, []>("select id from artifacts where expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now') and status = 'done'").all()) {
+				void rm(`${root}/actions/artifacts/${a.id}`, { recursive: true, force: true });
+				db.query("update artifacts set status = 'expired' where id = ?").run(a.id);
+			}
+		setTimeout(tick, 60_000 - (Date.now() % 60_000) + 50);
+	};
+	setTimeout(tick, 60_000 - (Date.now() % 60_000) + 50);
+}

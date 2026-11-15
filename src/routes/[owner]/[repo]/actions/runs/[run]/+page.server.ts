@@ -22,7 +22,8 @@ export async function load({ locals, params, url }) {
 	});
 	const setup = lines.filter((_, i) => !used.has(i) && i < (steps[0]?.log_index ?? lines.length));
 	const teardown = lines.filter((_, i) => !used.has(i) && i >= (steps[0]?.log_index ?? lines.length));
-	return { run, job, steps, setup, teardown };
+	const { artifacts } = await api<{ artifacts: { name: string; size: number; expired: boolean; archive_download_url: string }[] }>(locals.token, `${base}/runs/${params.run}/artifacts`);
+	return { run, job, steps, setup, teardown, artifacts };
 }
 
 async function act(token: string | undefined, path: string, method = 'POST') {

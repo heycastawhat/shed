@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
+import { runtimeToken } from './artifacts.js';
 import { RESULT, RESULT_NAME, toStruct, type } from './proto.js';
 import { appendLog, finishJob, logPath, settle, tasksVersion, type JobRow, type RunRow } from './runs.js';
 
@@ -23,7 +24,7 @@ class RpcError extends Error {
 const STATUS = { unauthenticated: 401, permission_denied: 403, not_found: 404, invalid_argument: 400, internal: 500, unimplemented: 404 };
 
 type RunnerRow = { id: number; uuid: string; token_hash: string; name: string; labels: string; version: string; repo_id: number | null; ephemeral: number };
-export type Ctx = { db: Database; root: string; origin: string; secrets: (repoId: number) => Promise<Record<string, string>>; defaultActionsUrl: string; registrationToken?: string };
+export type Ctx = { db: Database; root: string; origin: string; secrets: (repoId: number) => Promise<Record<string, string>>; defaultActionsUrl: string; registrationToken?: string; signingKey: string };
 
 function runnerJson(r: RunnerRow, token = '') {
 	return { id: r.id, uuid: r.uuid, token, name: r.name, status: 1, version: r.version, labels: JSON.parse(r.labels), ephemeral: !!r.ephemeral };
@@ -83,6 +84,10 @@ async function pickTask(c: Ctx, runner: RunnerRow) {
 			workflow_ref: `${repo.owner}/${repo.name}/.forgejo/workflows/${run.workflow}@${run.ref}`,
 			job: job.job_key,
 			token,
+			// What upload/download-artifact authenticate with; carries this run and job.
+			runtime_token: runtimeToken(c.signingKey, run.id, job.id, taskId),
+			gitea_runtime_token: runtimeToken(c.signingKey, run.id, job.id, taskId),
+			forgejo_runtime_token: runtimeToken(c.signingKey, run.id, job.id, taskId),
 			server_url: c.origin,
 			api_url: `${c.origin}/api/v1`,
 			retention_days: '90',

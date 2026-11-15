@@ -215,3 +215,13 @@ route('DELETE', '/admin/runners/:id', (c) => {
 route('DELETE', '/repos/:owner/:repo/actions/runners/:id', (c) => {
 	c.db.query('delete from runners where id = ? and repo_id = ?').run(Number(c.params.id), repoOf(c, 'admin').row.id);
 });
+
+route('GET', '/repos/:owner/:repo/actions/runs/:run/artifacts', (c) => {
+	const r = repoOf(c);
+	const x = runOf(c, r, 'number');
+	const list = c.db.query<{ id: number; name: string; size: number; created_at: string; expires_at: string }, [number]>("select id, name, size, created_at, expires_at from artifacts where run_id = ? and status in ('done', 'expired') order by name").all(x.id);
+	return {
+		total_count: list.length,
+		artifacts: list.map((a) => ({ ...a, expired: Date.parse(a.expires_at) < Date.now(), archive_download_url: `${c.origin}/${r.full}/actions/runs/${x.number}/artifacts/${encodeURIComponent(a.name)}` }))
+	};
+});

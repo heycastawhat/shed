@@ -395,6 +395,18 @@ const MIGRATIONS = [
 		fingerprint text not null unique,
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 		last_used_at text
+	);`,
+	// CI artifacts (actions/upload-artifact@v4): uploaded in blocks, then one zip per name per run.
+	`create table artifacts (
+		id integer primary key,
+		run_id integer not null references runs(id) on delete cascade,
+		job_id integer not null,
+		name text not null,
+		size integer not null default 0,
+		status text not null default 'uploading',
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		expires_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+90 days')),
+		unique (run_id, name)
 	);`
 ];
 

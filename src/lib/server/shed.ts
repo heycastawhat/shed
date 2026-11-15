@@ -4,7 +4,7 @@ import { setSshBase } from './shedrepo-shape.js';
 import { startSsh } from './ssh.js';
 import { openDb } from './db.js';
 import './activity.js';
-import './actions/runs.js';
+import { startScheduler } from './actions/runs.js';
 
 // The one database and data folder for this process. Opened on import, so a bad database stops the server at startup (hooks' init imports it).
 mkdirSync(SHED_DATA, { recursive: true });
@@ -20,7 +20,9 @@ export const setOrigin = (o: string) => (current = o);
 
 // One SSH server per process, even when the dev server reloads this module.
 const g = globalThis as { shedSsh?: boolean };
-export function serveSsh() {
+// Background services: the CI scheduler and git over SSH.
+export function startBackground() {
+	startScheduler(db, root);
 	if (!SHED_SSH_PORT || g.shedSsh) return;
 	g.shedSsh = true;
 	startSsh(db, root, SHED_SSH_PORT);
