@@ -150,16 +150,17 @@
 	}
 	.danger-zone {
 		gap: 0;
-		padding: 0;
-		border-color: color-mix(in srgb, var(--del-fg) 50%, var(--border));
 	}
 	.danger-zone form {
 		display: grid;
 		gap: 0.5rem;
-		padding: 1rem;
+		padding: 0.9rem 0;
+	}
+	.danger-zone form:last-child {
+		padding-bottom: 0;
 	}
 	.danger-zone form + form {
-		border-top: 1px solid var(--border);
+		border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 	}
 	.danger-zone .lead {
 		margin: 0;

@@ -50,10 +50,18 @@
 		min-width: 0;
 		max-width: 48rem;
 	}
-	/* Shared by every settings page. */
+	/* Shared by every settings page: each section is one of Sink's grouped cards (as .settings-card in app.css). */
+	.content :global(section) {
+		padding: 1.25rem 1.4rem;
+		border-radius: 24px;
+		background: color-mix(in srgb, var(--accent) 4%, color-mix(in srgb, var(--fg) 2.5%, var(--bg)));
+	}
+	.content :global(section:has(.danger-zone)) {
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--del-fg) 45%, transparent);
+	}
 	.content :global(h2) {
 		margin: 0 0 0.25rem;
-		font-size: 1.15rem;
+		font-size: 1.1rem;
 	}
 	.content :global(h3) {
 		margin: 0 0 0.5rem;
@@ -64,14 +72,18 @@
 		color: var(--muted);
 	}
 	.content :global(section + section) {
-		margin-top: 2rem;
+		margin-top: 1rem;
 	}
 	.content :global(.card) {
 		display: grid;
 		gap: 0.9rem;
+	}
+	/* Forms tucked inside a card (a new rule, a new secret) get a panel of their own. */
+	.content :global(:is(.card.new, .card.register, details > .card)) {
+		margin-top: 0.75rem;
 		padding: 1rem;
-		border: 1px solid var(--border);
 		border-radius: var(--radius);
+		background: var(--bg);
 	}
 	.content :global(.field) {
 		display: grid;
@@ -133,8 +145,6 @@
 		list-style: none;
 		padding: 0;
 		margin: 0;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
 	}
 	.content :global(.list > li) {
 		display: flex;
@@ -142,10 +152,10 @@
 		justify-content: space-between;
 		align-items: center;
 		gap: 0.5rem 1rem;
-		padding: 0.7rem 1rem;
+		padding: 0.75rem 0;
 	}
 	.content :global(.list > li + li) {
-		border-top: 1px solid var(--border);
+		border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 	}
 	.content :global(.list > li.empty) {
 		color: var(--muted);
@@ -173,6 +183,10 @@
 		font-size: 0.85em;
 	}
 	@media (max-width: 700px) {
+		.content :global(section) {
+			padding: 1.1rem;
+			border-radius: 20px;
+		}
 		.settings {
 			grid-template-columns: minmax(0, 1fr);
 			gap: 1rem;
