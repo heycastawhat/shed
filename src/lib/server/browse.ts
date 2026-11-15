@@ -136,3 +136,42 @@ export async function aheadBehind(dir: string, base: string, head: string) {
 }
 
 export const mergeBase = async (dir: string, a: string, b: string) => (await gitTry(dir, ['merge-base', a, b]))?.trim() || null;
+
+export type BlameCommit = { sha: string; author: string; email: string; time: number; summary: string };
+export type BlameRange = { sha: string; start: number; count: number };
+
+// `git blame --porcelain`: a header line per blamed line, the commit's details only the first time it appears, then the line itself after a tab.
+// Consecutive lines from one commit become one range.
+export function parseBlame(out: string) {
+	const commits: Record<string, BlameCommit> = {};
+	const ranges: BlameRange[] = [];
+	let cur: BlameCommit | null = null;
+	for (const line of out.split('\n')) {
+		if (line.startsWith('\t')) continue;
+		const head = line.match(/^([0-9a-f]{40,64}) \d+ (\d+)/);
+		if (head) {
+			const [, sha, n] = head;
+			cur = commits[sha] ??= { sha, author: '', email: '', time: 0, summary: '' };
+			const last = ranges.at(-1);
+			if (last?.sha === sha && last.start + last.count === Number(n)) last.count++;
+			else ranges.push({ sha, start: Number(n), count: 1 });
+			continue;
+		}
+		if (!cur) continue;
+		const sp = line.indexOf(' ');
+		const [key, value] = [line.slice(0, sp), line.slice(sp + 1)];
+		if (key === 'author') cur.author = value;
+		else if (key === 'author-mail') cur.email = value.replace(/^<|>$/g, '');
+		else if (key === 'author-time') cur.time = Number(value);
+		else if (key === 'summary') cur.summary = value;
+	}
+	return { commits, ranges };
+}
+
+export const blame = async (dir: string, sha: string, path: string) => parseBlame(await git(dir, ['blame', '--porcelain', sha, '--', path]));
+
+// Every file path at a commit, for the file finder. Capped so a huge repo can't blow up the page.
+export async function allPaths(dir: string, sha: string, max = 50000) {
+	const out = await git(dir, ['ls-tree', '-r', '-z', '--name-only', sha]);
+	return out.split('\0').filter(Boolean).slice(0, max);
+}

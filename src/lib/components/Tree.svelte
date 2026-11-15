@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Breadcrumbs from './Breadcrumbs.svelte';
+	import { page } from '$app/state';
+	import CloneMenu from './CloneMenu.svelte';
 	import Icon from './Icon.svelte';
 	import { refPath } from '#lib/repo.js';
 	import { ago } from '#lib/time.js';
@@ -11,14 +13,40 @@
 		path,
 		entries,
 		last,
-		readme
-	}: { repo: string; ref: string; path: string; entries: Entry[]; last: Record<string, { title: string; date: string }>; readme?: { name: string; html: string } } = $props();
+		readme,
+		canEdit = false
+	}: {
+		repo: string;
+		ref: string;
+		path: string;
+		entries: Entry[];
+		last: Record<string, { title: string; date: string }>;
+		readme?: { name: string; html: string };
+		canEdit?: boolean;
+	} = $props();
 
+	let menu = $state<HTMLDetailsElement>();
 	const parent = $derived(path.split('/').filter(Boolean).slice(0, -1).join('/'));
 	const href = (e: Entry) => `/${repo}/${e.type === 'dir' ? 'tree' : 'blob'}/${refPath(ref, e.path)}`;
 </script>
 
-{#if path}<Breadcrumbs {repo} {ref} {path} />{/if}
+<div class="tools">
+	{#if path}<Breadcrumbs {repo} {ref} {path} />{/if}
+	<span class="buttons">
+		<button class="button" onclick={() => dispatchEvent(new Event('gotofile'))} title="Go to file (t)"><Icon name="search" size={14} />Go to file</button>
+		<a class="button" href="/{repo}/commits/{refPath(ref, path)}" title="History of this folder"><Icon name="history" size={14} />History</a>
+		{#if canEdit}
+			<details class="add" bind:this={menu}>
+				<summary class="button"><Icon name="plus" size={14} />Add file<Icon name="chevron" size={12} /></summary>
+				<div class="menu">
+					<a href="/{repo}/new/{refPath(ref, path)}"><Icon name="file" size={14} />New file</a>
+					<a href="/{repo}/upload/{refPath(ref, path)}"><Icon name="upload" size={14} />Upload files</a>
+				</div>
+			</details>
+		{/if}
+		{#if !path && page.data.repo}<CloneMenu {repo} {ref} https={page.data.repo.clone_url} ssh={page.data.repo.ssh_url} />{/if}
+	</span>
+</div>
 
 <ul class="tree">
 	{#if path}
@@ -47,7 +75,63 @@
 	</section>
 {/if}
 
+<svelte:window onclick={(e) => menu?.open && !menu.contains(e.target as Node) && (menu.open = false)} />
+
 <style>
+	.tools {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 0.6rem 1rem;
+		margin-bottom: 1rem;
+	}
+	.tools :global(.crumbs) {
+		margin: 0.3rem 0 0;
+	}
+	.buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-left: auto;
+	}
+	.buttons .button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.25rem 0.65rem;
+		color: var(--fg);
+		font-size: 0.85rem;
+	}
+	.add {
+		position: relative;
+	}
+	.add summary {
+		list-style: none;
+	}
+	.add summary::-webkit-details-marker {
+		display: none;
+	}
+	.menu {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 0.3rem);
+		z-index: 10;
+		display: grid;
+		min-width: 10rem;
+		padding: 0.3rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg);
+		box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+	}
+	.menu a {
+		padding: 0.4rem 0.6rem;
+		border-radius: 6px;
+		font-size: 0.88rem;
+	}
+	.menu a:hover {
+		background: color-mix(in srgb, var(--fg) 9%, transparent);
+	}
 	.tree,
 	.readme {
 		border: 1px solid var(--border);

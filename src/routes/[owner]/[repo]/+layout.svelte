@@ -1,25 +1,30 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import FileFinder from '#lib/components/FileFinder.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import RepoActions from '#lib/components/RepoActions.svelte';
 	import { refPath } from '#lib/repo.js';
 
 	let { data, children } = $props();
 	const base = $derived(`/${data.repo.full_name}`);
 	const pinned = $derived(data.pins.includes(data.repo.full_name));
-	const listing = $derived(page.route.id?.match(/\/(branches|releases)$/)?.[1]);
+	const listing = $derived(page.route.id?.match(/\/(branches|releases)(?:\/|$)/)?.[1]);
 	// svelte-ignore state_referenced_locally
 	let proto = $state<'ssh' | 'https'>(data.repo.ssh_url ? 'ssh' : 'https');
 	const url = $derived(proto === 'ssh' ? data.repo.ssh_url : data.repo.clone_url);
 	const section = $derived(
-		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity)/)?.[1] ??
+		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity|settings)/)?.[1] ??
+			(/^\/\[owner\]\/\[repo\]\/(labels|milestones)/.test(page.route.id ?? '') ? 'issues' : null) ??
+			(/^\/\[owner\]\/\[repo\]\/compare/.test(page.route.id ?? '') ? 'pulls' : null) ??
 			(/\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code')
 	);
 
 	function switchRef(ref: string) {
 		const path = page.params.path ?? '';
-		const kind = page.route.id?.match(/\/(tree|blob|commits)\//)?.[1] ?? 'tree';
-		goto(`${base}/${kind}/${refPath(ref, kind === 'commits' ? '' : path)}`);
+		const route = page.route.id?.match(/\/(tree|blob|commits|blame|edit)\//)?.[1] ?? 'tree';
+		const kind = route === 'edit' ? 'blob' : route;
+		goto(`${base}/${kind}/${refPath(ref, path)}`);
 	}
 </script>
 
@@ -32,7 +37,9 @@
 			<input type="hidden" name="pin" value={pinned ? '0' : '1'} />
 			<button class:on={pinned} title={pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar'}><Icon name="pin" size={13} />{pinned ? 'Pinned' : 'Pin'}</button>
 		</form>
+		<RepoActions repo={data.repo.full_name} social={data.social} signedIn={!!data.user} />
 	</h1>
+	{#if data.forkedFrom}<p class="forked"><Icon name="fork" size={13} />forked from <a href="/{data.forkedFrom.owner}/{data.forkedFrom.name}">{data.forkedFrom.owner}/{data.forkedFrom.name}</a></p>{/if}
 	{#if data.repo.description}<p>{data.repo.description}</p>{/if}
 	<nav>
 		<div class="tabs">
@@ -51,7 +58,7 @@
 			<a href="{base}/activity" class:active={section === 'activity'}><Icon name="activity" size={15} />Activity</a>
 			{#if data.agents}<a href="{base}/agents" class:active={section === 'agents'}><Icon name="agents" size={15} />Agents</a>{/if}
 			{#if data.repo.permissions.admin}
-				<a href="{data.repo.html_url}/settings" target="_blank" rel="noreferrer"><Icon name="sliders" size={15} />Settings<Icon name="external" size={11} /></a>
+				<a href="{base}/settings" class:active={section === 'settings'}><Icon name="sliders" size={15} />Settings</a>
 			{/if}
 		</div>
 		<div class="refs">
@@ -73,7 +80,7 @@
 	</nav>
 </div>
 
-{#if data.repo.empty}
+{#if data.repo.empty && section !== 'settings'}
 	<section class="empty">
 		<h2>This repository is empty</h2>
 		<p class="muted">Push an existing project to it:</p>
@@ -89,6 +96,7 @@ git push -u origin {data.repo.default_branch}</pre>
 	</section>
 {:else}
 	{@render children()}
+	{#if section === 'code'}<FileFinder repo={data.repo.full_name} ref={data.ref} />{/if}
 {/if}
 
 <style>
@@ -190,6 +198,13 @@ git push -u origin {data.repo.default_branch}</pre>
 	.head p {
 		color: var(--muted);
 		margin: 0.4rem 0 0;
+	}
+	.head .forked {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		margin-top: 0.2rem;
+		font-size: 0.85rem;
 	}
 	nav {
 		display: flex;

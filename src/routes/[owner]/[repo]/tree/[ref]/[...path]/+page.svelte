@@ -5,4 +5,4 @@
 	let { data } = $props();
 </script>
 
-<Tree repo={data.repo.full_name} ref={data.ref} path={page.params.path ?? ''} entries={data.entries} last={data.last} readme={data.readme} />
+<Tree repo={data.repo.full_name} ref={data.ref} path={page.params.path ?? ''} entries={data.entries} last={data.last} readme={data.readme} canEdit={data.repo.permissions.push && data.branches.includes(data.ref)} />
