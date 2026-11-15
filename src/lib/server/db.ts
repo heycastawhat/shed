@@ -462,6 +462,28 @@ const MIGRATIONS = [
 		media_type text not null default '',
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 		primary key (owner_id, digest)
+	);`,
+	// Project boards: columns of cards, each card an issue or PR of the repo, or a note.
+	`create table projects (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		title text not null,
+		description text not null default '',
+		state text not null default 'open' check (state in ('open', 'closed')),
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table project_columns (
+		id integer primary key,
+		project_id integer not null references projects(id) on delete cascade,
+		title text not null,
+		position real not null default 0
+	);
+	create table project_cards (
+		id integer primary key,
+		column_id integer not null references project_columns(id) on delete cascade,
+		issue_id integer references issues(id) on delete cascade,
+		note text not null default '',
+		position real not null default 0
 	);`
 ];
 

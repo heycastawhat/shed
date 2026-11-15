@@ -15,7 +15,7 @@
 	let proto = $state<'ssh' | 'https'>(data.repo.ssh_url ? 'ssh' : 'https');
 	const url = $derived(proto === 'ssh' ? data.repo.ssh_url : data.repo.clone_url);
 	const section = $derived(
-		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity|settings)/)?.[1] ??
+		page.route.id?.match(/^\/\[owner\]\/\[repo\]\/(pulls|issues|agents|actions|wiki|activity|projects|settings)/)?.[1] ??
 			(/^\/\[owner\]\/\[repo\]\/(labels|milestones)/.test(page.route.id ?? '') ? 'issues' : null) ??
 			(/^\/\[owner\]\/\[repo\]\/compare/.test(page.route.id ?? '') ? 'pulls' : null) ??
 			(/\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code')
@@ -62,6 +62,7 @@
 				</a>
 			{/if}
 			{#if data.repo.has_actions}<a href="{base}/actions" class:active={section === 'actions'}><Icon name="actions" size={15} />Actions</a>{/if}
+			<a href="{base}/projects" class:active={section === 'projects'}><Icon name="board" size={15} />Projects</a>
 			{#if data.repo.has_wiki}<a href="{base}/wiki" class:active={section === 'wiki'}><Icon name="wiki" size={15} />Wiki</a>{/if}
 			<a href="{base}/activity" class:active={section === 'activity'}><Icon name="activity" size={15} />Activity</a>
 			{#if data.agents}<a href="{base}/agents" class:active={section === 'agents'}><Icon name="agents" size={15} />Agents</a>{/if}

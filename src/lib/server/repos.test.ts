@@ -17,7 +17,7 @@ afterEach(() => rm(root, { recursive: true }));
 test('migrations run once and reopening is a no-op', () => {
 	db.close();
 	db = openDb(`${root}/shed.db`);
-	expect(db.query('pragma user_version').get()).toEqual({ user_version: 10 });
+	expect(db.query('pragma user_version').get()).toEqual({ user_version: 11 });
 });
 
 test('refuses a database from a newer build', () => {

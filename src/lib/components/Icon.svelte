@@ -38,6 +38,7 @@
 	import IFilter from '@mingcute/svelte/core-regular/filter';
 	import IDelete2 from '@mingcute/svelte/core-regular/delete-2';
 	import IDownload from '@mingcute/svelte/core-regular/download';
+	import IBoard from '@mingcute/svelte/core-regular/board';
 	import IPackage from '@mingcute/svelte/core-regular/package';
 	import IFileZip from '@mingcute/svelte/core-regular/file-zip';
 	import IPlayCircle from '@mingcute/svelte/core-regular/play-circle';
@@ -114,6 +115,8 @@
 		filter: IFilter,
 		trash: IDelete2,
 		download: IDownload,
+		board: IBoard,
+		package: IPackage,
 		release: IPackage,
 		zip: IFileZip,
 		star: IStar,
