@@ -21,14 +21,24 @@ test('allowlist matching', () => {
 	expect(isAllowed(list, { sub: 'abcd', preferred_username: 'ada2' })).toBe(false);
 });
 
-test('first sign-in makes an admin; later ones update the profile and keep the login', () => {
+test('first sign-in makes an admin; later ones keep the login and name', () => {
 	const id = signIn(db, { sub: 's1', preferred_username: 'ada', name: 'Ada', email: 'j@x.nz', picture: 'https://p/1' });
 	expect(db.query('select login, name, email, admin, avatar_url from users where id = ?').get(id)).toEqual({ login: 'ada', name: 'Ada', email: 'j@x.nz', admin: 1, avatar_url: 'https://p/1' });
 	expect(signIn(db, { sub: 's1', preferred_username: 'renamed', name: 'Ada P' })).toBe(id);
-	expect(db.query('select login, name, email from users where id = ?').get(id)).toEqual({ login: 'ada', name: 'Ada P', email: 'j@x.nz' });
+	expect(db.query('select login, name, email from users where id = ?').get(id)).toEqual({ login: 'ada', name: 'Ada', email: 'j@x.nz' });
 	const other = signIn(db, { sub: 's2', preferred_username: 'ADA' });
 	expect(db.query('select login, admin from users where id = ?').get(other)).toEqual({ login: 'ADA-2', admin: 0 });
 	expect(db.query('select login from users where id = ?').get(signIn(db, { sub: 's3', preferred_username: '../evil name.git' }))).toEqual({ login: 'evil-name' });
+});
+
+test('a name or avatar set in Shed survives sign-in; the provider fills empty ones', () => {
+	const id = signIn(db, { sub: 's1', preferred_username: 'ada', picture: 'https://p/1' });
+	expect(db.query('select name, avatar_url from users where id = ?').get(id)).toEqual({ name: '', avatar_url: 'https://p/1' });
+	signIn(db, { sub: 's1', name: 'Ada', picture: 'https://p/2' });
+	expect(db.query('select name, avatar_url from users where id = ?').get(id)).toEqual({ name: 'Ada', avatar_url: 'https://p/2' });
+	db.query("update users set name = 'J', avatar_url = '/avatars/1.img?v=1' where id = ?").run(id);
+	signIn(db, { sub: 's1', name: 'Ada', picture: 'https://p/3' });
+	expect(db.query('select name, avatar_url from users where id = ?').get(id)).toEqual({ name: 'J', avatar_url: '/avatars/1.img?v=1' });
 });
 
 test('sessions', () => {

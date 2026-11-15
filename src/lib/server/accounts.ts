@@ -33,7 +33,7 @@ export function isAllowed(list: string[], c: Claims) {
 	});
 }
 
-// The provider's username becomes the login, made URL-safe and unique. Later sign-ins keep the login and refresh name, email and avatar.
+// The provider's username becomes the login, made URL-safe and unique. Later sign-ins keep the login and refresh the email and avatar.
 // The first person to sign in is the admin.
 export function signIn(db: Database, c: Claims) {
 	const email = c.email && c.email_verified !== false ? c.email : null;
@@ -46,7 +46,9 @@ export function signIn(db: Database, c: Claims) {
 	if (claim) db.query('update users set oidc_sub = ? where id = ?').run(c.sub, claim.id);
 	const existing = db.query<UserRow, [string]>('select * from users where oidc_sub = ?').get(c.sub);
 	if (existing) {
-		db.query('update users set name = ?, email = coalesce(?, email), avatar_url = ? where id = ?').run(c.name ?? existing.name, email, c.picture ?? '', existing.id);
+		// What people set in Shed wins: the provider only fills an empty name, and never replaces an uploaded avatar.
+		const avatar = existing.avatar_url.startsWith('/avatars/') ? existing.avatar_url : (c.picture ?? '');
+		db.query('update users set name = ?, email = coalesce(?, email), avatar_url = ? where id = ?').run(existing.name || c.name || '', email, avatar, existing.id);
 		return existing.id;
 	}
 	const base =

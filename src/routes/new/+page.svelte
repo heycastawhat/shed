@@ -22,7 +22,7 @@
 	<div class="name">
 		<label class="field owner">
 			<span>Owner</span>
-			<select name="owner" value={v?.owner ?? data.owners[0]}>
+			<select name="owner" value={v?.owner ?? data.owner ?? data.owners[0]}>
 				{#each data.owners as o (o)}<option>{o}</option>{/each}
 			</select>
 		</label>

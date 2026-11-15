@@ -36,6 +36,12 @@
 		<h1>{o.full_name || o.login}</h1>
 		{#if o.full_name}<div class="login muted">{o.login}</div>{/if}
 		{#if data.members}<span class="tag">Organization</span>{/if}
+		{#if data.role}
+			<div class="org-links">
+				{#if data.role !== 'admin'}<a class="button" href="/new?owner={encodeURIComponent(o.login)}"><Icon name="plus" size={14} />New repository</a>{/if}
+				{#if data.role !== 'member'}<a class="button" href="/orgs/{encodeURIComponent(o.login)}/settings"><Icon name="sliders" size={14} />Settings</a>{/if}
+			</div>
+		{/if}
 		{#if o.description}<p class="bio">{o.description}</p>{/if}
 		{#if !data.members && (o.followers_count || o.following_count)}
 			<div class="muted counts"><Icon name="group" size={14} /><strong>{o.followers_count}</strong> followers · <strong>{o.following_count}</strong> following</div>
@@ -149,6 +155,18 @@
 	aside .tag {
 		display: inline-block;
 		margin-top: 0.5rem;
+	}
+	.org-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin-top: 0.9rem;
+	}
+	.org-links .button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.875rem;
 	}
 	.bio {
 		margin: 0.9rem 0 0;

@@ -89,6 +89,24 @@
 			</div>
 			{#if msg('rename')?.error}<p class="error" role="alert">{msg('rename')?.error}</p>{/if}
 		</form>
+		<form method="POST" action="?/transfer" use:enhance>
+			<h3>Transfer</h3>
+			<p class="lead">Moves it to another owner: you, or an organization you own. Issues, pull requests and CI come along; old links stop working.</p>
+			{#if data.targets.length}
+				<div class="row">
+					<label class="field"
+						><span class="sr">New owner</span>
+						<select name="new_owner" disabled={s.archived}>
+							{#each data.targets as t (t)}<option>{t}</option>{/each}
+						</select>
+					</label>
+					<button disabled={s.archived}>Transfer</button>
+				</div>
+			{:else}
+				<p class="lead">There's nowhere to move it: you don't own an organization. <a href="/orgs/new">Create one</a>.</p>
+			{/if}
+			{#if msg('transfer')?.error}<p class="error" role="alert">{msg('transfer')?.error}</p>{/if}
+		</form>
 		<form method="POST" action="?/archive" use:enhance>
 			<h3>{s.archived ? 'Unarchive' : 'Archive'}</h3>
 			<p class="lead">{s.archived ? 'Makes it writable again: pushes, issues and pull requests.' : 'Makes it read-only: no pushes, issues, comments or settings changes until unarchived.'}</p>

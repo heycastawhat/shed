@@ -6,7 +6,10 @@
 
 <div class="head">
 	<h1>Repositories</h1>
-	<a class="button primary" href="/new">New repository</a>
+	<div class="new">
+		<a class="button" href="/orgs/new">New organization</a>
+		<a class="button primary" href="/new">New repository</a>
+	</div>
 </div>
 
 <RepoList repos={data.repos} pins={data.pins}>
@@ -23,6 +26,12 @@
 	}
 	.head h1 {
 		margin: 0;
+	}
+	.new {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: end;
+		gap: 0.5rem;
 	}
 	.button.primary {
 		background: var(--accent);

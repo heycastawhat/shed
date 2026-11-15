@@ -45,6 +45,7 @@
 			{ label: 'Agent keys', kind: 'Page', icon: 'agents', run: go('/settings/agents') },
 			{ label: 'Settings', kind: 'Page', icon: 'sliders', run: go('/settings/account') },
 			{ label: 'New repository', kind: 'Action', icon: 'plus', run: go('/new') },
+			{ label: 'New organization', kind: 'Action', icon: 'plus', run: go('/orgs/new') },
 			...(d.waiting ? [{ label: `Review ${d.waiting} waiting agent request${d.waiting === 1 ? '' : 's'}`, kind: 'Action', icon: 'clock', run: go('/agents') }] : []),
 			{ label: prefs.nav === 'sidebar' ? 'Switch to top bar' : 'Switch to sidebar', kind: 'Action', icon: 'layout', run: () => prefs.save({ nav: prefs.nav === 'sidebar' ? 'bar' : 'sidebar' }) },
 			...(prefs.nav === 'sidebar' ? [{ label: prefs.collapsed ? 'Expand sidebar' : 'Collapse sidebar', kind: 'Action', icon: 'layout', hint: '[', run: () => prefs.save({ collapsed: !prefs.collapsed }) }] : []),

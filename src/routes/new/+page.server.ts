@@ -14,10 +14,12 @@ function owners(userId: number) {
 		.all(userId, userId);
 }
 
-export function load({ locals }) {
+export function load({ locals, url }) {
 	if (!locals.user) redirect(303, '/login');
+	const list = owners(locals.user.id).map((o) => o.login);
 	return {
-		owners: owners(locals.user.id).map((o) => o.login),
+		owners: list,
+		owner: list.find((o) => o.toLowerCase() === url.searchParams.get('owner')?.toLowerCase()),
 		gitignores: Object.keys(GITIGNORES),
 		licenses: Object.entries(LICENSES).map(([key, l]) => ({ key, name: l.name }))
 	};

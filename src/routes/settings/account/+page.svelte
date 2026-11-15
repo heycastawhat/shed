@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import ProfileForm from '#lib/components/ProfileForm.svelte';
 	import { ago } from '#lib/time.js';
 
-	let { data } = $props();
+	let { data, form } = $props();
 	const others = $derived(data.sessions.filter((s) => !s.current).length);
 	// The newest few stay in view; the rest fold away, since test runs and old browsers pile up.
 	const SHOWN = 5;
@@ -12,14 +13,9 @@
 
 <h1>Account</h1>
 
-<section class="me">
-	{#if data.me.avatar_url}<img src={data.me.avatar_url} alt="" />{/if}
-	<div>
-		<strong>{data.me.name || data.me.login}</strong>
-		<div class="muted">@{data.me.login}, signed in with <a href={data.provider}>{new URL(data.provider).host}</a></div>
-	</div>
-	<a class="button" href={data.provider}>Edit profile there</a>
-</section>
+<h2>Profile</h2>
+<p class="muted">What people see on <a href="/{data.me.login}">your profile</a>. You're @{data.me.login}, signed in with <a href={data.provider}>{new URL(data.provider).host}</a>; a name or picture set here stays when you sign in again.</p>
+<ProfileForm profile={data.profile} avatar={data.me.avatar_url || `/avatars/${data.me.login}.svg`} uploaded={data.uploaded} login={data.me.login} {form} />
 
 <h2>Where you're signed in</h2>
 <p class="muted">Signing out here ends that browser's session. Agent keys aren't affected, and you stay signed in to your sign-in provider.</p>
@@ -59,21 +55,12 @@
 {/if}
 
 <style>
-	.me {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		padding: 1rem;
-		border: 1px solid var(--border);
-		border-radius: 8px;
+	h2 {
+		margin: 2rem 0 0.25rem;
+		font-size: 1.15rem;
 	}
-	.me img {
-		width: 48px;
-		height: 48px;
-		border-radius: 50%;
-	}
-	.me div {
-		flex: 1;
+	h1 + h2 {
+		margin-top: 0;
 	}
 	.list {
 		list-style: none;

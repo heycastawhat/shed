@@ -40,10 +40,12 @@ export function load({ locals, params, url }) {
 		following_count: 0,
 		starred_repos_count: 0
 	};
+	const role = org ? db.query<{ role: string }, [number, number]>('select role from org_members where org_id = ? and user_id = ?').get(row.id, locals.user.id)?.role : null;
 	return {
 		owner,
 		repos,
 		members,
+		role: role ?? (org && locals.user.admin ? 'admin' : null),
 		orgs,
 		days: org ? null : calendar(heatmap(db, row.id)),
 		feed: feedEvents(org ? orgFeed(db, row.id, visible) : userFeed(db, row.id, visible))

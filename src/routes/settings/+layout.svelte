@@ -78,6 +78,10 @@
 		nav {
 			grid-auto-flow: column;
 			justify-content: start;
+			overflow-x: auto;
+		}
+		nav a {
+			white-space: nowrap;
 		}
 		h2 {
 			display: none;

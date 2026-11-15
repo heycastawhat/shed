@@ -1,9 +1,20 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { api, type Repo } from '#lib/server/forgejo.js';
 import { send } from '#lib/server/issue.js';
+import { db } from '#lib/server/shed.js';
+
+// Where a repo can be transferred: to yourself or an org you own (a site admin, any org).
+const targets = (userId: number, admin: boolean) =>
+	db
+		.query<{ login: string }, [number, number]>(
+			"select login from users where id = ?1 union select u.login from users u left join org_members m on m.org_id = u.id and m.user_id = ?1 where u.kind = 'org' and (m.role = 'owner' or ?2) order by login"
+		)
+		.all(userId, admin ? 1 : 0)
+		.map((u) => u.login);
 
 export async function load({ locals, params }) {
-	return { settings: await api<Repo>(locals.token, `/repos/${params.owner}/${params.repo}`) };
+	const settings = await api<Repo>(locals.token, `/repos/${params.owner}/${params.repo}`);
+	return { settings, targets: locals.user ? targets(locals.user.id, !!locals.user.admin).filter((t) => t.toLowerCase() !== settings.owner.login.toLowerCase()) : [] };
 }
 
 const STYLES = {
@@ -48,6 +59,13 @@ export const actions = {
 		const failed = await patch('rename', locals.token, params, { name });
 		if (failed) return failed;
 		redirect(303, `/${params.owner}/${name}/settings`);
+	},
+	transfer: async ({ locals, params, request }) => {
+		const to = String((await request.formData()).get('new_owner') ?? '');
+		if (!to) return fail(422, { action: 'transfer', error: 'Pick a new owner' });
+		const failed = await send('transfer', locals.token, `/repos/${params.owner}/${params.repo}/transfer`, 'POST', { new_owner: to });
+		if (failed) return failed;
+		redirect(303, `/${to}/${params.repo}/settings`);
 	},
 	archive: async ({ locals, params, request }) => {
 		const archived = (await request.formData()).get('archived') === '1';
