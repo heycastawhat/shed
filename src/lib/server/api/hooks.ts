@@ -14,7 +14,8 @@ import { route, type Ctx } from './router.js';
 
 export const EVENTS = ['push', 'pull_request', 'issues', 'issue_comment', 'release'] as const;
 export type HookRow = { id: number; repo_id: number; url: string; secret: string; events: string; active: number; created_at: string };
-export type DeliveryRow = { id: number; hook_id: number; event: string; status: number | null; response: string; created_at: string };
+export type DeliveryRow = { id: number; hook_id: number; event: string; status: number | null; response: string; payload: string; headers: string; created_at: string };
+const deliveryJson = (d: DeliveryRow) => ({ ...d, headers: JSON.parse(d.headers) as Record<string, string> });
 
 const KEEP = 50;
 const TIMEOUT = 10_000;
@@ -80,8 +81,17 @@ route('DELETE', '/repos/:owner/:repo/hooks/:id', (c) => {
 });
 // Shed's own: recent deliveries, newest first.
 route('GET', '/repos/:owner/:repo/hooks/:id/deliveries', (c) =>
-	c.db.query<DeliveryRow, [number]>('select * from hook_deliveries where hook_id = ? order by id desc').all(hookOf(c).id)
+	c.db.query<DeliveryRow, [number]>('select * from hook_deliveries where hook_id = ? order by id desc').all(hookOf(c).id).map(deliveryJson)
 );
+// Shed's own: send a recorded delivery's body again, signed with the hook's current secret and URL, as a new delivery.
+route('POST', '/repos/:owner/:repo/hooks/:id/deliveries/:delivery/redeliver', async (c) => {
+	const h = hookOf(c);
+	const d =
+		c.db.query<DeliveryRow, [number, number]>('select * from hook_deliveries where id = ? and hook_id = ?').get(Number(c.params.delivery), h.id) ?? error(404, 'Delivery not found');
+	if (!d.payload) error(422, 'This delivery was recorded before Shed kept bodies, so it can\'t be sent again');
+	const id = await send(c.db, h, d.event, d.payload);
+	return deliveryJson(c.db.query<DeliveryRow, [number]>('select * from hook_deliveries where id = ?').get(id ?? 0) ?? error(404, 'Webhook not found'));
+});
 // A test sends a push event for the default branch's latest commit, as Forgejo does, and waits for the answer so the page can show it.
 route('POST', '/repos/:owner/:repo/hooks/:id/tests', async (c) => {
 	const h = hookOf(c);
@@ -115,32 +125,33 @@ async function head(res: Response, max = 1000) {
 	return new TextDecoder().decode(Uint8Array.from(chunks.flatMap((c) => [...c])).slice(0, max));
 }
 
-export async function deliver(db: Database, hook: HookRow, event: string, payload: unknown) {
-	const body = JSON.stringify(payload);
+function headersFor(secret: string, event: string, body: string) {
 	const id = crypto.randomUUID();
-	const sig = hmac(hook.secret, body);
+	const sig = hmac(secret, body);
+	return {
+		'content-type': 'application/json',
+		'user-agent': 'Shed-Hookshot',
+		'x-forgejo-event': event,
+		'x-gitea-event': event,
+		'x-github-event': event,
+		'x-forgejo-delivery': id,
+		'x-gitea-delivery': id,
+		'x-github-delivery': id,
+		'x-forgejo-signature': sig,
+		'x-gitea-signature': sig,
+		'x-hub-signature-256': `sha256=${sig}`
+	};
+}
+
+export const deliver = (db: Database, hook: HookRow, event: string, payload: unknown) => send(db, hook, event, JSON.stringify(payload));
+
+// The body and headers are kept so a delivery can be sent again; the signatures are only good for that body, so they're safe to store.
+async function send(db: Database, hook: HookRow, event: string, body: string) {
+	const headers = headersFor(hook.secret, event, body);
 	let status: number | null = null;
 	let response = '';
 	try {
-		const res = await fetch(hook.url, {
-			method: 'POST',
-			body,
-			redirect: 'manual',
-			signal: AbortSignal.timeout(TIMEOUT),
-			headers: {
-				'content-type': 'application/json',
-				'user-agent': 'Shed-Hookshot',
-				'x-forgejo-event': event,
-				'x-gitea-event': event,
-				'x-github-event': event,
-				'x-forgejo-delivery': id,
-				'x-gitea-delivery': id,
-				'x-github-delivery': id,
-				'x-forgejo-signature': sig,
-				'x-gitea-signature': sig,
-				'x-hub-signature-256': `sha256=${sig}`
-			}
-		});
+		const res = await fetch(hook.url, { method: 'POST', body, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT), headers });
 		status = res.status;
 		response = status >= 300 && status < 400 ? `Redirect to ${res.headers.get('location') ?? '?'} (not followed)` : await head(res);
 	} catch (e) {
@@ -148,8 +159,13 @@ export async function deliver(db: Database, hook: HookRow, event: string, payloa
 	}
 	// The hook may have been deleted while this was in flight.
 	if (!db.query('select 1 from hooks where id = ?').get(hook.id)) return;
-	db.query('insert into hook_deliveries (hook_id, event, status, response) values (?, ?, ?, ?)').run(hook.id, event, status, response);
+	const id = Number(
+		db
+			.query('insert into hook_deliveries (hook_id, event, status, response, payload, headers) values (?, ?, ?, ?, ?, ?)')
+			.run(hook.id, event, status, response, body, JSON.stringify(headers)).lastInsertRowid
+	);
 	db.query('delete from hook_deliveries where hook_id = ? and id not in (select id from hook_deliveries where hook_id = ? order by id desc limit ?)').run(hook.id, hook.id, KEEP);
+	return id;
 }
 
 // Hooks for the event, each delivered in the background. Returns the promises for tests.

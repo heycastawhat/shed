@@ -25,11 +25,14 @@ a POST $R/pulls/$n1/merge -d '{"Do":"merge"}' >/dev/null
 check 'conflict detected' "$(a GET $R/pulls/$n2 | py "d['mergeable']")" False
 check 'conflict refused' "$(a POST $R/pulls/$n2/merge -d '{"Do":"merge"}' | py "d['message']")" conflicts
 
-# Auto-merge: a pending status, schedule, then success merges it.
-file am$T am-$T.txt "a\n"
-# No workflows on this branch, so only the status set below decides.
-for w in $(a GET "$R/contents/.forgejo/workflows?ref=am$T" | py "' '.join(x['path'] for x in d)"); do a DELETE $R/contents/$w -d "{\"branch\":\"am$T\"}" >/dev/null; done
-n=$(pr am$T "Auto $T")
+# Auto-merge: a pending status, schedule, then success merges it. It merges into a throwaway base without the repo's workflows,
+# so only the status set below decides (and main keeps its CI).
+for w in $(a GET "$R/contents/.forgejo/workflows?ref=main" | py "' '.join(x['path'] for x in d) if isinstance(d, list) else ''"); do
+	a DELETE $R/contents/$w -d "{\"branch\":\"main\",\"new_branch\":\"amb$T\"}" >/dev/null 2>&1 || a DELETE $R/contents/$w -d "{\"branch\":\"amb$T\"}" >/dev/null
+done
+a GET $R/branches/amb$T -o /dev/null -w '%{http_code}' | command grep -q 200 || a POST $R/branches -d "{\"new_branch_name\":\"amb$T\",\"old_ref_name\":\"main\"}" >/dev/null
+a POST $R/contents/am-$T.txt -d "{\"content\":\"YQo=\",\"message\":\"am\",\"branch\":\"amb$T\",\"new_branch\":\"am$T\"}" >/dev/null
+n=$(r POST $R/pulls -d "{\"head\":\"am$T\",\"base\":\"amb$T\",\"title\":\"Auto $T\"}" | py "d['number']")
 sha=$(a GET $R/pulls/$n | py "d['head']['sha']")
 a POST $R/statuses/$sha -d '{"context":"ci / test","state":"pending"}' >/dev/null
 a POST $R/pulls/$n/merge -d '{"Do":"squash","merge_when_checks_succeed":true}' >/dev/null

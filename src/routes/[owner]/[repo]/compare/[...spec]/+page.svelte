@@ -11,8 +11,8 @@
 	const base = $derived(`/${data.repo.full_name}`);
 	const enc = (ref: string) => ref.split(':').map(encodeURIComponent).join(':');
 	const go = (b: string, h: string) => goto(`${base}/compare/${enc(b)}...${enc(h)}`);
-	// A head from a fork isn't in this repo's branch list; keep it selectable.
-	const heads = $derived(data.branches.includes(data.head) || !data.head ? data.branches : [data.head, ...data.branches]);
+	// A head that's in neither list (a fork's branch that's gone, say) stays selectable.
+	const known = $derived(!data.head || data.branches.includes(data.head) || data.forks.some((f) => f.branches.includes(data.head)));
 	let title = $derived(data.draft?.title ?? '');
 	let body = $derived(data.draft?.body ?? '');
 	let busy = $state(false);
@@ -38,7 +38,19 @@
 		<span class="muted">compare</span>
 		<select value={data.head} onchange={(e) => go(data.base, e.currentTarget.value)} aria-label="Head branch">
 			{#if !data.head}<option value="" disabled>Choose a branch</option>{/if}
-			{#each heads as b (b)}<option value={b}>{b}</option>{/each}
+			{#if !known}<option value={data.head}>{data.head}</option>{/if}
+			{#if data.forks.length}
+				<optgroup label={data.repo.full_name}>
+					{#each data.branches as b (b)}<option value={b}>{b}</option>{/each}
+				</optgroup>
+				{#each data.forks as f (f.repo)}
+					<optgroup label={f.repo}>
+						{#each f.branches as b (b)}<option value={b}>{b}</option>{/each}
+					</optgroup>
+				{/each}
+			{:else}
+				{#each data.branches as b (b)}<option value={b}>{b}</option>{/each}
+			{/if}
 		</select>
 	</label>
 	{#if c && c.total_commits}

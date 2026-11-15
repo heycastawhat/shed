@@ -32,3 +32,28 @@ test('tables and strikethrough', () => {
 	expect(render('| a | b |\n| - | - |\n| 1 | 2 |')).toContain('<table>');
 	expect(render('~~gone~~')).toContain('<s>gone</s>');
 });
+
+test('issue, PR, mention and commit references become links, except in code and links', () => {
+	const at = { repo: 'ada/sample', ref: '', dir: '' };
+	const html = render('Fixes #12 and kiwi/website#3, thanks @reviewer. See 1a2b3c4d and [#9](https://x.nz).\n\n`#7 @ada` and\n\n```\n#8\n```', at);
+	expect(html).toContain('Fixes <a href="/ada/sample/issues/12">#12</a>');
+	expect(html).toContain('<a href="/kiwi/website/issues/3">kiwi/website#3</a>');
+	expect(html).toContain('thanks <a href="/reviewer">@reviewer</a>.');
+	expect(html).toContain('See <a href="/ada/sample/commit/1a2b3c4d">1a2b3c4d</a>');
+	expect(html).toContain('<a href="https://x.nz">#9</a>');
+	expect(html).toContain('<code>#7 @ada</code>');
+	expect(html).toContain('<pre><code>#8\n</code></pre>');
+});
+
+test('references need the right context and shape', () => {
+	// No repo: bare numbers and SHAs stay text, qualified ones still link.
+	expect(render('#4 and 1a2b3c4d and a/b#5')).toBe('<p>#4 and 1a2b3c4d and <a href="/a/b/issues/5">a/b#5</a></p>\n');
+	const at = { repo: 'ada/sample', ref: 'main', dir: '' };
+	// Emails, URL fragments, entities, @agent, reserved paths, plain words and numbers aren't references.
+	for (const s of ['mail ada@x', 'page#12', 'defaced', '1234567', '@agent do it', '@settings', 'abc#12x'])
+		expect(render(s, at)).not.toContain('<a');
+	expect(render('https://x.nz/a#12', at)).toBe('<p><a href="https://x.nz/a#12">https://x.nz/a#12</a></p>\n');
+	// Links made by references aren't treated as repo-relative paths.
+	expect(render('#3 in a README', at)).toContain('href="/ada/sample/issues/3"');
+	expect(render('(#3), @a.b.', at)).toBe('<p>(<a href="/ada/sample/issues/3">#3</a>), <a href="/a.b">@a.b</a>.</p>\n');
+});

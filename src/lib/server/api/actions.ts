@@ -98,10 +98,21 @@ route('DELETE', '/repos/:owner/:repo/actions/runs/:run', (c) => {
 	if (!['success', 'failure', 'cancelled', 'skipped'].includes(x.status)) error(409, 'Cancel the run first');
 	c.db.query('delete from runs where id = ?').run(x.id);
 });
+const jobOf = (c: Ctx, r: RepoCtx) =>
+	c.db.query<JobRow, [number, number]>('select j.* from jobs j join runs r on r.id = j.run_id where j.id = ? and r.repo_id = ?').get(Number(c.params.job), r.row.id) ?? error(404, 'Job not found');
+// Shed's own: every attempt at a job (one task each, oldest first), so earlier attempts' logs stay readable after a re-run.
+route('GET', '/repos/:owner/:repo/actions/jobs/:job/attempts', (c) =>
+	c.db
+		.query<TaskRow & { status: string }, [number]>('select * from tasks where job_id = ? order by id')
+		.all(jobOf(c, repoOf(c)).id)
+		.map((t, i) => ({ id: t.id, attempt: i + 1, status: t.status, started_at: t.started_at, stopped_at: t.stopped_at, steps: JSON.parse(t.steps), log_length: t.log_length }))
+);
+// `?task=` reads an earlier attempt's log; the default is the latest.
 route('GET', '/repos/:owner/:repo/actions/jobs/:job/logs', async (c) => {
-	const r = repoOf(c);
-	const j = c.db.query<JobRow, [number, number]>('select j.* from jobs j join runs r on r.id = j.run_id where j.id = ? and r.repo_id = ?').get(Number(c.params.job), r.row.id) ?? error(404, 'Job not found');
-	const lines = j.task_id ? await readLog(c.root, j.task_id) : [];
+	const j = jobOf(c, repoOf(c));
+	const want = c.url.searchParams.get('task');
+	const task = want ? (c.db.query<{ id: number }, [number, number]>('select id from tasks where id = ? and job_id = ?').get(Number(want), j.id)?.id ?? error(404, 'No such attempt')) : j.task_id;
+	const lines = task ? await readLog(c.root, task) : [];
 	const from = Number(c.url.searchParams.get('from') ?? 0);
 	return new Response(lines.slice(from).join('\n'), { headers: { 'content-type': 'text/plain; charset=utf-8', 'x-log-length': String(lines.length) } });
 });

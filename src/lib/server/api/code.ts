@@ -7,7 +7,7 @@ import { afterPush, refSnapshot } from '../push.js';
 import { checkName, getRepo, type RepoRow } from '../repos.js';
 import { commitFiles } from '../write.js';
 import { refSha, repoJson, repoOf } from './common.js';
-import { protectionFor } from './protect.js';
+import { checkRefWrite } from './protect.js';
 import { me, route } from './router.js';
 
 // Several file changes in one commit (Forgejo's ChangeFiles): uploads, renames, edits. Every operation is checked against the branch
@@ -23,8 +23,7 @@ route('POST', '/repos/:owner/:repo/contents', async (c) => {
 		if (!/^[A-Za-z0-9._/-]{1,200}$/.test(b.new_branch) || /\.\.|^[-/.]|\/$|\.lock$|\/\/|@\{/.test(b.new_branch)) error(422, `${b.new_branch} isn't a valid branch name`);
 		if (await refSha(r.dir, `refs/heads/${b.new_branch}`)) error(409, `${b.new_branch} already exists`);
 	}
-	const rule = b.new_branch ? null : protectionFor(c.db, r.row.id, branch);
-	if (rule && (rule.push === 'none' || (rule.push === 'admins' && r.level !== 'admin'))) error(403, `${branch} is protected; commit to a new branch instead`);
+	checkRefWrite(c.db, r.row, r.level, b.new_branch || branch, 'push');
 	const changes = await planChanges(r.dir, parent, b.files ?? []);
 	const before = await refSnapshot(r.dir);
 	const n = changes.length;

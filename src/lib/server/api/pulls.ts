@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { parseDiff } from '../../diff.js';
-import { access, atLeast } from '../access.js';
+import { access, atLeast, tokenAccess } from '../access.js';
 import { type UserRow } from '../accounts.js';
 import { record } from '../activity.js';
 import * as browse from '../browse.js';
@@ -12,7 +12,7 @@ import { repoDir, type RepoRow } from '../repos.js';
 import { now, refSha, repoOf, slice, userByLogin, userJson, userRow, type RepoCtx } from './common.js';
 import { addComment, createIssue, crossReference, event, issueOf, repoRef, touch } from './issues.js';
 import { notify } from './notify.js';
-import { protectionFor } from './protect.js';
+import { checkRefWrite, protectionFor } from './protect.js';
 import { commitsJson } from './repos.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
 import { reviewCommentJson, reviewJson, issueJson, type CommentRow, type PullRow, type ReviewRow } from './shapes.js';
@@ -21,6 +21,7 @@ import { onCiStatus, pullEvent } from '../actions/runs.js';
 
 const Z = '0'.repeat(40);
 const SELECT = 'select i.*, p.* from issues i join pulls p on p.issue_id = i.id';
+const REPO = 'select r.*, u.login as owner from repos r join users u on u.id = r.owner_id';
 
 export function pullOf(c: Ctx, r: RepoCtx, number = Number(c.params.index)) {
 	return c.db.query<PullRow, [number, number]>(`${SELECT} where i.repo_id = ? and i.number = ?`).get(r.row.id, number) ?? error(404, `Pull request #${number} not found`);
@@ -532,12 +533,18 @@ route('POST', '/repos/:owner/:repo/pulls/:index/update', async (c) => {
 	const r = repoOf(c);
 	const p = pullOf(c, r);
 	const u = me(c);
-	if (p.head_repo_id) error(422, "Updating a fork's branch isn't supported yet");
-	if (!atLeast(r.level, 'write') && p.user_id !== u.id) error(403, 'Only the author or people with write access can update this branch');
+	// A fork's branch is written in the fork, by its rules and access, and the fork's push listener then moves the PR along.
+	const fork = p.head_repo_id && p.head_repo_id !== r.row.id ? c.db.query<RepoRow, [number]>(`${REPO} where r.id = ?`).get(p.head_repo_id) : null;
+	if (p.head_repo_id && !fork) error(404, 'The fork this branch was in is gone');
+	const head: RepoCtx = fork ? { row: fork, level: c.token ? tokenAccess(c.db, c.token, fork) : access(c.db, u.id, fork), dir: repoDir(c.root, fork.id), full: `${fork.owner}/${fork.name}` } : r;
+	if (!atLeast(head.level, 'write') && p.user_id !== u.id) error(403, 'Only the author or people with write access can update this branch');
+	if (head.row.archived) error(403, `${head.full} is archived`);
+	const rebase = c.url.searchParams.get('style') === 'rebase';
+	checkRefWrite(c.db, head.row, head.level, p.head, rebase ? 'force' : 'push');
 	const baseSha = (await refSha(r.dir, `refs/heads/${p.base}`))!;
 	const who = { name: u.name || u.login, email: u.email ?? `${u.login}@users.noreply` };
 	let next: string;
-	if (c.url.searchParams.get('style') === 'rebase') next = await rebaseOnto(r.dir, baseSha, p.head_sha, who);
+	if (rebase) next = await rebaseOnto(r.dir, baseSha, p.head_sha, who);
 	else {
 		const res = spawn(['--git-dir', r.dir, 'merge-tree', '--write-tree', '--no-messages', p.head_sha, baseSha]);
 		const tree = (await new Response(res.stdout).text()).split('\n')[0].trim();
@@ -545,9 +552,19 @@ route('POST', '/repos/:owner/:repo/pulls/:index/update', async (c) => {
 		const env = { GIT_AUTHOR_NAME: who.name, GIT_AUTHOR_EMAIL: who.email, GIT_COMMITTER_NAME: who.name, GIT_COMMITTER_EMAIL: who.email };
 		next = (await git(r.dir, ['commit-tree', tree, '-p', p.head_sha, '-p', baseSha, '-m', `Merge branch '${p.base}' into ${p.head}`], undefined, env)).trim();
 	}
-	const before = await refSnapshot(r.dir);
-	await git(r.dir, ['update-ref', `refs/heads/${p.head}`, next, p.head_sha]).catch(() => error(409, 'The branch moved; try again'));
-	await afterPush(c.db, c.root, r.row, u.id, before);
+	// The new commits are made in the base repo; a fork gets them through a temporary ref (a fetch can't ask for a bare SHA).
+	const tmp = `refs/shed/tmp/update-${crypto.randomUUID()}`;
+	if (fork) {
+		await git(r.dir, ['update-ref', tmp, next]);
+		await git(head.dir, ['fetch', '--quiet', '--no-tags', r.dir, `${tmp}:${tmp}`]).finally(() => git(r.dir, ['update-ref', '-d', tmp]));
+	}
+	const before = await refSnapshot(head.dir);
+	try {
+		await git(head.dir, ['update-ref', `refs/heads/${p.head}`, next, p.head_sha]).catch(() => error(409, 'The branch moved; try again'));
+	} finally {
+		if (fork) await git(head.dir, ['update-ref', '-d', tmp]).catch(() => {});
+	}
+	await afterPush(c.db, c.root, head.row, u.id, before);
 });
 
 // --- auto-merge ---

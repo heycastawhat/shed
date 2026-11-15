@@ -4,7 +4,7 @@ import { send } from '#lib/server/issue.js';
 import { EVENTS } from '#lib/server/api/hooks.js';
 
 type Hook = { id: number; config: { url: string }; events: string[]; active: boolean; created_at: string };
-type Delivery = { id: number; event: string; status: number | null; response: string; created_at: string };
+type Delivery = { id: number; event: string; status: number | null; response: string; payload: string; headers: Record<string, string>; created_at: string };
 
 export async function load({ locals, params }) {
 	const base = `/repos/${params.owner}/${params.repo}/hooks`;
@@ -32,5 +32,11 @@ export const actions = {
 	test: async ({ locals, params, request }) => {
 		const id = Number((await request.formData()).get('id'));
 		return (await send('test', locals.token, `${base(params)}/${id}/tests`, 'POST')) ?? { action: 'test', id, tested: true };
+	},
+	redeliver: async ({ locals, params, request }) => {
+		const f = await request.formData();
+		const id = Number(f.get('id'));
+		const failed = await send('redeliver', locals.token, `${base(params)}/${id}/deliveries/${Number(f.get('delivery'))}/redeliver`, 'POST');
+		return failed ? fail(failed.status, { ...failed.data, id }) : { action: 'redeliver', id };
 	}
 };

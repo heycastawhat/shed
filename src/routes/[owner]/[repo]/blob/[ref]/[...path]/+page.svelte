@@ -12,7 +12,7 @@
 	const base = $derived(`/${data.repo.full_name}`);
 	const raw = $derived(`${base}/raw/${refPath(data.ref, path)}`);
 	const permalink = $derived(`${base}/blob/${refPath(data.commit, path)}`);
-	const canEdit = $derived(data.repo.permissions.push && data.branches.includes(data.ref));
+	const canEdit = $derived(data.repo.permissions.push && !data.mirror && data.branches.includes(data.ref));
 	const size = $derived(
 		data.size < 1024 ? `${data.size} B` : data.size < 1048576 ? `${(data.size / 1024).toFixed(1)} KB` : `${(data.size / 1048576).toFixed(1)} MB`
 	);

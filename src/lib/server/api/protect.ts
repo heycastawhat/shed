@@ -1,5 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { error } from '@sveltejs/kit';
+import type { Level } from '../access.js';
+import type { RepoRow } from '../repos.js';
 import { me, route } from './router.js';
 import { repoOf } from './common.js';
 
@@ -21,6 +23,27 @@ export const glob = (p: string) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g,
 export function protectionFor(db: Database, repoId: number, branch: string) {
 	const rules = db.query<Protection, [number]>('select * from protected_branches where repo_id = ?').all(repoId);
 	return rules.find((r) => r.pattern === branch) ?? rules.find((r) => glob(r.pattern).test(branch)) ?? null;
+}
+
+// The same answers pushcheck.ts gives a git push, for ref writes Shed makes on someone's behalf (web edits, branch deletes, PR updates).
+// `force` is a write that doesn't fast-forward. Merges into a protected base are gated by the PR rules instead.
+export function refWriteRefusal(db: Database, repoId: number, level: Level, branch: string, op: 'push' | 'force' | 'delete') {
+	const rule = protectionFor(db, repoId, branch);
+	if (!rule) return null;
+	if (op === 'delete') return `${branch} is a protected branch, so it can't be deleted`;
+	if (rule.push === 'none') return `${branch} is a protected branch: push changes through a pull request`;
+	if (rule.push === 'admins' && level !== 'admin') return `${branch} is a protected branch: only repo admins can push to it`;
+	if (op === 'force' && !rule.force_push) return `${branch} is a protected branch, so force pushes to it are refused`;
+	return null;
+}
+// A pull mirror's refs belong to the repo it copies (the next sync would undo a write), as for git pushes in githttp.ts and ssh.ts.
+export function notMirror(row: RepoRow) {
+	if (row.mirror_url) error(403, `${row.owner}/${row.name} is a mirror; push to the repo it copies`);
+}
+export function checkRefWrite(db: Database, row: RepoRow, level: Level, branch: string, op: 'push' | 'force' | 'delete') {
+	notMirror(row);
+	const why = refWriteRefusal(db, row.id, level, branch, op);
+	if (why) error(403, why);
 }
 
 const json = (p: Protection) => ({

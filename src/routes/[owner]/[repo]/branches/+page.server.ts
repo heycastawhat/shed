@@ -1,9 +1,8 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit';
 import { aheadBehind, branches } from '#lib/server/browse.js';
-import { api, type Pull } from '#lib/server/forgejo.js';
-import { git, gitTry } from '#lib/server/git.js';
-import { afterPush, refSnapshot } from '#lib/server/push.js';
-import { db, root } from '#lib/server/shed.js';
+import { api, request, type Pull } from '#lib/server/forgejo.js';
+import { db } from '#lib/server/shed.js';
+import { protectionFor } from '#lib/server/api/protect.js';
 import { repoFor, toCommits } from '#lib/server/shedrepo.js';
 import { openPush } from '#lib/server/home.js';
 
@@ -12,7 +11,7 @@ const COMPARED = 50;
 
 export async function load({ locals, params, parent }) {
 	const { repo } = await parent();
-	const { dir } = repoFor(locals, params.owner, params.repo);
+	const { dir, row } = repoFor(locals, params.owner, params.repo);
 	const def = repo.default_branch;
 	const [all, pulls] = await Promise.all([
 		branches(dir),
@@ -36,7 +35,7 @@ export async function load({ locals, params, parent }) {
 				pr: pr && { number: pr.number, title: pr.title },
 				ahead: c?.ahead ?? null,
 				behind: c?.behind ?? null,
-				deletable: !!repo.permissions?.push && b.name !== def
+				deletable: !!repo.permissions?.push && !row.mirror_url && b.name !== def && !protectionFor(db, row.id, b.name)
 			};
 		})
 	};
@@ -55,16 +54,15 @@ export const actions = {
 		}
 		redirect(303, `/${params.owner}/${params.repo}/pulls/${number}`);
 	},
+	// Through the API, so the branch rules (and the compare-and-swap delete) are the same as everywhere else.
 	delete: async ({ locals, params, request: req }) => {
-		const { row, dir } = repoFor(locals, params.owner, params.repo, 'write');
 		const name = await branch(req);
-		if (name === row.default_branch) return fail(403, { error: `${name} is the default branch, so it can't be deleted` });
-		const sha = await gitTry(dir, ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]);
-		if (!sha) return fail(404, { error: `There's no branch called ${name}` });
-		// Compare-and-swap: if someone pushed to it since, the delete fails rather than losing their commit.
-		const before = await refSnapshot(dir);
-		await git(dir, ['update-ref', '-d', `refs/heads/${name}`, sha.trim()]);
-		await afterPush(db, root, row, locals.user!.id, before);
+		try {
+			await request(locals.token, `/repos/${params.owner}/${params.repo}/branches/${name.split('/').map(encodeURIComponent).join('/')}`, { method: 'DELETE' });
+		} catch (e) {
+			if (isHttpError(e)) return fail(e.status, { error: e.body.message });
+			throw e;
+		}
 		return { deleted: name };
 	}
 };

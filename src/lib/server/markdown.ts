@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import { RESERVED } from '../reserved.js';
 
 // Raw HTML in markdown is escaped (html: false), so output is safe to {@html} without a sanitiser; markdown-it already refuses
 // javascript:/vbscript:/data: links. Relative links and images in a repo file resolve against that file's folder to Shed's blob/raw URLs.
@@ -40,6 +41,50 @@ md.core.ruler.push('shed', (state) => {
 			if (c.type === 'link_open') c.attrSet('href', resolve(String(c.attrGet('href') ?? ''), env, 'blob'));
 			if (c.type === 'image') c.attrSet('src', resolve(String(c.attrGet('src') ?? ''), env, 'raw'));
 		}
+	}
+});
+
+// References in prose become links: `#12` (in a repo), `owner/repo#12`, `@login` and commit SHAs (in a repo, 7–40 hex digits with
+// at least one digit and one letter, so ordinary words and numbers stay text). Code, existing links and autolinks are left alone.
+// Numbers aren't checked: `/issues/N` redirects PRs to `/pulls/N` and a missing one is a plain 404.
+const REFS =
+	/(?<![\w&/#@.-])(?:([A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*)?#(\d+)\b|@([A-Za-z0-9](?:[\w.-]*[A-Za-z0-9])?)(?![\w@-]|\.\w)|\b((?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,40})\b(?![\w-]))/g;
+
+function refHref(m: RegExpExecArray, repo?: string) {
+	const [, other, number, login, sha] = m;
+	if (number) return other || repo ? `/${other || repo}/issues/${number}` : null;
+	if (login) return login === 'agent' || RESERVED.has(login.toLowerCase()) ? null : `/${login}`;
+	return repo ? `/${repo}/commit/${sha}` : null;
+}
+
+md.core.ruler.push('shed_refs', (state) => {
+	const env = state.env as Env;
+	for (const t of state.tokens) {
+		if (t.type !== 'inline' || !t.children) continue;
+		const out: typeof t.children = [];
+		let inLink = 0;
+		for (const c of t.children) {
+			if (c.type === 'link_open') inLink++;
+			if (c.type === 'link_close') inLink--;
+			if (c.type !== 'text' || inLink) {
+				out.push(c);
+				continue;
+			}
+			let last = 0;
+			for (const m of c.content.matchAll(REFS)) {
+				const href = refHref(m, env.repo);
+				if (!href) continue;
+				const text = (s: string) => Object.assign(new state.Token('text', '', 0), { content: s });
+				if (m.index > last) out.push(text(c.content.slice(last, m.index)));
+				const open = new state.Token('link_open', 'a', 1);
+				open.attrSet('href', href);
+				out.push(open, text(m[0]), new state.Token('link_close', 'a', -1));
+				last = m.index + m[0].length;
+			}
+			if (!last) out.push(c);
+			else if (last < c.content.length) out.push(Object.assign(new state.Token('text', '', 0), { content: c.content.slice(last) }));
+		}
+		t.children = out;
 	}
 });
 

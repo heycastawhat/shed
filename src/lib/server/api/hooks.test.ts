@@ -147,3 +147,26 @@ test('a test delivery sends a push of the default branch', async () => {
 	});
 	expect((await call(ada, 'GET', `/repos/ada/sample/hooks/${id}/deliveries`)).json).toMatchObject([{ event: 'push', status: 200 }]);
 });
+
+test('deliveries keep their body and headers and can be sent again with the current secret', async () => {
+	const id = Number(db.query("insert into hooks (repo_id, url, secret, events) values (?, ?, 'old', '[\"push\"]')").run(repoId, `${hookUrl}/fail`).lastInsertRowid);
+	expect((await call(ada, 'POST', `/repos/ada/sample/hooks/${id}/tests`)).status).toBe(204);
+	const [first] = (await call(ada, 'GET', `/repos/ada/sample/hooks/${id}/deliveries`)).json;
+	expect(first).toMatchObject({ status: 500, payload: got.at(-1)!.body, headers: { 'x-forgejo-event': 'push' } });
+	expect(first.headers['x-forgejo-signature']).toBe(new Bun.CryptoHasher('sha256', 'old').update(first.payload).digest('hex'));
+
+	await call(ada, 'PATCH', `/repos/ada/sample/hooks/${id}`, { config: { url: `${hookUrl}/again`, secret: 'new' } });
+	const again = await call(ada, 'POST', `/repos/ada/sample/hooks/${id}/deliveries/${first.id}/redeliver`);
+	expect(again.json).toMatchObject({ event: 'push', status: 200, payload: first.payload });
+	const r = got.at(-1)!;
+	expect(r.path).toBe('/again');
+	expect(r.body).toBe(first.payload);
+	expect(r.headers.get('x-forgejo-signature')).toBe(new Bun.CryptoHasher('sha256', 'new').update(first.payload).digest('hex'));
+	expect(r.headers.get('x-forgejo-delivery')).not.toBe(first.headers['x-forgejo-delivery']);
+	expect((await call(ada, 'GET', `/repos/ada/sample/hooks/${id}/deliveries`)).json).toHaveLength(2);
+
+	expect((await call(ada, 'POST', `/repos/ada/sample/hooks/${id}/deliveries/999999/redeliver`)).status).toBe(404);
+	expect((await call(other, 'POST', `/repos/ada/sample/hooks/${id}/deliveries/${first.id}/redeliver`)).status).toBe(403);
+	const old = Number(db.query("insert into hook_deliveries (hook_id, event, status) values (?, 'push', 200)").run(id).lastInsertRowid);
+	expect((await call(ada, 'POST', `/repos/ada/sample/hooks/${id}/deliveries/${old}/redeliver`)).status).toBe(422);
+});

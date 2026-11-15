@@ -13,10 +13,22 @@ function parseSpec(spec: string, fallback: string) {
 }
 const enc = (ref: string) => ref.split(':').map(encodeURIComponent).join(':');
 
+// Branches of the forks you can see, as `owner:branch` heads. Forks of forks aren't listed; their PRs go to their own parent.
+async function forkHeads(token: string | undefined, full: string) {
+	const forks = (await api<{ full_name: string; owner: { login: string } }[]>(token, `/repos/${full}/forks`).catch(() => [])).slice(0, 20);
+	return Promise.all(
+		forks.map(async (f) => ({
+			repo: f.full_name,
+			branches: (await api<{ name: string }[]>(token, `/repos/${f.full_name}/branches?limit=100`).catch(() => [])).map((b) => `${f.owner.login}:${b.name}`)
+		}))
+	).then((l) => l.filter((f) => f.branches.length));
+}
+
 export async function load({ locals, params, parent }) {
 	const { repo } = await parent();
 	const { base, head } = parseSpec(params.spec, repo.default_branch);
-	if (!head) return { base, head, compare: null };
+	const forks = await forkHeads(locals.token, repo.full_name);
+	if (!head) return { base, head, forks, compare: null };
 	const path = `/repos/${repo.full_name}/compare/${enc(base)}...${enc(head)}`;
 	try {
 		const [compare, files, open, options] = await Promise.all([
@@ -26,9 +38,9 @@ export async function load({ locals, params, parent }) {
 			locals.user ? Promise.all([triageOptions(locals.token, repo.full_name), api<User[]>(locals.token, `/repos/${repo.full_name}/reviewers`)]).then(([o, reviewers]) => ({ ...o, reviewers })) : null
 		]);
 		const existing = open.find((p) => p.base.ref === base && p.head.label === head);
-		return { base, head, compare: { ...compare, files }, existing: existing && { number: existing.number, title: existing.title }, options, draft: compare.total_commits ? draft(compare, head.split(':').at(-1)!) : null };
+		return { base, head, forks, compare: { ...compare, files }, existing: existing && { number: existing.number, title: existing.title }, options, draft: compare.total_commits ? draft(compare, head.split(':').at(-1)!) : null };
 	} catch (e) {
-		if (isHttpError(e) && e.status === 404) return { base, head, compare: null, missing: true };
+		if (isHttpError(e) && e.status === 404) return { base, head, forks, compare: null, missing: true };
 		throw e;
 	}
 }

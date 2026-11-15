@@ -7,6 +7,13 @@
 	let adding = $state(false);
 	const errorFor = (id: number) => (form?.action === 'save' && form.id === id ? form.error : undefined);
 	const ok = (s: number | null) => s !== null && s >= 200 && s < 300;
+	const pretty = (body: string) => {
+		try {
+			return JSON.stringify(JSON.parse(body), null, 2);
+		} catch {
+			return body;
+		}
+	};
 </script>
 
 <svelte:head><title>Webhooks · {data.repo.full_name}</title></svelte:head>
@@ -52,19 +59,42 @@
 						</div>
 						{#if form?.action === 'test' && 'error' in form && form.error}<p class="error" role="alert">{form.error}</p>{/if}
 						<h3>Recent deliveries</h3>
+						{#if form?.action === 'redeliver' && form.id === h.id && 'error' in form && form.error}<p class="error" role="alert">{form.error}</p>{/if}
 						{#if h.deliveries.length}
-							<table>
-								<tbody>
-									{#each h.deliveries as d (d.id)}
-										<tr>
-											<td><span class="status" class:ok={ok(d.status)}>{d.status ?? 'failed'}</span></td>
-											<td>{d.event}</td>
-											<td class="response" title={d.response}>{d.response || '(empty reply)'}</td>
-											<td class="muted when">{ago(d.created_at)}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
+							<ul class="deliveries">
+								{#each h.deliveries as d (d.id)}
+									<li>
+										<details>
+											<summary>
+												<span class="status" class:ok={ok(d.status)}>{d.status ?? 'failed'}</span>
+												<span class="event">{d.event}</span>
+												<span class="response" title={d.response}>{d.response || '(empty reply)'}</span>
+												<span class="muted when">{ago(d.created_at)}</span>
+											</summary>
+											<div class="delivery">
+												{#if d.payload}
+													<form method="POST" action="?/redeliver" use:enhance>
+														<input type="hidden" name="id" value={h.id} />
+														<input type="hidden" name="delivery" value={d.id} />
+														<button>Redeliver</button>
+														<small class="muted">Sends this body again, signed with the current secret</small>
+													</form>
+													<h4>Request headers</h4>
+													<pre>{Object.entries(d.headers)
+															.map(([k, v]) => `${k}: ${v}`)
+															.join('\n')}</pre>
+													<h4>Body</h4>
+													<pre>{pretty(d.payload)}</pre>
+												{:else}
+													<p class="muted">Sent before Shed kept request bodies, so it can't be redelivered.</p>
+												{/if}
+												<h4>Response</h4>
+												<pre>{d.response || '(empty reply)'}</pre>
+											</div>
+										</details>
+									</li>
+								{/each}
+							</ul>
 						{:else}
 							<p class="lead">Nothing sent yet.</p>
 						{/if}
@@ -132,25 +162,23 @@
 	.edit h3 {
 		margin: 0.5rem 0 0;
 	}
-	table {
-		width: 100%;
-		table-layout: fixed;
-		border-collapse: collapse;
+	.deliveries {
+		list-style: none;
+		margin: 0;
+		padding: 0;
 		font-size: 0.85rem;
 	}
-	td {
-		padding: 0.3rem 0.4rem;
+	.deliveries > li {
 		border-top: 1px solid var(--border);
-		vertical-align: top;
 	}
-	td:first-child {
-		width: 4.5rem;
-	}
-	td:nth-child(2) {
-		width: 7rem;
+	.deliveries summary {
+		display: grid;
+		grid-template-columns: 3.5rem 7rem minmax(0, 1fr) 6rem;
+		gap: 0.6rem;
+		padding: 0.35rem 0.4rem;
+		cursor: pointer;
 	}
 	.when {
-		width: 6rem;
 		text-align: right;
 	}
 	.response {
@@ -158,6 +186,34 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-family: var(--mono);
+	}
+	.delivery {
+		display: grid;
+		gap: 0.4rem;
+		padding: 0.25rem 0.4rem 0.75rem;
+		min-width: 0;
+	}
+	.delivery form {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.delivery h4 {
+		margin: 0.4rem 0 0;
+		font-size: 0.8rem;
+	}
+	.delivery pre {
+		margin: 0;
+		max-height: 20rem;
+		overflow: auto;
+		padding: 0.5rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--surface);
+		font-size: 0.78rem;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 	}
 	.status {
 		font-weight: 600;
@@ -167,8 +223,8 @@
 		color: var(--add-fg);
 	}
 	@media (max-width: 700px) {
-		td:nth-child(2) {
-			width: 5.5rem;
+		.deliveries summary {
+			grid-template-columns: 3rem 5.5rem minmax(0, 1fr);
 		}
 		.when {
 			display: none;

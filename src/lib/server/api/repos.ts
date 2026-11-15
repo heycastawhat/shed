@@ -9,6 +9,7 @@ import { afterPush, refSnapshot } from '../push.js';
 import { createRepo, getRepo, repoDir, type RepoRow } from '../repos.js';
 import { commitFiles, type Change } from '../write.js';
 import { bool, now, refSha, repoJson, repoOf, slice, userByLogin, userJson, userRow } from './common.js';
+import { orgJson } from './orgs.js';
 import { labelJson, milestoneJson, type LabelRow, type MilestoneRow } from './shapes.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
 
@@ -47,11 +48,15 @@ route('GET', '/repos/search', async (c) => {
 });
 route('GET', '/orgs/:name', (c) => {
 	const u = c.db.query<UserRow, [string]>("select * from users where login = ? and kind = 'org'").get(c.params.name) ?? error(404, 'Organization not found');
-	return { ...toUser(u), username: u.login, name: u.login };
+	return orgJson(u);
 });
 route('GET', '/orgs/:name/members', (c) => {
 	const org = c.db.query<UserRow, [string]>("select * from users where login = ? and kind = 'org'").get(c.params.name) ?? error(404, 'Organization not found');
-	return c.db.query<UserRow, [number]>('select u.* from users u join org_members m on m.user_id = u.id where m.org_id = ? order by u.login').all(org.id).map(toUser);
+	// `role` is Shed's own (owner or member); Forgejo has teams instead.
+	return c.db
+		.query<UserRow & { role: string }, [number]>('select u.*, m.role from users u join org_members m on m.user_id = u.id where m.org_id = ? order by u.login')
+		.all(org.id)
+		.map((u) => ({ ...toUser(u), role: u.role }));
 });
 route('GET', '/user/orgs', (c) =>
 	c.db
@@ -178,6 +183,8 @@ route('POST', '/repos/:owner/:repo/branches', async (c) => {
 	const b = await c.body<{ new_branch_name: string; old_ref_name?: string; old_branch_name?: string }>();
 	if (!/^[A-Za-z0-9._/-]{1,200}$/.test(b.new_branch_name ?? '') || b.new_branch_name.includes('..') || b.new_branch_name.startsWith('-')) error(422, 'Invalid branch name');
 	const from = (await refSha(r.dir, b.old_ref_name || b.old_branch_name || r.row.default_branch)) ?? error(404, 'Starting point not found');
+	const { checkRefWrite } = await import('./protect.js');
+	checkRefWrite(c.db, r.row, r.level, b.new_branch_name, 'push');
 	const before = await refSnapshot(r.dir);
 	await git(r.dir, ['update-ref', `refs/heads/${b.new_branch_name}`, from, '0'.repeat(40)]).catch(() => error(409, `${b.new_branch_name} already exists`));
 	await afterPush(c.db, c.root, r.row, me(c).id, before);
@@ -187,8 +194,8 @@ route('DELETE', '/repos/:owner/:repo/branches/*branch', async (c) => {
 	const r = repoOf(c, 'write');
 	const name = c.params.branch;
 	if (name === r.row.default_branch) error(403, `${name} is the default branch`);
-	const { protectionFor } = await import('./protect.js');
-	if (protectionFor(c.db, r.row.id, name)) error(403, `${name} is protected`);
+	const { checkRefWrite } = await import('./protect.js');
+	checkRefWrite(c.db, r.row, r.level, name, 'delete');
 	const sha = (await refSha(r.dir, `refs/heads/${name}`)) ?? error(404, 'Branch not found');
 	const before = await refSnapshot(r.dir);
 	await git(r.dir, ['update-ref', '-d', `refs/heads/${name}`, sha]);
@@ -214,6 +221,7 @@ route('POST', '/repos/:owner/:repo/tags', async (c) => {
 	const r = repoOf(c, 'write');
 	const b = await c.body<{ tag_name: string; target?: string; message?: string }>();
 	if (!/^[A-Za-z0-9._/-]{1,200}$/.test(b.tag_name ?? '') || b.tag_name.includes('..') || b.tag_name.startsWith('-')) error(422, 'Invalid tag name');
+	(await import('./protect.js')).notMirror(r.row);
 	const sha = (await refSha(r.dir, b.target || r.row.default_branch)) ?? error(404, 'Target not found');
 	const before = await refSnapshot(r.dir);
 	const u = me(c);
@@ -225,6 +233,7 @@ route('POST', '/repos/:owner/:repo/tags', async (c) => {
 });
 route('DELETE', '/repos/:owner/:repo/tags/*tag', async (c) => {
 	const r = repoOf(c, 'write');
+	(await import('./protect.js')).notMirror(r.row);
 	const before = await refSnapshot(r.dir);
 	await git(r.dir, ['update-ref', '-d', `refs/tags/${c.params.tag}`]).catch(() => error(404, 'Tag not found'));
 	await afterPush(c.db, c.root, r.row, me(c).id, before);
@@ -353,6 +362,8 @@ async function writeFile(c: Ctx, mode: 'create' | 'update' | 'delete') {
 	const parent = await refSha(r.dir, `refs/heads/${branch}`);
 	if (!parent && !(await browse.isEmpty(r.dir))) error(404, `There's no branch called ${branch}`);
 	if (b.new_branch && (await refSha(r.dir, `refs/heads/${b.new_branch}`))) error(409, `${b.new_branch} already exists`);
+	const { checkRefWrite } = await import('./protect.js');
+	checkRefWrite(c.db, r.row, r.level, target, 'push');
 	const path = c.params.path;
 	const current = parent ? await git(r.dir, ['rev-parse', '--verify', '--quiet', `${parent}:${path}`]).then((s) => s.trim(), () => null) : null;
 	if (mode === 'create' && current) error(422, `${path} already exists`);

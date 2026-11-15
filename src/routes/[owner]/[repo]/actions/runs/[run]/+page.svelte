@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import Icon from '#lib/components/Icon.svelte';
 	import { ago } from '#lib/time.js';
 
@@ -89,6 +89,16 @@
 				<span class="muted small">
 					{#if data.job.runner}on {data.job.runner}{:else if data.job.status === 'waiting'}waiting for a runner with {data.job.runs_on.join(', ') || 'any label'}{:else if data.job.status === 'blocked'}waiting for {data.job.needs.join(', ')}{/if}
 				</span>
+				{#if data.attempts.length > 1}
+					<select
+						class="attempt"
+						value={data.attempt}
+						onchange={(e) => goto(`${base}?job=${data.job?.id}${e.currentTarget.selectedIndex === data.attempts.length - 1 ? '' : `&task=${e.currentTarget.value}`}`, { replace: true, reset: false })}
+						aria-label="Attempt"
+					>
+						{#each data.attempts as a, i (a.id)}<option value={a.id}>Attempt {i + 1}{i === data.attempts.length - 1 ? ' (latest)' : ''} · {a.status}{a.started_at ? ` · ${ago(a.started_at)}` : ''}</option>{/each}
+					</select>
+				{/if}
 			</h3>
 			<div class="log">
 				{#if data.setup.length}
@@ -186,8 +196,22 @@
 		margin: 0 0 0.6rem;
 		font-size: 1rem;
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.6rem;
 		align-items: baseline;
+	}
+	.attempt {
+		margin-left: auto;
+		min-width: 0;
+		max-width: 100%;
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: normal;
+		padding: 0.2rem 0.4rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--surface);
+		color: var(--fg);
 	}
 	.log {
 		border: 1px solid var(--border);
