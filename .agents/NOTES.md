@@ -118,8 +118,6 @@ Everything is on branch `shed`, committed, not pushed, not deployed. Open work, 
    has never been built (this machine can't run x86).
 3. **Agents end to end**: `@agent` mentions and T3 tasks haven't been run against Shed (MCP keys pass `shed-mcp.sh`). Running them starts real
    T3 tasks on the owner's T3 (:3773); ask first.
-4. **Small gaps**: renaming/transferring a repo doesn't update token repo lists, agent key scopes or pins (`forge.json`); `runs-on` only
-   resolves `${{ matrix.* }}`; release tags can still be created on mirrors; mobile polish.
 
 ## Working with the owner
 
