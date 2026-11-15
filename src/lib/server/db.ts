@@ -407,7 +407,14 @@ const MIGRATIONS = [
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 		expires_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+90 days')),
 		unique (run_id, name)
-	);`
+	);`,
+	// Redelivering a webhook needs what was sent; pull mirrors keep a remote they fetch from on a timer.
+	`alter table hook_deliveries add column payload text not null default '';
+	alter table hook_deliveries add column headers text not null default '{}';
+	alter table repos add column mirror_url text;
+	alter table repos add column mirror_interval integer not null default 0;
+	alter table repos add column mirror_updated_at text;
+	alter table repos add column mirror_error text;`
 ];
 
 export function openDb(path: string) {
