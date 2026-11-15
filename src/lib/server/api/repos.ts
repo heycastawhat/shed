@@ -147,6 +147,7 @@ route('PATCH', '/repos/:owner/:repo', async (c) => {
 		set.merge_styles = JSON.stringify(next);
 	}
 	for (const [k, v] of Object.entries(set)) c.db.query(`update repos set ${k} = ? where id = ?`).run(v as string, row.id);
+	if (set.name) await (await import('../repos.js')).repoMoved(c.db, `${row.owner}/${row.name}`, `${row.owner}/${set.name}`);
 	return repoJson(c, c.db.query<RepoRow, [number]>(`${ALL_REPOS} where r.id = ?`).get(row.id)!);
 });
 route('DELETE', '/repos/:owner/:repo', async (c) => {

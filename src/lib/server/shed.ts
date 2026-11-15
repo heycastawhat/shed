@@ -6,6 +6,8 @@ import { startSsh } from './ssh.js';
 import { openDb } from './db.js';
 import './activity.js';
 import { startScheduler } from './actions/runs.js';
+import { onRepoMoved, renameIn } from './repos.js';
+import { update } from './store.js';
 
 // The one database and data folder for this process. Opened on import, so a bad database stops the server at startup (hooks' init imports it).
 mkdirSync(SHED_DATA, { recursive: true });
@@ -14,6 +16,16 @@ setMailer(SHED_SMTP_URL, SHED_MAIL_FROM);
 export const db = openDb(`${SHED_DATA}/shed.db`);
 export const provider = { issuer: SHED_OIDC_ISSUER, clientId: SHED_OIDC_CLIENT_ID, clientSecret: SHED_OIDC_CLIENT_SECRET };
 export const allowlist = SHED_ALLOWED_USERS.split(',');
+
+// Agent keys, pins, tasks and waiting approvals name repos by owner/name.
+onRepoMoved((from, to) =>
+	update((d) => {
+		for (const k of d.keys) k.repos = renameIn(k.repos, from, to);
+		for (const u of Object.keys(d.pins)) d.pins[+u] = renameIn(d.pins[+u], from, to);
+		for (const t of d.tasks) [t.repo] = renameIn([t.repo], from, to);
+		for (const a of d.approvals) if (a.status === 'pending') [a.repo] = renameIn([a.repo], from, to);
+	})
+);
 
 // The address people reach Shed at, from the latest request (Shed serves one host), for links the API puts in its responses.
 let current = 'http://localhost';

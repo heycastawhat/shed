@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { error } from '@sveltejs/kit';
 import { RESERVED } from '../reserved.js';
 import type { UserRow } from './accounts.js';
-import { checkName, getRepo, type RepoRow } from './repos.js';
+import { checkName, getRepo, repoMoved, type RepoRow } from './repos.js';
 
 export type Profile = { full_name?: unknown; description?: unknown; website?: unknown; location?: unknown };
 export type Role = 'owner' | 'member';
@@ -77,11 +77,12 @@ export function deleteOrg(db: Database, orgId: number) {
 }
 
 // Repos are stored by id, so a transfer is only a new owner_id.
-export function transferRepo(db: Database, repo: RepoRow, to: Pick<UserRow, 'id' | 'login' | 'kind'>) {
+export async function transferRepo(db: Database, repo: RepoRow, to: Pick<UserRow, 'id' | 'login' | 'kind'>) {
 	if (to.kind === 'agent') error(422, "Agents can't own repositories");
 	if (to.id === repo.owner_id) error(422, `${repo.owner}/${repo.name} already belongs to ${to.login}`);
 	if (getRepo(db, to.login, repo.name)) error(409, `${to.login} already has a repository called ${repo.name}`);
 	db.query("update repos set owner_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where id = ?").run(to.id, repo.id);
 	// The new owner administers it anyway; a leftover grant would only show up in the collaborator list.
 	db.query('delete from collaborators where repo_id = ? and user_id = ?').run(repo.id, to.id);
+	await repoMoved(db, `${repo.owner}/${repo.name}`, `${to.login}/${repo.name}`);
 }
