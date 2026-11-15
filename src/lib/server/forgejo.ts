@@ -156,6 +156,7 @@ export type Issue = {
 	milestone: Milestone | null;
 	comments: number;
 	created_at: string;
+	updated_at: string;
 	closed_at: string | null;
 	pull_request: unknown;
 	is_locked?: boolean;

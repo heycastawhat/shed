@@ -622,6 +622,10 @@
 		box-sizing: border-box;
 		min-width: 0;
 	}
+	/* Split layout: the list pane gets its own room instead of squeezing the PR. */
+	main:has(:global(.split)) {
+		max-width: calc(1040px + 18.25rem);
+	}
 	.tabs {
 		display: none;
 	}

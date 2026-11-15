@@ -1,8 +1,8 @@
 import { getContext, setContext } from 'svelte';
 
 export type NavMode = 'sidebar' | 'bar';
-export type Layout = 'classic' | 'tabs';
-export const LAYOUTS: Layout[] = ['classic', 'tabs'];
+export type Layout = 'classic' | 'tabs' | 'split';
+export const LAYOUTS: Layout[] = ['classic', 'tabs', 'split'];
 
 // One instance per root layout (via context), so it is never shared between requests on the server.
 export class Prefs {

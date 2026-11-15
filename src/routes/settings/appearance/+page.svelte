@@ -12,7 +12,8 @@
 	// Drawn like Sink's layout cards: the shell, the sheet, and where things open.
 	const LAYOUT = [
 		['classic', 'Classic', 'Sidebar and one big sheet. Everything opens full page.'],
-		['tabs', 'Tabs', 'PRs, issues, files and commits you open stay as tabs, like a browser.']
+		['tabs', 'Tabs', 'PRs, issues, files and commits you open stay as tabs, like a browser.'],
+		['split', 'Split', 'PRs and issues open beside their list, on wide screens.']
 	] as const;
 	let form: HTMLFormElement;
 	let paletteForm: HTMLFormElement;
@@ -86,9 +87,17 @@
 					<rect x="57" y="4" width="22" height="8" rx="4" class="bar" />
 					<rect x="82" y="4" width="22" height="8" rx="4" class="bar" />
 				{/if}
-				<rect x="32" y={value === 'tabs' ? 15 : 4} width="84" height={value === 'tabs' ? 61 : 72} rx="6" class="sheet" />
-				<rect x="38" y={value === 'tabs' ? 21 : 11} width="40" height="5" rx="2.5" class="ink" />
-				{#each [0, 1, 2, 3] as i (i)}<rect x="38" y={(value === 'tabs' ? 31 : 22) + i * 9} width={70 - (i % 2) * 18} height="5" rx="2.5" class="bar" />{/each}
+				{#if value === 'split'}
+					<rect x="32" y="4" width="84" height="72" rx="6" class="sheet" />
+					{#each [0, 1, 2, 3, 4] as i (i)}<rect x="36" y={9 + i * 13} width="26" height="10" rx="3" class={i === 1 ? 'tab' : 'card'} />{/each}
+					<rect x="66" y="8" width="46" height="64" rx="4" class="open" />
+					<rect x="71" y="14" width="26" height="5" rx="2.5" class="ink" />
+					{#each [0, 1, 2] as i (i)}<rect x="71" y={25 + i * 9} width={36 - (i % 2) * 12} height="5" rx="2.5" class="bar" />{/each}
+				{:else}
+					<rect x="32" y={value === 'tabs' ? 15 : 4} width="84" height={value === 'tabs' ? 61 : 72} rx="6" class="sheet" />
+					<rect x="38" y={value === 'tabs' ? 21 : 11} width="40" height="5" rx="2.5" class="ink" />
+					{#each [0, 1, 2, 3] as i (i)}<rect x="38" y={(value === 'tabs' ? 31 : 22) + i * 9} width={70 - (i % 2) * 18} height="5" rx="2.5" class="bar" />{/each}
+				{/if}
 			</svg>
 			<strong>{label}</strong>
 			<span class="muted">{hint}</span>
@@ -251,6 +260,14 @@
 	}
 	.tab {
 		fill: color-mix(in srgb, var(--accent) 45%, transparent);
+	}
+	.card {
+		fill: color-mix(in srgb, var(--accent) 18%, transparent);
+	}
+	.open {
+		fill: var(--bg);
+		stroke: var(--accent);
+		stroke-width: 1.2;
 	}
 	.swatch.sidebar {
 		background: linear-gradient(90deg, var(--accent) 28%, var(--surface) 28%);
