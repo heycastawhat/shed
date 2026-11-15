@@ -10,7 +10,7 @@ type Run = {
 	commit_sha: string;
 	event: string;
 	status: string;
-	trigger_user: User;
+	trigger_user: User | null;
 	started: string;
 	stopped: string;
 	created: string;
@@ -35,7 +35,7 @@ export async function load({ locals, params, url }) {
 		sha: r.commit_sha,
 		event: r.event,
 		status: r.status,
-		who: r.trigger_user.login,
+		who: r.trigger_user?.login ?? null,
 		// Unset times come back as the Unix epoch.
 		duration: Date.parse(r.started) > 0 && Date.parse(r.stopped) > 0 ? (Date.parse(r.stopped) - Date.parse(r.started)) / 1000 : null,
 		created: r.created,

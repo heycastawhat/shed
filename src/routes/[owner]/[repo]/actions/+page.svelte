@@ -43,7 +43,7 @@
 			<div class="main">
 				<a href="/{data.repo.full_name}/actions/runs/{r.number}"><strong>{r.title}</strong></a>
 				<div class="meta">
-					{r.workflow} #{r.number} · {r.event} by <a href="/{r.who}">{r.who}</a> · <code>{r.ref}</code> ·
+					{r.workflow} #{r.number} · {r.event}{#if r.who}{' by '}<a href="/{r.who}">{r.who}</a>{/if} · <code>{r.ref}</code> ·
 					<a href="/{data.repo.full_name}/commit/{r.sha}"><code>{r.sha.slice(0, 7)}</code></a>
 				</div>
 			</div>
