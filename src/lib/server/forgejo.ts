@@ -1,14 +1,17 @@
 import { error } from '@sveltejs/kit';
-import { FORGEJO_URL } from '$app/env/private';
+import { getUser, tokenAuth } from './accounts.js';
+import { dispatch } from './api/index.js';
+import { internalUser } from './api/internal.js';
+import { render } from './markdown.js';
+import { db, origin, root } from './shed.js';
 
+// Shed's own API, called in-process. `token` is an internal token for the signed-in person (or a personal token); none is anonymous.
 export async function request(token: string | undefined, path: string, init: RequestInit = {}) {
-	// Paths are built from URL params and agent arguments; fetch would resolve a `..` segment and escape the repo (and an agent key's repo scope).
-	if (path.split('?')[0].split(/[/\\]/).some((s) => /^(\.|%2e){1,2}$/i.test(s))) error(400, 'Invalid path');
-	const res = await fetch(`${FORGEJO_URL}/api/v1${path}`, {
-		...init,
-		headers: { ...(token && { authorization: `Bearer ${token}` }), ...init.headers }
-	}).catch(() => error(502, "Couldn't reach Forgejo"));
-	if (!res.ok) error(res.status, (await res.json().catch(() => null))?.message || `Forgejo returned ${res.status} ${res.statusText}`);
+	const internal = internalUser(token);
+	const t = !internal && token ? tokenAuth(db, token) : null;
+	const user = internal ? getUser(db, internal) : t ? getUser(db, t.userId) : null;
+	const res = await dispatch(db, root, origin(), new Request(`http://shed/api/v1${path}`, init), { user, token: t });
+	if (!res.ok) error(res.status, (await res.json().catch(() => null))?.message || `Shed returned ${res.status}`);
 	return res;
 }
 
@@ -27,35 +30,20 @@ export async function apiPage<T>(token: string | undefined, path: string) {
 	return { items: (await res.json()) as T[], total: Number(res.headers.get('x-total-count') ?? 0) };
 }
 
-// For a file in the repo, pass `at` (its ref and folder) so relative links and images resolve to forge's own pages.
-export async function renderMarkdown(token: string | undefined, text: string, repo: string, at?: { ref: string; dir: string }) {
-	// Forgejo resolves relative paths against the context, so a context of <repo>/src/branch/<ref>/<dir> brings every file link back under one prefix to rewrite.
-	const base = at && `${FORGEJO_URL}/${repo}/src/branch/${encodeURIComponent(at.ref)}/`;
-	const res = await request(token, '/markdown', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ Text: text, Mode: 'gfm', Context: base ? base + encodePath(at!.dir) : `${FORGEJO_URL}/${repo}` })
-	});
-	const html = await res.text();
-	if (!base) return html;
-	const ref = encodeURIComponent(at!.ref);
-	return html.replaceAll(`src="${base}`, `src="/${repo}/raw/${ref}/`).replaceAll(`href="${base}`, `href="/${repo}/blob/${ref}/`);
+// For a file in the repo, pass `at` (its ref and folder) so relative links and images resolve to its blob/raw pages.
+export async function renderMarkdown(_token: string | undefined, text: string, repo: string, at?: { ref: string; dir: string }) {
+	return render(text, at ? { repo, ...at } : { repo, ref: '', dir: '' });
 }
 
-// Forgejo's API can't resolve conversations, so a reaction on the thread's first comment stands in for it.
-const RESOLVED = 'rocket';
-
-export async function isResolved(token: string | undefined, repo: string, comment: number) {
-	const reactions = await api<{ content: string }[] | null>(token, `/repos/${repo}/issues/comments/${comment}/reactions`);
-	return !!reactions?.some((r) => r.content === RESOLVED);
+// A thread is resolved when its comments are (Shed resolves whole threads; any comment in it names the thread).
+export async function isResolved(token: string | undefined, repo: string, comment: number, number?: number) {
+	if (number === undefined) return false;
+	const all = await api<{ id: number; resolver: unknown }[]>(token, `/repos/${repo}/pulls/${number}/comments`);
+	return !!all.find((c) => c.id === comment)?.resolver;
 }
 
 export async function setResolved(token: string | undefined, repo: string, form: FormData) {
-	await request(token, `/repos/${repo}/issues/comments/${form.get('comment')}/reactions`, {
-		method: form.has('undo') ? 'DELETE' : 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ content: RESOLVED })
-	});
+	await request(token, `/repos/${repo}/pulls/comments/${form.get('comment')}/resolve`, { method: form.has('undo') ? 'DELETE' : 'POST' });
 }
 
 export const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');

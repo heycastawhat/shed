@@ -2,9 +2,8 @@ import { error } from '@sveltejs/kit';
 import { userToken } from './auth.js';
 import { read, sha256, update, type AgentKey } from './store.js';
 
-// A key acts as its owner, using the owner's stored Forgejo grant (see userToken), so it keeps working after the browser session ends.
+// A key acts as its owner (see userToken), so it keeps working after the browser session ends.
 export async function createKey(user: { id: number; login: string }, name: string, repos: string[], ask: string[], allow: string[]) {
-	if (!(await read()).grants[user.id]) error(401, 'Log in to forge again');
 	const key = `fk_${crypto.getRandomValues(new Uint8Array(32)).toBase64({ alphabet: 'base64url', omitPadding: true })}`;
 	const record: AgentKey = {
 		id: crypto.randomUUID(),

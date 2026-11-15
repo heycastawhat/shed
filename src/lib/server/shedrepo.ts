@@ -2,52 +2,14 @@ import type { Database } from 'bun:sqlite';
 import { error, redirect } from '@sveltejs/kit';
 import { access, atLeast, type Level } from './access.js';
 import { toUser, type UserRow } from './accounts.js';
+import { toRepo } from './shedrepo-shape.js';
 import { isEmpty, type CommitInfo } from './browse.js';
 import type { Commit, Repo } from './forgejo.js';
 import { getRepo, repoDir, type RepoRow } from './repos.js';
 import { db, root } from './shed.js';
 
 // Shed's rows in the shapes forge's pages already take (they were written against Forgejo's API), so pages move over without UI changes.
-
-
-export function toRepo(row: RepoRow, owner: UserRow, level: Level, empty: boolean, origin: string): Repo {
-	const full = `${row.owner}/${row.name}`;
-	return {
-		id: row.id,
-		full_name: full,
-		name: row.name,
-		description: row.description,
-		private: !!row.private,
-		updated_at: row.updated_at,
-		default_branch: row.default_branch,
-		owner: toUser(owner),
-		clone_url: `${origin}/${full}.git`,
-		ssh_url: '',
-		html_url: `${origin}/${full}`,
-		empty,
-		open_pr_counter: 0,
-		open_issues_count: 0,
-		has_issues: true,
-		permissions: { admin: level === 'admin', push: atLeast(level, 'write'), pull: atLeast(level, 'read') },
-		default_merge_style: 'merge',
-		default_delete_branch_after_merge: false,
-		allow_merge_commits: true,
-		allow_rebase: true,
-		allow_rebase_explicit: true,
-		allow_squash_merge: true,
-		allow_fast_forward_only_merge: true,
-		language: '',
-		stars_count: 0,
-		forks_count: 0,
-		fork: false,
-		has_wiki: false,
-		has_actions: true,
-		has_projects: false,
-		has_releases: true,
-		archived: !!row.archived,
-		watchers_count: 0
-	};
-}
+export { toRepo };
 
 // The repo a request is about, if this person may see it; 404 otherwise (so private repos don't reveal they exist), or a sign-in for anonymous visitors.
 export function repoFor(locals: App.Locals, owner: string, name: string, need: Level = 'read') {

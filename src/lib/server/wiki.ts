@@ -1,25 +1,63 @@
-import { FORGEJO_URL } from '$app/env/private';
-import { api, request } from '#lib/server/forgejo.js';
+import { error } from '@sveltejs/kit';
+import { existsSync } from 'node:fs';
+import { git, gitTry, initBare } from './git.js';
+import { render } from './markdown.js';
+import { commitFiles, type Change } from './write.js';
 
-type Page = { title: string; sub_url: string; content_base64: string; html_url: string; last_commit: { author: { name: string }; created: string } | null };
+// A repo's wiki is a second bare repo beside it (<id>.wiki.git), one markdown file per page, as Forgejo and GitHub keep them, so it
+// can be cloned and edited with git too. Page names use dashes for spaces in file names ("Getting Started" ↔ Getting-Started.md).
+export const wikiDir = (repoDir: string) => repoDir.replace(/\.git$/, '.wiki.git');
+const file = (name: string) => `${name.trim().replaceAll(' ', '-')}.md`;
+const title = (path: string) => path.replace(/\.md$/, '').replaceAll('-', ' ');
 
-// Forgejo's /markdown doesn't expand [[Page]] or [[Text|Page]] links, so they become plain links first.
+async function head(dir: string) {
+	if (!existsSync(dir)) return null;
+	return (await gitTry(dir, ['rev-parse', '--verify', '--quiet', 'refs/heads/main']))?.trim() || null;
+}
+
+export async function wikiPages(repoDir: string) {
+	const dir = wikiDir(repoDir);
+	const sha = await head(dir);
+	if (!sha) return [];
+	return (await git(dir, ['ls-tree', '--name-only', sha]))
+		.split('\n')
+		.filter((f) => f.endsWith('.md'))
+		.map((f) => ({ title: title(f), sub_url: f.replace(/\.md$/, '') }))
+		.sort((a, b) => +(b.sub_url === 'Home') - +(a.sub_url === 'Home') || a.title.localeCompare(b.title));
+}
+
+// [[Page]] and [[Text|Page]] become links to the page; other relative links and images resolve inside the wiki.
 const wikiLinks = (md: string) => md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, a: string, b?: string) => `[${a}](${encodeURIComponent((b ?? a).trim().replaceAll(' ', '-'))})`);
 
-export async function wikiPage(token: string | undefined, repo: string, name: string) {
-	const [pages, page] = await Promise.all([
-		api<{ title: string; sub_url: string }[]>(token, `/repos/${repo}/wiki/pages?limit=100`).catch(() => []),
-		api<Page>(token, `/repos/${repo}/wiki/page/${encodeURIComponent(name)}`).catch(() => null)
-	]);
-	if (!page) return { pages, page: null };
-	const base = `${FORGEJO_URL}/${repo}/wiki/`;
-	const md = new TextDecoder().decode(Uint8Array.fromBase64(page.content_base64));
-	const res = await request(token, '/markdown', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ Text: wikiLinks(md), Mode: 'wiki', Context: base })
-	});
-	// Page links come back under Forgejo's wiki URL; images stay on Forgejo's raw wiki files.
-	const html = (await res.text()).replaceAll(`src="${base}`, `src="${base}raw/`).replaceAll(`href="${base}`, `href="/${repo}/wiki/`);
-	return { pages, page: { title: page.title, name: page.sub_url, html, edit: `${page.html_url}?action=_edit`, updated: page.last_commit && { by: page.last_commit.author.name, at: page.last_commit.created } } };
+export async function wikiPage(repoDir: string, repo: string, name: string) {
+	const dir = wikiDir(repoDir);
+	const pages = await wikiPages(repoDir);
+	const sha = await head(dir);
+	const path = file(name);
+	const md = sha ? await gitTry(dir, ['cat-file', 'blob', `${sha}:${path}`]) : null;
+	if (md === null) return { pages, page: null };
+	const [when, by] = (await git(dir, ['log', '-1', '--format=%cI%x00%an', sha!, '--', path])).trim().split('\0');
+	const html = render(wikiLinks(md), { repo, ref: '', dir: '' })
+		.replace(/href="(?![a-z][a-z0-9+.-]*:|\/|#)([^"]+)"/gi, `href="/${repo}/wiki/$1"`)
+		.replace(/src="(?![a-z][a-z0-9+.-]*:|\/)([^"]+)"/gi, `src="/${repo}/wiki/raw/$1"`);
+	return { pages, page: { title: title(path), name: path.replace(/\.md$/, ''), html, markdown: md, updated: { by, at: when } } };
 }
+
+// Saves a page (renaming it when `from` differs), or deletes it when text is null. Creates the wiki on first save.
+export async function saveWikiPage(repoDir: string, o: { name: string; from?: string; text: string | null; message?: string; author: { name: string; email: string } }) {
+	if (!o.name.trim() || /[/\\]|^\.|\.\./.test(o.name)) error(400, "Page names can't contain / or \\ or start with a dot");
+	const dir = wikiDir(repoDir);
+	if (!existsSync(dir)) await initBare(dir, 'main');
+	const parent = await head(dir);
+	const path = file(o.name);
+	const changes: Change[] = o.text === null ? [{ path, content: null }] : [{ path, content: o.text.replace(/\r\n/g, '\n') }];
+	if (o.from && file(o.from) !== path) changes.push({ path: file(o.from), content: null });
+	await commitFiles(dir, {
+		branch: 'main',
+		parent,
+		changes,
+		message: o.message?.trim() || `${o.text === null ? 'Delete' : parent && (await gitTry(dir, ['cat-file', '-e', `${parent}:${path}`])) !== null ? 'Update' : 'Add'} ${title(path)}`,
+		author: o.author
+	});
+}
+

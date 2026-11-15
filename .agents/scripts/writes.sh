@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Drives forge's write actions (the same form posts the UI makes) against a throwaway PR and issue, then checks Forgejo's state.
-# Run login.sh first. Defaults to :5173 against dev/forgejo on :3000; override APP/FJ/FJDIR/JAR for another pair.
+# Run login.sh first (or, against Shed: FJ=$APP JP=<ada token> RP=<reviewer token> and a jar holding shed_session).
 # Creates, merges and deletes throwaway branches/PRs/issues in ada/sample, so only point it at a test instance.
 set -uo pipefail
 APP=${APP:-localhost:5173} FJ=${FJ:-localhost:3000} FJDIR=${FJDIR:-forgejo} JAR=${JAR:-app}
 cd "$(dirname "$0")/../tmp"
-JP=$(cat ../../dev/$FJDIR/.admin-password) RP=$(cat ../../dev/$FJDIR/.reviewer-password)
+JP=${JP:-$(cat ../../dev/$FJDIR/.admin-password)} RP=${RP:-$(cat ../../dev/$FJDIR/.reviewer-password)}
 R=/repos/ada/sample T=$(date +%s) fail=0
 api() { local m=$1 p=$2; shift 2; curl -s -u "ada:$JP" -X "$m" -H 'Content-Type: application/json' "$FJ/api/v1$p" "$@"; }
 rapi() { local m=$1 p=$2; shift 2; curl -s -u "reviewer:$RP" -X "$m" -H 'Content-Type: application/json' "$FJ/api/v1$p" "$@"; }

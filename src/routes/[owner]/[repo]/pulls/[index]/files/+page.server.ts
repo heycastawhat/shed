@@ -4,7 +4,7 @@ import { loadDiff } from '#lib/server/diff.js';
 import { fixWithAgent } from '#lib/server/fix.js';
 import { mention } from '#lib/server/mention.js';
 import { unsign } from '#lib/sign.js';
-import { api, isResolved, renderMarkdown, request, setResolved, type Review, type ReviewComment } from '#lib/server/forgejo.js';
+import { api, renderMarkdown, request, setResolved, type Review, type ReviewComment } from '#lib/server/forgejo.js';
 
 export type LineComment = { id: number; review: number; user: { login: string; avatar_url: string }; date: string; html: string; agent?: string };
 
@@ -16,12 +16,14 @@ export async function load({ locals, params }) {
 
 	// Keyed "path\0old:N" or "path\0new:N"; Forgejo puts new-side lines in `position`, old-side in `original_position`.
 	const comments: Record<string, LineComment[]> = {};
+	const resolvedKeys = new Set<string>();
 	for (const c of all.sort((a, b) => a.created_at.localeCompare(b.created_at))) {
 		const key = `${c.path}\0${c.position ? `new:${c.position}` : `old:${c.original_position}`}`;
+		if (c.resolver) resolvedKeys.add(key);
 		const { body, agent } = unsign(c.body);
 		(comments[key] ??= []).push({ id: c.id, review: c.pull_request_review_id, user: c.user, date: c.created_at, html: await renderMarkdown(locals.token, body, repo), agent });
 	}
-	const resolved = (await Promise.all(Object.values(comments).map(async ([root]) => ((await isResolved(locals.token, repo, root.id)) ? [root.id] : [])))).flat();
+	const resolved = Object.entries(comments).flatMap(([key, [root]]) => (resolvedKeys.has(key) ? [root.id] : []));
 	return { files, comments, resolved };
 }
 

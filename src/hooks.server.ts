@@ -1,8 +1,9 @@
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
-import { FORGEJO_TOKEN } from '$app/env/private';
-import { sessionUser } from '#lib/server/accounts.js';
+import { getUser, sessionUser, tokenAuth } from '#lib/server/accounts.js';
+import { dispatch } from '#lib/server/api/index.js';
+import { internalToken } from '#lib/server/api/internal.js';
 import { gitHttp, isGitRequest } from '#lib/server/githttp.js';
-import { db, root } from '#lib/server/shed.js';
+import { db, root, setOrigin } from '#lib/server/shed.js';
 import { sweepMentions } from '#lib/server/mention.js';
 import { read } from '#lib/server/store.js';
 import { isTheme } from '#lib/themes.js';
@@ -20,10 +21,19 @@ const SECURITY_HEADERS = {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+	setOrigin(event.url.origin);
 	if (isGitRequest(event.url)) return gitHttp(db, root, event.request, event.url);
+	// The REST API for scripts and tools: a Shed token as `token …`, `Bearer …` or a Basic password. Cookies don't count, so no CSRF.
+	if (event.url.pathname.startsWith('/api/v1/')) {
+		const h = event.request.headers.get('authorization') ?? '';
+		const raw = h.match(/^(?:token|bearer)\s+(.+)$/i)?.[1] ?? (h.match(/^basic\s+(.+)$/i) ? new TextDecoder().decode(Uint8Array.fromBase64(h.split(/\s+/)[1])).split(':').slice(1).join(':') : undefined);
+		const t = raw ? tokenAuth(db, raw) : null;
+		if (raw && !t) return new Response(JSON.stringify({ message: 'That token is unknown or expired' }), { status: 401, headers: { 'content-type': 'application/json' } });
+		return dispatch(db, root, event.url.origin, event.request, { user: t ? getUser(db, t.userId) : null, token: t });
+	}
 	event.locals.user = sessionUser(db, event.cookies.get('shed_session')) ?? undefined;
-	// Bridge while pages move from Forgejo to Shed: a signed-in person's Forgejo calls use this one token.
-	event.locals.token = event.locals.user && FORGEJO_TOKEN;
+	// Pages call Shed's API in-process as the signed-in person.
+	event.locals.token = event.locals.user ? internalToken(event.locals.user.id) : undefined;
 	sweepMentions();
 	// Set on <html> while rendering so a chosen theme doesn't flash the OS one first.
 	const theme = event.cookies.get('forge_theme');

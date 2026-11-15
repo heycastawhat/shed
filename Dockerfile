@@ -4,7 +4,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY . .
 # SvelteKit 3 validates env vars while analysing routes; they're read again at runtime, not baked in.
-RUN FORGEJO_URL=http://build FORGEJO_CLIENT_ID=- FORGEJO_CLIENT_SECRET=- FORGE_SECRET=build-time-placeholder-not-a-real-secret \
+RUN FORGE_SECRET=build-time-placeholder-not-a-real-secret \
 	SHED_OIDC_ISSUER=http://build SHED_OIDC_CLIENT_ID=- SHED_OIDC_CLIENT_SECRET=- SHED_ALLOWED_USERS=user:build bun --bun run build \
 	&& bun build bin/shed.ts --target=bun --outfile build/shed.js
 

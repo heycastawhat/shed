@@ -91,8 +91,10 @@ to Shed accounts by email. Re-runnable per repo. Forgejo stays up until Shed has
 
 ## API
 
-REST under `/api` (JSON, token or session cookie), shaped for Shed's own UI and agents, not a Forgejo clone. `/mcp` for
-agents, as now. A Forgejo/Gitea-compatible API subset is a non-goal unless a tool needs it.
+`/api/v1` is Forgejo-compatible (the subset Shed's pages, agents and common tools use), served from `src/lib/server/api/`.
+Pages call it in-process through `forgejo.ts` with an internal token for the signed-in person, so forge's pages moved over
+unchanged; scripts and tools call it over HTTP with a Shed token. Where Forgejo's API fell short, Shed adds endpoints
+(`pulls/N/revisions`, `pulls/N/comments`, `pulls/comments/ID/resolve`). `/mcp` for agents, as now.
 
 ## First usable version
 
@@ -106,6 +108,15 @@ agents, as now. A Forgejo/Gitea-compatible API subset is a non-goal unless a too
 8. Agents moved over from forge (keys → agent users, MCP, approvals, T3).
 
 Then: SSH, webhooks, branch protection UI, notifications, search, releases, wiki, stacked PRs.
+
+## Later: UI redesign (after the backend)
+
+Take Sink's visual language, not its component library (`@m3e/web` builds in the browser; Shed renders on the server):
+a seed-colour palette made server-side with `material-color-utilities` (same purple seed as Sink, accent picker), Roboto Flex
+with its width axis for headings, a tinted shell with one big rounded sheet, pill nav, tonal buttons, a bottom tab bar on phones,
+settings as grouped cards. Code views (diffs, trees, commit lists) stay dense.
+Layouts like Sink's, per account: **Tabs** for PRs (open PRs and their files as tabs that keep scroll, drafts and viewed state)
+and **Split** for lists (the PR list beside the open PR).
 
 ## Working
 

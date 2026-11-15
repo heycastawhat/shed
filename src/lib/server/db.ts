@@ -71,7 +71,236 @@ const MIGRATIONS = [
 		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 	);
 	create index activity_user on activity (user_id, created_at);
-	create index activity_repo on activity (repo_id, created_at);`
+	create index activity_repo on activity (repo_id, created_at);`,
+	// Issues and pull requests share one numbering per repo, as in Forgejo, so imported links keep working.
+	`alter table repos add column next_number integer not null default 1;
+	alter table repos add column fork_of integer references repos(id) on delete set null;
+	alter table repos add column has_issues integer not null default 1;
+	alter table repos add column has_wiki integer not null default 1;
+	alter table repos add column default_merge_style text not null default 'merge';
+	alter table repos add column delete_branch_after_merge integer not null default 0;
+	alter table repos add column merge_styles text not null default '["merge","rebase","rebase-merge","squash","fast-forward-only"]';
+	create table milestones (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		title text not null collate nocase,
+		description text not null default '',
+		state text not null default 'open' check (state in ('open', 'closed')),
+		due_on text,
+		closed_at text,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		unique (repo_id, title)
+	);
+	create table labels (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		name text not null collate nocase,
+		color text not null default 'ededed',
+		description text not null default '',
+		unique (repo_id, name)
+	);
+	create table issues (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		number integer not null,
+		user_id integer not null references users(id),
+		title text not null,
+		body text not null default '',
+		state text not null default 'open' check (state in ('open', 'closed')),
+		is_pull integer not null default 0,
+		milestone_id integer references milestones(id) on delete set null,
+		locked integer not null default 0,
+		pinned integer not null default 0,
+		due_on text,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		closed_at text,
+		unique (repo_id, number)
+	);
+	create index issues_repo on issues (repo_id, is_pull, state, updated_at);
+	create table issue_labels (
+		issue_id integer not null references issues(id) on delete cascade,
+		label_id integer not null references labels(id) on delete cascade,
+		primary key (issue_id, label_id)
+	);
+	create table assignees (
+		issue_id integer not null references issues(id) on delete cascade,
+		user_id integer not null references users(id) on delete cascade,
+		primary key (issue_id, user_id)
+	);
+	create table pulls (
+		issue_id integer primary key references issues(id) on delete cascade,
+		base text not null,
+		head text not null,
+		-- Set when the head branch lives in a fork.
+		head_repo_id integer references repos(id) on delete set null,
+		head_sha text not null,
+		merge_base text,
+		draft integer not null default 0,
+		merged_at text,
+		merged_by integer references users(id),
+		merge_commit text,
+		-- Merge when checks pass: the style to merge with, and who asked.
+		auto_merge text,
+		auto_merge_by integer references users(id),
+		auto_merge_message text
+	);
+	create index pulls_head on pulls (head);
+	-- Every push to a PR's head, so comments stay tied to what they were made on and "changes since your review" is a diff.
+	create table revisions (
+		id integer primary key,
+		issue_id integer not null references issues(id) on delete cascade,
+		head_sha text not null,
+		before_sha text,
+		base_sha text,
+		user_id integer references users(id),
+		forced integer not null default 0,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table reviews (
+		id integer primary key,
+		issue_id integer not null references issues(id) on delete cascade,
+		user_id integer not null references users(id),
+		state text not null check (state in ('APPROVED', 'REQUEST_CHANGES', 'COMMENT', 'PENDING', 'REQUEST_REVIEW')),
+		body text not null default '',
+		commit_sha text not null default '',
+		dismissed integer not null default 0,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table review_requests (
+		issue_id integer not null references issues(id) on delete cascade,
+		user_id integer not null references users(id) on delete cascade,
+		primary key (issue_id, user_id)
+	);
+	create table comments (
+		id integer primary key,
+		issue_id integer not null references issues(id) on delete cascade,
+		user_id integer not null references users(id),
+		body text not null default '',
+		review_id integer references reviews(id) on delete cascade,
+		-- Line comments: where, on which side and line of which commit's diff, and the hunk around it as it was.
+		path text,
+		side text check (side in ('old', 'new')),
+		line integer,
+		commit_sha text,
+		diff_hunk text,
+		resolved_by integer references users(id),
+		resolved_at text,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create index comments_issue on comments (issue_id, created_at);
+	create table reactions (
+		id integer primary key,
+		issue_id integer references issues(id) on delete cascade,
+		comment_id integer references comments(id) on delete cascade,
+		user_id integer not null references users(id) on delete cascade,
+		content text not null,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		unique (issue_id, comment_id, user_id, content)
+	);
+	-- Timeline entries other than comments and reviews: label, assignees, milestone, change_title, close, reopen, merge_pull, push, ...
+	create table events (
+		id integer primary key,
+		issue_id integer not null references issues(id) on delete cascade,
+		user_id integer not null references users(id),
+		kind text not null,
+		data text not null default '{}',
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create index events_issue on events (issue_id, created_at);
+	create table statuses (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		sha text not null,
+		context text not null default 'default',
+		state text not null check (state in ('pending', 'success', 'error', 'failure', 'warning')),
+		description text not null default '',
+		target_url text not null default '',
+		creator_id integer references users(id),
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create index statuses_sha on statuses (repo_id, sha, context, id);
+	create table releases (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		tag text not null,
+		target text not null default '',
+		name text not null default '',
+		body text not null default '',
+		draft integer not null default 0,
+		prerelease integer not null default 0,
+		user_id integer not null references users(id),
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		published_at text,
+		unique (repo_id, tag)
+	);
+	create table release_assets (
+		id integer primary key,
+		release_id integer not null references releases(id) on delete cascade,
+		name text not null,
+		size integer not null,
+		uuid text not null unique,
+		download_count integer not null default 0,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table notifications (
+		id integer primary key,
+		user_id integer not null references users(id) on delete cascade,
+		issue_id integer references issues(id) on delete cascade,
+		repo_id integer not null references repos(id) on delete cascade,
+		reason text not null default '',
+		unread integer not null default 1,
+		pinned integer not null default 0,
+		updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		unique (user_id, issue_id)
+	);
+	create table subscriptions (
+		user_id integer not null references users(id) on delete cascade,
+		issue_id integer not null references issues(id) on delete cascade,
+		subscribed integer not null default 1,
+		primary key (user_id, issue_id)
+	);
+	create table stars (
+		user_id integer not null references users(id) on delete cascade,
+		repo_id integer not null references repos(id) on delete cascade,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+		primary key (user_id, repo_id)
+	);
+	create table watches (
+		user_id integer not null references users(id) on delete cascade,
+		repo_id integer not null references repos(id) on delete cascade,
+		primary key (user_id, repo_id)
+	);
+	create table protected_branches (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		pattern text not null,
+		required_approvals integer not null default 0,
+		required_checks text not null default '[]',
+		block_on_rejected integer not null default 1,
+		dismiss_stale integer not null default 0,
+		push text not null default 'none' check (push in ('none', 'admins', 'all')),
+		force_push integer not null default 0,
+		unique (repo_id, pattern)
+	);
+	create table hooks (
+		id integer primary key,
+		repo_id integer not null references repos(id) on delete cascade,
+		url text not null,
+		secret text not null default '',
+		events text not null default '["push"]',
+		active integer not null default 1,
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);
+	create table hook_deliveries (
+		id integer primary key,
+		hook_id integer not null references hooks(id) on delete cascade,
+		event text not null,
+		status integer,
+		response text not null default '',
+		created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	);`
 ];
 
 export function openDb(path: string) {

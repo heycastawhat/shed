@@ -1,13 +1,12 @@
 import { fail, isHttpError } from '@sveltejs/kit';
-import { FORGEJO_URL } from '$app/env/private';
 import { parseDiff } from '#lib/diff.js';
 import { unsign } from '#lib/sign.js';
 import { fixWithAgent } from '#lib/server/fix.js';
 import { mention } from '#lib/server/mention.js';
 import { issueActions, triageOptions } from '#lib/server/issue.js';
-import { api, isResolved, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
+import { api, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
 
-export async function load({ locals, params, parent }) {
+export async function load({ locals, params, parent, url }) {
 	const repo = `${params.owner}/${params.repo}`;
 	const [{ pull, repo: r, user }, comments, reviews] = await Promise.all([
 		parent(),
@@ -53,7 +52,7 @@ export async function load({ locals, params, parent }) {
 						thread: `${c.path}\0${line}`,
 						closed: !!c.resolver || outdated,
 						root: false,
-						resolved: false,
+						resolved: !!c.resolver,
 						path: c.path,
 						line: c.position || c.original_position,
 						outdated,
@@ -71,13 +70,8 @@ export async function load({ locals, params, parent }) {
 	const threads = new Map<string, { root: number; closed: boolean; resolved: boolean }>();
 	for (const c of timeline.flatMap((t) => t.inline)) {
 		const t = threads.get(c.thread);
-		threads.set(c.thread, { root: Math.min(t?.root ?? c.id, c.id), closed: !!t?.closed || c.closed, resolved: false });
+		threads.set(c.thread, { root: Math.min(t?.root ?? c.id, c.id), closed: !!t?.closed || c.closed, resolved: !!t?.resolved || c.resolved });
 	}
-	await Promise.all(
-		[...threads.values()].map(async (t) => {
-			t.resolved = await isResolved(locals.token, repo, t.root);
-		})
-	);
 	for (const c of timeline.flatMap((t) => t.inline)) {
 		const t = threads.get(c.thread)!;
 		c.root = t.root === c.id;
@@ -97,7 +91,7 @@ export async function load({ locals, params, parent }) {
 				name: s.context.replace(/^\/ /, ''),
 				state: s.status,
 				description: s.description,
-				url: s.target_url && new URL(s.target_url, FORGEJO_URL).href,
+				url: s.target_url && new URL(s.target_url, url.origin).href,
 				run: s.target_url?.match(/\/actions\/runs\/(\d+)\//)?.[1]
 			})).sort((a, b) => a.name.localeCompare(b.name))
 		},

@@ -12,9 +12,6 @@ const required = (name: string) => (v: string | undefined) => {
 };
 
 export const variables = defineEnvVars({
-	FORGEJO_URL: { description: 'Base URL of the Forgejo instance, without trailing slash', schema: url('FORGEJO_URL') },
-	FORGEJO_CLIENT_ID: { description: 'OAuth2 client ID registered in Forgejo', schema: required('FORGEJO_CLIENT_ID') },
-	FORGEJO_CLIENT_SECRET: { description: 'OAuth2 client secret registered in Forgejo', schema: required('FORGEJO_CLIENT_SECRET') },
 	FORGE_SECRET: {
 		description: 'Random secret that encrypts stored agent credentials (e.g. `openssl rand -base64 32`)',
 		schema: (v) => {
@@ -26,7 +23,6 @@ export const variables = defineEnvVars({
 	SHED_OIDC_CLIENT_ID: { description: 'OIDC client ID; the redirect URI is <shed URL>/auth/callback', schema: required('SHED_OIDC_CLIENT_ID') },
 	SHED_OIDC_CLIENT_SECRET: { description: 'OIDC client secret', schema: required('SHED_OIDC_CLIENT_SECRET') },
 	SHED_ALLOWED_USERS: { description: 'Who may sign in: comma-separated email:…, user:… (provider username) or sub:…', schema: (v) => parseAllowlist(v).join(',') },
-	FORGEJO_TOKEN: { description: 'Temporary: a Forgejo access token the pages not yet moved to Shed use for whoever is signed in', schema: (v) => v || undefined },
 	SHED_DATA: { description: 'Directory for shed.db and the git repos', schema: (v) => v || 'data' },
 	FORGE_DATA: { description: 'Directory for forge.json (agent keys and activity)', schema: (v) => v || 'data' },
 	T3_URL: { description: 'Optional T3 Code server every user gets, e.g. http://localhost:3773. More hosts are added in Settings → Agents', schema: (v) => (v ? url('T3_URL')(v) : undefined) },

@@ -7,7 +7,8 @@ export type Person = { name: string; email: string };
 
 // Makes a commit without a checkout: a throwaway index starts from the parent's tree, takes the changes (null deletes), and the
 // branch moves only if it still points at the parent (compare-and-swap), so a concurrent push is never overwritten.
-export async function commitFiles(dir: string, o: { branch: string; parent: string | null; changes: Change[]; message: string; author: Person; committer?: Person }) {
+// `newBranch` makes `branch` fresh off `parent` (it must not exist yet).
+export async function commitFiles(dir: string, o: { branch: string; parent: string | null; changes: Change[]; message: string; author: Person; committer?: Person; newBranch?: boolean }) {
 	const index = `${tmpdir()}/shed-index-${crypto.randomUUID()}`;
 	const who = o.committer ?? o.author;
 	const env = {
@@ -29,7 +30,7 @@ export async function commitFiles(dir: string, o: { branch: string; parent: stri
 		await git(dir, ['update-index', '-z', '--index-info'], info, env);
 		const tree = (await git(dir, ['write-tree'], undefined, env)).trim();
 		const commit = (await git(dir, ['commit-tree', tree, ...(o.parent ? ['-p', o.parent] : []), '-F', '-'], o.message, env)).trim();
-		await git(dir, ['update-ref', `refs/heads/${o.branch}`, commit, o.parent ?? '0'.repeat(40)]);
+		await git(dir, ['update-ref', `refs/heads/${o.branch}`, commit, o.newBranch ? '0'.repeat(40) : (o.parent ?? '0'.repeat(40))]);
 		return commit;
 	} finally {
 		await rm(index, { force: true });
