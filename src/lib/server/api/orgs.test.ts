@@ -2,10 +2,10 @@ import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { Database } from 'bun:sqlite';
-import { getUser, signIn, type TokenAuth } from '../accounts.js';
+import { createToken, getUser, signIn, type TokenAuth } from '../accounts.js';
 import { sniff } from '../avatars.js';
 import { openDb } from '../db.js';
-import { createRepo } from '../repos.js';
+import { createRepo, onRepoMoved } from '../repos.js';
 import { dispatch } from './router.js';
 import './repos.js';
 
@@ -71,6 +71,20 @@ test('transfer: admin on the repo, owner of the destination, no name clash', asy
 	await call(bob, 'PUT', '/orgs/kiwi/members/ana', { role: 'owner' });
 	expect((await call(ana, 'POST', '/repos/ana/app/transfer', { new_owner: 'kiwi' })).status).toBe(409);
 	expect((await call(ana, 'POST', '/repos/kiwi/app/transfer', { new_owner: 'kiwi' })).status).toBe(422);
+});
+
+test('renames and transfers carry token repo lists and tell listeners', async () => {
+	await createRepo(db, root, ana, { name: 'tool' });
+	const moves: string[] = [];
+	onRepoMoved((from, to) => void moves.push(`${from} -> ${to}`));
+	createToken(db, ana, { name: 'one', scopes: ['repo:read'], repos: ['Ana/Tool', 'ana/other'] });
+	createToken(db, ana, { name: 'all', scopes: ['repo:read'] });
+	const lists = () => db.query<{ repos: string }, []>('select repos from tokens order by id').all().map((t) => JSON.parse(t.repos));
+	expect((await call(ana, 'PATCH', '/repos/ana/tool', { name: 'tools' })).status).toBe(200);
+	expect((await call(ana, 'POST', '/repos/ana/tools/transfer', { new_owner: 'kiwi' })).status).toBe(202);
+	expect(moves).toEqual(['ana/tool -> ana/tools', 'ana/tools -> kiwi/tools']);
+	expect(lists()).toEqual([['kiwi/tools', 'ana/other'], ['*']]);
+	await call(ana, 'DELETE', '/repos/kiwi/tools');
 });
 
 test('an org with repos cannot be deleted', async () => {

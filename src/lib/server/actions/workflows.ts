@@ -128,12 +128,50 @@ export function expandMatrix(matrix: unknown): Record<string, unknown>[] {
 	return combos.length ? combos : [{}];
 }
 
-// ${{ matrix.x }} in a job's name or runs-on, the only expressions the server resolves; the runner evaluates the rest.
-const subMatrix = (s: string, combo: Record<string, unknown>) => s.replace(/\$\{\{\s*matrix\.([\w-]+)\s*\}\}/g, (_, k) => String(combo[k] ?? ''));
+// The only expressions the server resolves, in a job's name and runs-on: `matrix.x`, `vars.X`, `inputs.x` (or `github.event.inputs.x`),
+// a quoted string and `fromJSON(…)` of either. The runner evaluates everything else.
+export type Context = { matrix?: Record<string, unknown>; vars?: Record<string, string>; inputs?: Record<string, unknown> };
+function evaluate(expr: string, ctx: Context): unknown {
+	const e = expr.trim();
+	const ref = e.match(/^(?:(matrix|vars)|(?:github\.event\.)?(inputs))\.([\w-]+)$/);
+	if (ref) return ctx[(ref[1] ?? ref[2]) as keyof Context]?.[ref[3]] ?? '';
+	const quoted = e.match(/^'((?:[^']|'')*)'$/);
+	if (quoted) return quoted[1].replaceAll("''", "'");
+	const json = e.match(/^fromJSON\((.+)\)$/i);
+	if (json) {
+		try {
+			return JSON.parse(String(evaluate(json[1], ctx)));
+		} catch {
+			return undefined;
+		}
+	}
+	return undefined;
+}
+const sub = (s: string, ctx: Context) => s.replace(/\$\{\{(.+?)\}\}/g, (all, e) => String(evaluate(e, ctx) ?? all));
+
+// runs-on as a label, a list of them, `{ labels }`, or one expression that gives either.
+export function runsOn(v: unknown, ctx: Context): string[] {
+	if (Array.isArray(v)) return v.flatMap((l) => runsOn(l, ctx));
+	if (v && typeof v === 'object') return runsOn((v as { labels?: unknown }).labels ?? '', ctx);
+	const whole = typeof v === 'string' && v.trim().match(/^\$\{\{(.+)\}\}$/s);
+	if (whole && !whole[1].includes('}}')) {
+		const r = evaluate(whole[1], ctx);
+		if (Array.isArray(r)) return r.map(String);
+		if (r !== undefined) return [String(r)];
+	}
+	return [sub(String(v ?? ''), ctx)];
+}
 
 export type PlannedJob = { key: string; name: string; needs: string[]; runsOn: string[]; payload: string; always: boolean };
 
-export function planJobs(w: Workflow): PlannedJob[] {
+// A dispatch's inputs over the workflow's defaults.
+export function inputsOf(w: Workflow, given: unknown): Record<string, unknown> {
+	const declared = (w.on as { workflow_dispatch?: { inputs?: Record<string, { default?: unknown }> } } | undefined)?.workflow_dispatch?.inputs;
+	const defaults = declared && typeof declared === 'object' ? Object.fromEntries(Object.entries(declared).map(([k, d]) => [k, d?.default ?? ''])) : {};
+	return { ...defaults, ...(given && typeof given === 'object' ? given : {}) };
+}
+
+export function planJobs(w: Workflow, ctx: Omit<Context, 'matrix'> = {}): PlannedJob[] {
 	const top = Object.fromEntries(Object.entries(w).filter(([k]) => k !== 'jobs' && k !== 'true'));
 	const out: PlannedJob[] = [];
 	for (const [key, job] of Object.entries(w.jobs ?? {})) {
@@ -142,15 +180,14 @@ export function planJobs(w: Workflow): PlannedJob[] {
 		for (const combo of combos) {
 			const keys = Object.keys(combo);
 			const baseName = job.name ?? key;
-			const name = keys.length && !/\$\{\{\s*matrix\./.test(baseName) ? `${baseName} (${keys.map((k) => (typeof combo[k] === 'object' ? JSON.stringify(combo[k]) : String(combo[k]))).join(', ')})` : subMatrix(baseName, combo);
+			const name = keys.length && !/\$\{\{\s*matrix\./.test(baseName) ? `${baseName} (${keys.map((k) => (typeof combo[k] === 'object' ? JSON.stringify(combo[k]) : String(combo[k]))).join(', ')})` : sub(baseName, { ...ctx, matrix: combo });
 			const single: Job = { ...job };
 			if (keys.length) single.strategy = { ...job.strategy, matrix: Object.fromEntries(keys.map((k) => [k, [combo[k]]])) };
-			const runsOn = (Array.isArray(job['runs-on']) ? job['runs-on'] : [job['runs-on'] ?? '']).map((l) => subMatrix(String(l), combo));
-			out.push({
+						out.push({
 				key,
 				name,
 				needs: (Array.isArray(job.needs) ? job.needs : job.needs ? [job.needs] : []).map(String),
-				runsOn,
+				runsOn: runsOn(job['runs-on'], { ...ctx, matrix: combo }),
 				payload: YAML.stringify({ ...top, jobs: { [key]: single } }),
 				always: /\b(always|failure|cancelled)\s*\(/.test(String(job.if ?? ''))
 			});

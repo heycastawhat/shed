@@ -4,7 +4,7 @@ import YAML from 'yaml';
 import { git } from '../git.js';
 import { onPush } from '../push.js';
 import { repoDir, type RepoRow } from '../repos.js';
-import { fires, parseWorkflow, planJobs, workflowFiles, type Trigger } from './workflows.js';
+import { fires, inputsOf, parseWorkflow, planJobs, workflowFiles, type Trigger } from './workflows.js';
 
 export type RunRow = {
 	id: number;
@@ -88,6 +88,7 @@ export async function trigger(
 	const files = await workflowFiles(dir, t.sha);
 	const changed = t.event === 'push' || t.event.startsWith('pull_request') ? (t.files ?? (await changedFiles(dir, t.before ?? null, t.sha))) : undefined;
 	const made: number[] = [];
+	const vars = Object.fromEntries(db.query<{ name: string; value: string }, [number]>('select name, value from action_vars where repo_id = ?').all(repoId).map((v) => [v.name, v.value]));
 	for (const f of files) {
 		if (t.only && f.path !== t.only && !f.path.endsWith(`/${t.only}`)) continue;
 		let w;
@@ -98,7 +99,7 @@ export async function trigger(
 			continue;
 		}
 		if (!fires(w.on, { ...t, files: changed })) continue;
-		const jobs = planJobs(w);
+		const jobs = planJobs(w, { vars, inputs: inputsOf(w, t.payload.inputs) });
 		if (!jobs.length) continue;
 		const id = db.transaction(() => {
 			const number = db.query<{ n: number }, [number]>('update repos set next_run = next_run + 1 where id = ? returning next_run - 1 as n').get(repoId)!.n;

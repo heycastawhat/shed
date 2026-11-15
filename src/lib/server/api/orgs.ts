@@ -112,7 +112,7 @@ route('POST', '/repos/:owner/:repo/transfer', async (c) => {
 	const to = userByLogin(c.db, name) ?? error(404, `No user or organization called ${name}`);
 	const allowed = u.admin || to.id === u.id || (to.kind === 'org' && ownsOrg(c.db, to.id, u));
 	if (!allowed) error(403, to.kind === 'org' ? `You need to be an owner of ${to.login}` : 'You can only transfer to yourself or an organization you own');
-	transferRepo(c.db, row, to);
+	await transferRepo(c.db, row, to);
 	const moved = getRepo(c.db, to.login, row.name)!;
 	return new Response(JSON.stringify(await repoJson(c, moved)), { status: 202, headers: { 'content-type': 'application/json' } });
 });

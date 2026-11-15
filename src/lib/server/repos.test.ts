@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import type { Database } from 'bun:sqlite';
 import { openDb } from './db.js';
 import { git } from './git.js';
-import { createRepo, deleteRepo, getRepo, listRepos, repoDir } from './repos.js';
+import { createRepo, deleteRepo, getRepo, listRepos, renameIn, repoDir } from './repos.js';
 
 let root: string, db: Database, ada: number;
 beforeEach(async () => {
@@ -64,4 +64,8 @@ test('commitFiles writes without a checkout and refuses a stale parent', async (
 	await expect(commitFiles(dir, { branch: 'main', parent: first, changes: [{ path: 'c', content: 'c' }], message: 'Stale', author: me })).rejects.toThrow();
 	await expect(commitFiles(dir, { branch: 'main', parent: second, changes: [{ path: '../x', content: 'c' }], message: 'Bad', author: me })).rejects.toThrow(/Invalid path/);
 	expect((await git(dir, ['rev-parse', 'main'])).trim()).toBe(second);
+});
+
+test('renameIn swaps owner/name ignoring case and keeps the rest', () => {
+	expect(renameIn(['*', 'Ada/App', 'ada/other'], 'ada/app', 'kiwi/app')).toEqual(['*', 'kiwi/app', 'ada/other']);
 });

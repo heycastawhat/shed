@@ -60,6 +60,23 @@ export async function createRepo(db: Database, root: string, ownerId: number, in
 	return id;
 }
 
+type Moved = (from: string, to: string) => void | Promise<void>;
+const moved: Moved[] = [];
+// forge.json (agent keys, pins) subscribes here; its store can't be imported where this runs under bun test.
+export const onRepoMoved = (fn: Moved) => moved.push(fn);
+
+const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+export const renameIn = (list: string[], from: string, to: string) => list.map((r) => (same(r, from) ? to : r));
+
+// After a rename or transfer: anything that names the repo by owner/name follows it.
+export async function repoMoved(db: Database, from: string, to: string) {
+	for (const t of db.query<{ id: number; repos: string }, []>('select id, repos from tokens').all()) {
+		const list: string[] = JSON.parse(t.repos);
+		if (list.some((r) => same(r, from))) db.query('update tokens set repos = ? where id = ?').run(JSON.stringify(renameIn(list, from, to)), t.id);
+	}
+	for (const fn of moved) await Promise.resolve(fn(from, to)).catch((e) => console.error('repo moved listener', e));
+}
+
 // The git data goes to trash/ rather than being deleted, so a mistaken delete can be undone by hand.
 export async function deleteRepo(db: Database, root: string, id: number) {
 	await mkdir(`${root}/trash`, { recursive: true });
