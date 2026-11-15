@@ -24,7 +24,11 @@
 		</div>
 		<ListFilters labels={data.labels} milestones={data.milestones} label={data.label} milestone={data.milestone} assignee={data.assignee} me={data.user?.login} />
 	</div>
-	<a class="button primary" href="/{data.repo.full_name}/issues/new"><Icon name="plus" size={14} />New issue</a>
+	<div class="right">
+		<a class="button" href="/{data.repo.full_name}/labels"><Icon name="tag" size={14} />Labels</a>
+		<a class="button" href="/{data.repo.full_name}/milestones"><Icon name="milestone" size={14} />Milestones</a>
+		<a class="button primary" href="/{data.repo.full_name}/issues/new"><Icon name="plus" size={14} />New issue</a>
+	</div>
 </div>
 
 <ul class="issues">
@@ -63,6 +67,17 @@
 		align-items: center;
 		justify-content: space-between;
 		margin-bottom: 0.75rem;
+	}
+	.right {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.right .button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--fg);
 	}
 	.left {
 		display: flex;

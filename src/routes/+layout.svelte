@@ -45,7 +45,9 @@
 		{ href: '/', label: 'Home', icon: 'home', chord: 'G H', on: path === '/' },
 		{ href: '/changes', label: 'Changes', icon: 'changes', chord: 'G C', on: path.startsWith('/changes') },
 		{ href: '/repos', label: 'Repos', icon: 'repos', chord: 'G R', add: '/new', on: !inPinned && !NOT_REPOS.has(path.split('/')[1]) || path === '/repos' || path === '/new' },
-		{ href: '/agents', label: 'Agents', icon: 'agents', chord: 'G A', badge: data.waiting, on: path === '/agents' || path.startsWith('/settings/agents') }
+		{ href: '/agents', label: 'Agents', icon: 'agents', chord: 'G A', badge: data.waiting, on: path === '/agents' || path.startsWith('/settings/agents') },
+		{ href: '/notifications', label: 'Notifications', icon: 'bell', chord: 'G N', badge: data.unread, on: path.startsWith('/notifications') },
+		{ href: '/explore', label: 'Explore', icon: 'explore', chord: 'G E', on: path.startsWith('/explore') || path.startsWith('/search') }
 	]);
 
 	// Close menus whenever we navigate.
@@ -56,7 +58,7 @@
 		if (pinMenu) pinMenu.open = false;
 	});
 
-	const CHORDS: Record<string, string> = { h: '/', c: '/changes', r: '/repos', a: '/agents' };
+	const CHORDS: Record<string, string> = { h: '/', c: '/changes', r: '/repos', a: '/agents', n: '/notifications', e: '/explore' };
 	let chord = false;
 	let chordTimer: ReturnType<typeof setTimeout>;
 

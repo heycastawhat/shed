@@ -63,6 +63,9 @@ route('GET', '/notifications', (c) => {
 	return new Paged(rows.slice(p.offset, p.offset + p.limit).map((n) => json(c, n)), rows.length);
 });
 route('GET', '/notifications/new', (c) => ({ new: c.db.query<{ n: number }, [number]>('select count(*) as n from notifications where user_id = ? and unread = 1').get(me(c).id)!.n }));
+route('GET', '/notifications/threads/:id', (c) =>
+	json(c, c.db.query<Row, [number, number]>('select * from notifications where id = ? and user_id = ?').get(Number(c.params.id), me(c).id) ?? error(404, 'Notification not found'))
+);
 route('PATCH', '/notifications/threads/:id', (c) => {
 	const u = me(c);
 	const to = c.url.searchParams.get('to-status') ?? 'read';

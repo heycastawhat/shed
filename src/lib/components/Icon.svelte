@@ -66,6 +66,12 @@
 	import IFork from '@mingcute/svelte/core-regular/fork';
 	import IGroup from '@mingcute/svelte/core-regular/group';
 	import IMenu from '@mingcute/svelte/core-regular/menu';
+	import IEmoji from '@mingcute/svelte/core-regular/emoji';
+	import IQuoteLeft from '@mingcute/svelte/core-regular/quote-left';
+	import IMore1 from '@mingcute/svelte/core-regular/more-1';
+	import IUnlock from '@mingcute/svelte/core-regular/unlock';
+	import INotificationOff from '@mingcute/svelte/core-regular/notification-off';
+	import IMailOpen from '@mingcute/svelte/core-regular/mail-open';
 
 	const ICONS = {
 		home: IHome4,
@@ -135,7 +141,13 @@
 		projects: ILayoutGrid,
 		packages: IPackage2,
 		globe: IGlobe,
-		edit: IEdit2
+		edit: IEdit2,
+		emoji: IEmoji,
+		quote: IQuoteLeft,
+		more: IMore1,
+		unlock: IUnlock,
+		'bell-off': INotificationOff,
+		read: IMailOpen
 	};
 </script>
 

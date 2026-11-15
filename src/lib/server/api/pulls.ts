@@ -382,6 +382,18 @@ for (const [m, remove] of [
 		return remove ? undefined : [];
 	});
 
+// Everyone who can be asked to review: the owner, collaborators and org members who can read the repo.
+route('GET', '/repos/:owner/:repo/reviewers', (c) => {
+	const r = repoOf(c);
+	return c.db
+		.query<UserRow, [number, number, number]>(
+			`select * from users where kind = 'user' and (id = ? or id in (select user_id from collaborators where repo_id = ?) or id in (select user_id from org_members where org_id = ?)) order by login`
+		)
+		.all(r.row.owner_id, r.row.id, r.row.owner_id)
+		.filter((u) => atLeast(access(c.db, u.id, r.row), 'read'))
+		.map((u) => userJson(c.db, u.id)!);
+});
+
 // --- merging ---
 
 // What stands between this PR and a merge, by branch protection: approvals, rejections and required checks.
@@ -431,6 +443,7 @@ export async function doMerge(c: Ctx, r: RepoCtx, p: PullRow, o: { style: MergeS
 	const u = me(c);
 	if (p.merged_at) error(405, 'This pull request is already merged');
 	if (p.state !== 'open') error(405, 'This pull request is closed');
+	if (p.draft) error(405, 'This pull request is a draft; mark it ready for review first');
 	if (!atLeast(r.level, 'write')) error(403, 'Merging needs write access');
 	const styles: string[] = JSON.parse(c.db.query<{ merge_styles: string }, [number]>('select merge_styles from repos where id = ?').get(r.row.id)!.merge_styles);
 	if (!styles.includes(o.style)) error(405, `This repo doesn't allow ${o.style} merges`);

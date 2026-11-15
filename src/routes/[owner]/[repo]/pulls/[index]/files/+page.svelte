@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
 	import DiffView from '#lib/components/DiffView.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 	import type { Draft } from '#lib/diff.js';
 
 	let { data, form } = $props();
@@ -27,6 +28,22 @@
 </script>
 
 {#if form && 'posted' in form}<p class="error">{form.error}</p>{/if}
+{#if data.since}
+	<div class="since">
+		<Icon name="history" size={15} />
+		<span>Showing changes since <a href="/{data.repo.full_name}/commit/{data.since}"><code>{data.since.slice(0, 7)}</code></a>, the head you last reviewed. Comments are off in this view.</span>
+		<a href="?">Show all changes</a>
+	</div>
+{:else if data.lastReview}
+	<div class="since">
+		<Icon name="history" size={15} />
+		<span>New changes since your last review{data.lastReview.pushes ? ` (${data.lastReview.pushes} push${data.lastReview.pushes === 1 ? '' : 'es'})` : ''}.</span>
+		<a href="?since={data.lastReview.sha}">Show changes since your last review</a>
+	</div>
+{/if}
+{#if data.since}
+	<DiffView files={data.files} />
+{:else}
 <DiffView
 	files={data.files}
 	comments={data.comments}
@@ -39,6 +56,7 @@
 	viewedKey="viewed:{data.repo.full_name}#{data.pull.number}"
 	source="/{data.repo.full_name}/lines/{data.pull.head.sha}"
 />
+{/if}
 
 {#if pending.length}
 	<form
@@ -72,6 +90,25 @@
 {/if}
 
 <style>
+	.since {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+		padding: 0.6rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		font-size: 0.9rem;
+	}
+	.since > a:last-child {
+		margin-left: auto;
+	}
+	.since code {
+		font-family: var(--mono);
+		font-size: 0.85em;
+	}
 	.review {
 		position: sticky;
 		bottom: 1rem;

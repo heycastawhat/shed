@@ -22,6 +22,7 @@
 		<a href={q({ state: 'closed' })} class:on={data.state === 'closed'}><Icon name="check" size={14} />Closed</a>
 	</div>
 	<ListFilters labels={data.labels} milestones={data.milestones} label={data.label} milestone={data.milestone} assignee={data.assignee} me={data.user?.login} />
+	{#if data.user}<a class="button primary new" href="/{data.repo.full_name}/compare"><Icon name="plus" size={14} />New pull request</a>{/if}
 </div>
 
 <ul class="pulls">
@@ -59,6 +60,19 @@
 		align-items: center;
 		gap: 0.5rem;
 		margin-bottom: 0.75rem;
+	}
+	.new {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		margin-left: auto;
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--bg);
+		font-weight: 600;
+	}
+	.new:hover {
+		filter: brightness(1.1);
 	}
 	.filters {
 		display: inline-flex;

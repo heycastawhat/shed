@@ -14,14 +14,16 @@
 	<a href="?" class:on={data.tab === 'releases'}><Icon name="release" size={14} />Releases<span class="n">{data.releases.length}</span></a>
 	<a href="?tags" class:on={data.tab === 'tags'}><Icon name="tag" size={14} />Tags<span class="n">{data.tags.length}</span></a>
 </div>
+{#if data.repo.permissions.push}<a class="button primary new" href="{base}/releases/new"><Icon name="plus" size={14} />New release</a>{/if}
 
 {#if data.tab === 'releases'}
 	{#each data.releases as r (r.id)}
-		<article class="release">
+		<article class="release" id="release-{r.tag_name}">
 			<header>
 				<h2>{r.name || r.tag_name}</h2>
 				{#if r.draft}<span class="pill">Draft</span>{:else if r.prerelease}<span class="pill warn">Pre-release</span>{/if}
 				{#if r === data.releases.find((x) => !x.draft && !x.prerelease)}<span class="pill latest">Latest</span>{/if}
+				{#if data.repo.permissions.push}<a class="edit" href="{base}/releases/edit/{r.id}"><Icon name="pencil" size={13} />Edit</a>{/if}
 			</header>
 			<p class="meta">
 				<a href="{base}/tree/{refPath(r.tag_name)}"><Icon name="tag" size={13} />{r.tag_name}</a> · {r.author.login} · <span title={r.published_at}>{ago(r.published_at)}</span>
@@ -91,7 +93,33 @@
 		font-size: 0.75rem;
 		color: var(--muted);
 	}
+	.new {
+		float: right;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--bg);
+		font-weight: 600;
+	}
+	.new:hover {
+		color: var(--bg) !important;
+		filter: brightness(1.1);
+	}
+	.edit {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		margin-left: auto;
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+	.release:target {
+		border-color: var(--accent);
+	}
 	.release {
+		scroll-margin-top: 4rem;
 		padding: 1rem 1.2rem;
 		border: 1px solid var(--border);
 		border-radius: 8px;

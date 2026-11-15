@@ -1,4 +1,4 @@
-import { fail, isHttpError } from '@sveltejs/kit';
+import { error, fail, isHttpError } from '@sveltejs/kit';
 import type { Draft } from '#lib/diff.js';
 import { loadDiff } from '#lib/server/diff.js';
 import { fixWithAgent } from '#lib/server/fix.js';
@@ -8,10 +8,24 @@ import { api, renderMarkdown, request, setResolved, type Review, type ReviewComm
 
 export type LineComment = { id: number; review: number; user: { login: string; avatar_url: string }; date: string; html: string; agent?: string };
 
-export async function load({ locals, params }) {
+type Revision = { head_sha: string; forced: boolean };
+
+export async function load({ locals, params, parent, url }) {
 	const repo = `${params.owner}/${params.repo}`;
 	const pr = `/repos/${repo}/pulls/${params.index}`;
-	const [files, reviews] = await Promise.all([loadDiff(locals.token, `${pr}.diff`), api<Review[]>(locals.token, `${pr}/reviews`)]);
+	const { pull } = await parent();
+	const [reviews, revisions] = await Promise.all([api<(Review & { commit_id: string })[]>(locals.token, `${pr}/reviews`), api<Revision[]>(locals.token, `${pr}/revisions`)]);
+	// The head you last reviewed, if it has moved on since; "changes since" diffs that head against the current one.
+	const reviewed = reviews.findLast((r) => r.user.id === locals.user?.id && r.state !== 'PENDING' && r.commit_id)?.commit_id;
+	const at = revisions.findIndex((v) => v.head_sha === reviewed);
+	const lastReview = reviewed && reviewed !== pull.head.sha ? { sha: reviewed, pushes: at < 0 ? null : revisions.length - 1 - at } : null;
+	const since = url.searchParams.get('since');
+	if (since) {
+		if (!/^[0-9a-f]{7,40}$/.test(since)) error(400, 'Not a commit');
+		const files = await loadDiff(locals.token, `/repos/${repo}/compare/${since}..${pull.head.sha}.diff`).catch(() => error(404, `Commit ${since.slice(0, 7)} is gone, probably after a force-push`));
+		return { files, comments: {}, resolved: [], since, lastReview };
+	}
+	const files = await loadDiff(locals.token, `${pr}.diff`);
 	const all = (await Promise.all(reviews.map((r) => api<ReviewComment[]>(locals.token, `${pr}/reviews/${r.id}/comments`)))).flat();
 
 	// Keyed "path\0old:N" or "path\0new:N"; Forgejo puts new-side lines in `position`, old-side in `original_position`.
@@ -24,7 +38,7 @@ export async function load({ locals, params }) {
 		(comments[key] ??= []).push({ id: c.id, review: c.pull_request_review_id, user: c.user, date: c.created_at, html: await renderMarkdown(locals.token, body, repo), agent });
 	}
 	const resolved = Object.entries(comments).flatMap(([key, [root]]) => (resolvedKeys.has(key) ? [root.id] : []));
-	return { files, comments, resolved };
+	return { files, comments, resolved, since: null, lastReview };
 }
 
 // Posting a review is the only way to make a line comment; the line goes in new_position or old_position by side.

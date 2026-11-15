@@ -39,6 +39,9 @@
 			{ label: 'Changes', kind: 'Page', icon: 'changes', hint: 'G C', run: go('/changes') },
 			{ label: 'Repositories', kind: 'Page', icon: 'repos', hint: 'G R', run: go('/repos') },
 			{ label: 'Agents', kind: 'Page', icon: 'agents', hint: 'G A', run: go('/agents') },
+			{ label: d.unread ? `Notifications (${d.unread} unread)` : 'Notifications', kind: 'Page', icon: 'bell', hint: 'G N', run: go('/notifications') },
+			{ label: 'Explore', kind: 'Page', icon: 'explore', hint: 'G E', run: go('/explore') },
+			{ label: 'Search', kind: 'Page', icon: 'search', run: go('/search') },
 			{ label: 'Agent keys', kind: 'Page', icon: 'agents', run: go('/settings/agents') },
 			{ label: 'Settings', kind: 'Page', icon: 'sliders', run: go('/settings/account') },
 			{ label: 'New repository', kind: 'Action', icon: 'plus', run: go('/new') },
@@ -70,7 +73,9 @@
 			.filter((r) => r.score >= 0)
 			.sort((a, b) => a.score - b.score)
 			.map((r) => r.it)
-			.slice(0, 12);
+			.slice(0, 11)
+			// Always offer the full search for what was typed.
+			.concat({ label: `Search for “${query.trim()}”`, hint: 'Issues, PRs, code, repos', kind: 'Action', icon: 'search', run: go(`/search?q=${encodeURIComponent(query.trim())}`) });
 	});
 
 	$effect(() => {

@@ -116,8 +116,13 @@ export type Pull = {
 	labels: Label[];
 	assignees: User[] | null;
 	milestone: Milestone | null;
-	head: { ref: string; label: string; sha: string };
-	base: { ref: string };
+	head: { ref: string; label: string; sha: string; repo_id?: number };
+	base: { ref: string; sha?: string };
+	merge_base?: string | null;
+	requested_reviewers?: User[];
+	is_locked?: boolean;
+	pin_order?: number;
+	updated_at?: string;
 	created_at: string;
 	comments: number;
 	changed_files?: number;
@@ -153,6 +158,8 @@ export type Issue = {
 	created_at: string;
 	closed_at: string | null;
 	pull_request: unknown;
+	is_locked?: boolean;
+	pin_order?: number;
 };
 export type Comment = { id: number; body: string; user: User; created_at: string };
 export type ReviewComment = Comment & { path: string; position: number; original_position: number; diff_hunk: string; resolver: User | null; pull_request_review_id: number };

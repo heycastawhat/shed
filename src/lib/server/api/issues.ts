@@ -303,8 +303,10 @@ async function react(c: Ctx, where: 'issue_id' | 'comment_id', id: number, add: 
 	const content = (await c.body<{ content: string }>()).content;
 	if (!REACTIONS.has(content)) error(422, `Reaction must be one of ${[...REACTIONS].join(' ')}`);
 	const u = me(c);
-	if (add) c.db.query(`insert or ignore into reactions (${where}, user_id, content) values (?, ?, ?)`).run(id, u.id, content);
-	else c.db.query(`delete from reactions where ${where} = ? and user_id = ? and content = ?`).run(id, u.id, content);
+	// The unique index can't catch repeats: the unused id column is null, and nulls never collide.
+	const had = c.db.query(`select 1 from reactions where ${where} = ? and user_id = ? and content = ?`).get(id, u.id, content);
+	if (add && !had) c.db.query(`insert into reactions (${where}, user_id, content) values (?, ?, ?)`).run(id, u.id, content);
+	if (!add) c.db.query(`delete from reactions where ${where} = ? and user_id = ? and content = ?`).run(id, u.id, content);
 	return add ? { content, user: toUser(u), created_at: now() } : undefined;
 }
 route('GET', '/repos/:owner/:repo/issues/comments/:id/reactions', (c) => {

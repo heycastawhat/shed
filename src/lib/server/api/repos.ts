@@ -3,10 +3,10 @@ import { access, atLeast } from '../access.js';
 import { toUser, type UserRow } from '../accounts.js';
 import { heatmap, orgFeed, record, repoFeed, userFeed } from '../activity.js';
 import * as browse from '../browse.js';
-import { git } from '../git.js';
+import { git, gitTry } from '../git.js';
 import { render } from '../markdown.js';
 import { afterPush, refSnapshot } from '../push.js';
-import { createRepo, getRepo, type RepoRow } from '../repos.js';
+import { createRepo, getRepo, repoDir, type RepoRow } from '../repos.js';
 import { commitFiles, type Change } from '../write.js';
 import { bool, now, refSha, repoJson, repoOf, slice, userByLogin, userJson, userRow } from './common.js';
 import { labelJson, milestoneJson, type LabelRow, type MilestoneRow } from './shapes.js';
@@ -105,15 +105,18 @@ async function createFor(c: Ctx, ownerId: number) {
 	return repoJson(c, row);
 }
 route('PATCH', '/repos/:owner/:repo', async (c) => {
-	const { row } = repoOf(c, 'admin');
 	const b = await c.body<Record<string, unknown>>();
+	const { row } = repoOf(c, 'admin', b.archived === false);
 	const set: Record<string, unknown> = {};
 	if (typeof b.description === 'string') set.description = b.description;
 	if (typeof b.private === 'boolean') set.private = b.private ? 1 : 0;
 	if (typeof b.archived === 'boolean') set.archived = b.archived ? 1 : 0;
 	if (typeof b.has_issues === 'boolean') set.has_issues = b.has_issues ? 1 : 0;
 	if (typeof b.has_wiki === 'boolean') set.has_wiki = b.has_wiki ? 1 : 0;
-	if (typeof b.default_merge_style === 'string') set.default_merge_style = b.default_merge_style;
+	if (typeof b.default_merge_style === 'string') {
+		if (!['merge', 'rebase', 'rebase-merge', 'squash', 'fast-forward-only'].includes(b.default_merge_style)) error(422, `Unknown merge style ${b.default_merge_style}`);
+		set.default_merge_style = b.default_merge_style;
+	}
 	if (typeof b.default_delete_branch_after_merge === 'boolean') set.delete_branch_after_merge = b.default_delete_branch_after_merge ? 1 : 0;
 	if (typeof b.default_branch === 'string') {
 		const dir = repoOf(c).dir;
@@ -135,13 +138,14 @@ route('PATCH', '/repos/:owner/:repo', async (c) => {
 			const k = (Object.keys(flags) as (keyof typeof flags)[]).find((f) => flags[f] === s)!;
 			return typeof b[k] === 'boolean' ? b[k] : cur.includes(s);
 		});
+		if (!next.length) error(422, 'Allow at least one merge style');
 		set.merge_styles = JSON.stringify(next);
 	}
 	for (const [k, v] of Object.entries(set)) c.db.query(`update repos set ${k} = ? where id = ?`).run(v as string, row.id);
 	return repoJson(c, c.db.query<RepoRow, [number]>(`${ALL_REPOS} where r.id = ?`).get(row.id)!);
 });
 route('DELETE', '/repos/:owner/:repo', async (c) => {
-	const { row } = repoOf(c, 'admin');
+	const { row } = repoOf(c, 'admin', true);
 	const { deleteRepo } = await import('../repos.js');
 	await deleteRepo(c.db, c.root, row.id);
 });
@@ -270,12 +274,30 @@ route('GET', '/repos/:owner/:repo/commits/:ref/status', async (c) => {
 	const { combinedStatus } = await import('./statuses.js');
 	return combinedStatus(c, r.row.id, sha);
 });
+// `owner:branch` names a branch in a fork; its commits are fetched in so the diff works inside this repo.
+async function compareHead(c: Ctx, r: ReturnType<typeof repoOf>, spec: string) {
+	if (!spec.includes(':')) return refSha(r.dir, spec);
+	const [owner, branch] = spec.split(':');
+	if (owner === r.row.owner) return refSha(r.dir, `refs/heads/${branch}`);
+	const fork = c.db.query<RepoRow, [string, number]>(`${ALL_REPOS} where u.login = ? and r.fork_of = ?`).get(owner, r.row.id);
+	if (!fork || !atLeast(access(c.db, c.user?.id, fork), 'read')) error(404, `${owner} has no fork of ${r.full}`);
+	const tmp = `refs/shed/tmp/compare-${crypto.randomUUID()}`;
+	if ((await gitTry(r.dir, ['fetch', '--quiet', '--no-tags', repoDir(c.root, fork.id), `+refs/heads/${branch}:${tmp}`])) === null) return null;
+	const sha = await refSha(r.dir, tmp);
+	await git(r.dir, ['update-ref', '-d', tmp]);
+	return sha;
+}
+// `base...head` diffs from the merge base, `base..head` directly. A `.diff` suffix returns the diff as text.
 route('GET', '/repos/:owner/:repo/compare/*spec', async (c) => {
 	const r = repoOf(c);
-	const [from, to] = c.params.spec.split('...');
-	const [a, b] = await Promise.all([refSha(r.dir, from), refSha(r.dir, to ?? '')]);
+	const asText = c.params.spec.endsWith('.diff');
+	const spec = asText ? c.params.spec.slice(0, -5) : c.params.spec;
+	const three = spec.includes('...');
+	const [from, to = ''] = spec.split(three ? '...' : '..');
+	const [a, b] = await Promise.all([refSha(r.dir, from), compareHead(c, r, to)]);
 	if (!a || !b) error(404, 'Ref not found');
-	const base = (await browse.mergeBase(r.dir, a, b)) ?? a;
+	const base = three ? ((await browse.mergeBase(r.dir, a, b)) ?? a) : a;
+	if (asText) return new Response(await browse.diff(r.dir, base, b), { headers: { 'content-type': 'text/plain; charset=utf-8' } });
 	const list = (await git(r.dir, ['rev-list', '--reverse', '--max-count=250', `${base}..${b}`])).split('\n').filter(Boolean);
 	const commits = await Promise.all(list.map((s) => browse.commit(r.dir, s)));
 	const files = (await git(r.dir, ['diff', '--name-status', '--find-renames', base, b]))
@@ -285,7 +307,9 @@ route('GET', '/repos/:owner/:repo/compare/*spec', async (c) => {
 			const [st, ...paths] = l.split('\t');
 			return { filename: paths.at(-1)!, previous_filename: paths.length > 1 ? paths[0] : undefined, status: { A: 'added', D: 'deleted', M: 'changed', R: 'renamed' }[st[0]] ?? 'changed' };
 		});
-	return { total_commits: list.length, commits: commitsJson(c, r.full, commits), files, merge_base_commit: base };
+	const { mergeable } = await import('./pulls.js');
+	// `mergeable` and `head_sha` are Shed's own: whether the head merges into `from` cleanly, and the head it compared.
+	return { total_commits: list.length, commits: commitsJson(c, r.full, commits), files, merge_base_commit: base, head_sha: b, mergeable: await mergeable(r.dir, a, b) };
 });
 
 // --- files ---

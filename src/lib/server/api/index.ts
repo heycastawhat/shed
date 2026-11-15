@@ -7,4 +7,8 @@ import './protect.js';
 import './notify.js';
 import './releases.js';
 import './actions.js';
+import './hooks.js';
+import './code.js';
+import './keys.js';
+import './search.js';
 export { dispatch } from './router.js';

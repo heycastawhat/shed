@@ -26,13 +26,18 @@ check 'conflict detected' "$(a GET $R/pulls/$n2 | py "d['mergeable']")" False
 check 'conflict refused' "$(a POST $R/pulls/$n2/merge -d '{"Do":"merge"}' | py "d['message']")" conflicts
 
 # Auto-merge: a pending status, schedule, then success merges it.
-file am$T am-$T.txt "a\n"; n=$(pr am$T "Auto $T")
+file am$T am-$T.txt "a\n"
+# No workflows on this branch, so only the status set below decides.
+for w in $(a GET "$R/contents/.forgejo/workflows?ref=am$T" | py "' '.join(x['path'] for x in d)"); do a DELETE $R/contents/$w -d "{\"branch\":\"am$T\"}" >/dev/null; done
+n=$(pr am$T "Auto $T")
 sha=$(a GET $R/pulls/$n | py "d['head']['sha']")
 a POST $R/statuses/$sha -d '{"context":"ci / test","state":"pending"}' >/dev/null
 a POST $R/pulls/$n/merge -d '{"Do":"squash","merge_when_checks_succeed":true}' >/dev/null
 check 'scheduled' "$(a GET $R/pulls/$n | py "d['auto_merge']['style']")" squash
 check 'not yet merged' "$(a GET $R/pulls/$n | py "d['merged']")" False
-a POST $R/statuses/$sha -d '{"context":"ci / test","state":"success"}' >/dev/null; sleep 1
+a POST $R/statuses/$sha -d '{"context":"ci / test","state":"success"}' >/dev/null
+# The repo's own CI (if a runner is up) adds checks too; the merge waits for all of them.
+for i in $(seq 60); do [ "$(a GET $R/pulls/$n | py "d['merged']")" = True ] && break; sleep 2; done
 check 'merged on success' "$(a GET $R/pulls/$n | py "d['merged']")" True
 
 # Revisions: a push to the head adds one, and a comment on the old head shows as outdated in its hunk.
@@ -58,4 +63,9 @@ a POST $R/pulls/$n/reviews -d '{"event":"APPROVED"}' >/dev/null
 a POST $R/pulls/$n/merge -d '{"Do":"merge"}' >/dev/null
 check 'merged after approval' "$(a GET $R/pulls/$n | py "d['merged']")" True
 a DELETE $R/branch_protections/main >/dev/null
+# Close what's still open, which also cancels its CI.
+for t in "Conflict B $T" "Revisions $T"; do
+	m=$(a GET "$R/pulls?state=open&limit=100" | py "[p['number'] for p in d if p['title'] == '$t'][0]")
+	a PATCH $R/pulls/$m -d '{"state":"closed"}' >/dev/null
+done
 exit $fail

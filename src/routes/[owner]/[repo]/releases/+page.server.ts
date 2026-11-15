@@ -23,8 +23,7 @@ export async function load({ locals, params, parent, url }) {
 	const { dir } = repoFor(locals, params.owner, params.repo);
 	const archive = (ref: string, ext: string) => `/${repo.full_name}/archive/${encodeURIComponent(ref)}.${ext}`;
 	const [releases, tags] = await Promise.all([
-		// Bridge: releases still live in Forgejo; tags are read from the repo.
-		locals.token ? api<Release[]>(locals.token, `${base}/releases?limit=50`).catch(() => []) : [],
+		api<Release[]>(locals.token, `${base}/releases?limit=50`),
 		gitTags(dir).then((ts) => ts.map((t): Tag => ({ name: t.name, message: t.message, commit: { sha: t.sha, created: t.date }, zipball_url: archive(t.name, 'zip'), tarball_url: archive(t.name, 'tar.gz') })))
 	]);
 	return {

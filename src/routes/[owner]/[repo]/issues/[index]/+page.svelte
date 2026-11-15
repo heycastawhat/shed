@@ -4,7 +4,8 @@
 	import Byline from '#lib/components/Byline.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import IssueState from '#lib/components/IssueState.svelte';
-	import LabelChip from '#lib/components/LabelChip.svelte';
+	import ThreadItem from '#lib/components/ThreadItem.svelte';
+	import ThreadSide from '#lib/components/ThreadSide.svelte';
 	import Triage from '#lib/components/Triage.svelte';
 	import EditTitle from '#lib/components/EditTitle.svelte';
 	import Description from '#lib/components/Description.svelte';
@@ -13,11 +14,17 @@
 	let { data, form } = $props();
 	const i = $derived(data.issue);
 	const can = $derived(data.repo.permissions.push || i.user.id === data.user?.id);
-	const comments = $derived(data.timeline.filter((e) => e.type === 'comment').length);
+	const comments = $derived(data.thread.items.filter((e) => e.type === 'comment').length);
+	const locked = $derived(!!i.is_locked && !data.repo.permissions.push);
 	let busy = $state(false);
 	let draft = $state('');
 	const close = $derived(i.state === 'open');
 	let mentionInput = $state<HTMLTextAreaElement>();
+	function quote(text: string) {
+		draft = (draft.trim() ? `${draft.trimEnd()}\n\n` : '') + text;
+		mentionInput?.focus();
+		mentionInput?.scrollIntoView({ block: 'center' });
+	}
 </script>
 
 <div class="head">
@@ -33,35 +40,16 @@
 		<ol class="timeline">
 			<li>
 				<img class="avatar" src={i.user.avatar_url} alt="" />
-				<Description login={i.user.login} agent={data.description.agent} created={i.created_at} html={data.description.html} body={i.body} {can} />
+				<Description login={i.user.login} agent={data.description.agent} created={i.created_at} html={data.description.html} body={i.body} {can} reactions={data.thread.reactions} signedIn={!!data.user} onquote={quote} />
 			</li>
-			{#each data.timeline as e (e.id)}
-				{#if e.type === 'comment'}
-					<li>
-						<img class="avatar" src={e.user.avatar_url} alt="" />
-						<div class="card">
-							<div class="who"><Byline bold login={e.user.login} agent={e.agent} /> commented {ago(e.date)}</div>
-							<article class="markdown">{@html e.html}</article>
-						</div>
-					</li>
-				{:else}
-					<li class="event">
-						<span class="dot {e.type}"><Icon name={{ close: 'done', reopen: 'issue', label: 'tag', assignees: 'user', milestone: 'milestone' }[e.type] ?? 'pencil'} size={e.type === 'close' || e.type === 'reopen' ? 16 : 14} /></span>
-						<p>
-							<strong>{e.user.login}</strong>
-							{#if e.type === 'close'}closed this
-							{:else if e.type === 'reopen'}reopened this
-							{:else if e.type === 'label' && e.label}{e.added ? 'added' : 'removed'} <LabelChip label={e.label} />
-							{:else if e.type === 'assignees'}{#if e.assignee === e.user.login}{e.unassigned ? 'removed their assignment' : 'self-assigned this'}{:else}{e.unassigned ? 'unassigned' : 'assigned'} <strong>{e.assignee}</strong>{/if}
-							{:else if e.milestone}{#if e.milestone.to && e.milestone.from}moved this from <strong>{e.milestone.from}</strong> to <strong>{e.milestone.to}</strong>{:else if e.milestone.to}added this to <strong>{e.milestone.to}</strong>{:else}removed this from <strong>{e.milestone.from}</strong>{/if}
-							{:else if e.title}changed the title from <s>{e.title.from}</s> to <strong>{e.title.to}</strong>{/if}
-							{ago(e.date)}
-						</p>
-					</li>
-				{/if}
+			{#each data.thread.items as e (e.id)}
+				<ThreadItem item={e} repo={data.repo.full_name} me={data.user?.login} admin={data.repo.permissions.admin} onquote={quote} />
 			{/each}
 		</ol>
 
+		{#if locked}
+			<p class="locked muted"><Icon name="lock" size={14} />This conversation is locked; only people with write access can comment.</p>
+		{:else if data.user}
 		<form
 			class="compose"
 			method="POST"
@@ -98,9 +86,13 @@
 				<button class="primary" disabled={busy || !draft.trim()}>{busy ? 'Sending…' : 'Comment'}</button>
 			</div>
 		</form>
+		{/if}
 	</div>
 
-	<aside><Triage item={i} options={data.options} can={data.repo.permissions.push} list="/{data.repo.full_name}/issues" /></aside>
+	<aside>
+		<Triage item={i} options={data.options} can={data.repo.permissions.push} list="/{data.repo.full_name}/issues" />
+		<ThreadSide subscribed={data.thread.subscribed} locked={!!i.is_locked} pinned={!!i.pin_order} signedIn={!!data.user} can={data.repo.permissions.push} />
+	</aside>
 </div>
 
 <style>
@@ -158,67 +150,6 @@
 		background: var(--bg);
 		box-shadow: 0 0 0 4px var(--bg);
 	}
-	.event {
-		align-items: center !important;
-		font-size: 0.9rem;
-		color: var(--muted);
-	}
-	.event + .event {
-		margin-top: -0.6rem;
-	}
-	.event p {
-		margin: 0;
-	}
-	.event strong {
-		color: var(--fg);
-	}
-	.dot {
-		display: grid;
-		place-items: center;
-		justify-self: center;
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		color: var(--muted);
-		box-shadow: 0 0 0 4px var(--bg);
-	}
-	.dot.close,
-	.dot.reopen {
-		width: 32px;
-		height: 32px;
-		border: 0;
-		color: var(--bg);
-	}
-	.dot.close {
-		background: var(--del-fg);
-	}
-	.dot.reopen {
-		background: var(--accent);
-	}
-	.card {
-		min-width: 0;
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		overflow: hidden;
-	}
-	.who {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 1rem;
-		background: var(--surface);
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
-	.who :global(strong) {
-		color: var(--fg);
-	}
-	.markdown {
-		padding: 1rem;
-		margin: 0;
-	}
 	.compose {
 		margin-top: 1.5rem;
 		border: 1px solid var(--border);
@@ -259,12 +190,21 @@
 		margin-right: auto;
 		font-size: 0.8rem;
 	}
+	.locked {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 1.5rem;
+		padding: 0.75rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+	}
 	.error {
 		color: var(--del-fg);
 		font-size: 0.9rem;
 	}
 	@media (max-width: 700px) {
-		.who,
 		.compose-bar {
 			flex-wrap: wrap;
 			row-gap: 0.4rem;

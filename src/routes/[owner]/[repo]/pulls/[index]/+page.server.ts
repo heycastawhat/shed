@@ -3,24 +3,30 @@ import { parseDiff } from '#lib/diff.js';
 import { unsign } from '#lib/sign.js';
 import { fixWithAgent } from '#lib/server/fix.js';
 import { mention } from '#lib/server/mention.js';
-import { issueActions, triageOptions } from '#lib/server/issue.js';
-import { api, renderMarkdown, request, setResolved, type CombinedStatus, type Comment, type MergeStyle, type Repo, type Review, type ReviewComment } from '#lib/server/forgejo.js';
+import { issueActions, send, triageOptions } from '#lib/server/issue.js';
+import { loadThread, threadActions } from '#lib/server/thread.js';
+import { api, renderMarkdown, request, setResolved, type Branch, type CombinedStatus, type MergeStyle, type Repo, type Review, type ReviewComment, type User } from '#lib/server/forgejo.js';
 
 export async function load({ locals, params, parent, url }) {
 	const repo = `${params.owner}/${params.repo}`;
-	const [{ pull, repo: r, user }, comments, reviews] = await Promise.all([
+	const [{ pull, repo: r, user }, thread, reviews] = await Promise.all([
 		parent(),
-		api<Comment[]>(locals.token, `/repos/${repo}/issues/${params.index}/comments`),
+		loadThread(locals.token, repo, params.index, locals.user?.login),
 		api<Review[]>(locals.token, `/repos/${repo}/pulls/${params.index}/reviews`)
 	]);
-	const [status, diff, events, options] = await Promise.all([
+	const open = pull.state === 'open';
+	const [status, diff, options, branches, behind, reviewerOptions] = await Promise.all([
 		api<CombinedStatus>(locals.token, `/repos/${repo}/commits/${pull.head.sha}/status`),
 		request(locals.token, `/repos/${repo}/pulls/${params.index}.diff`).then((res) => res.text()),
-		api<{ type: string; user: { login: string } }[]>(locals.token, `/repos/${repo}/issues/${params.index}/timeline`),
-		triageOptions(locals.token, repo)
+		triageOptions(locals.token, repo),
+		open && r.permissions.push ? api<Branch[]>(locals.token, `/repos/${repo}/branches?limit=100`) : [],
+		// Commits on the base that the head doesn't have yet.
+		open
+			? api<{ total_commits: number }>(locals.token, `/repos/${repo}/compare/${pull.head.sha}...${encodeURIComponent(pull.base.ref)}`).then((c) => c.total_commits, () => 0)
+			: 0,
+		api<User[]>(locals.token, `/repos/${repo}/reviewers`)
 	]);
-	// The API has no auto-merge field; the latest schedule/cancel event in the timeline is the only record of it.
-	const schedule = events.findLast((e) => e.type === 'pull_scheduled_merge' || e.type === 'pull_cancel_scheduled_merge');
+	const schedule = thread.items.findLast((e) => e.type === 'pull_scheduled_merge' || e.type === 'pull_cancel_scheduled_merge');
 	// Forgejo doesn't flag outdated comments in the API, so a comment counts as current only if its line is still in the diff with the same text.
 	const current = new Map<string, string>();
 	for (const f of parseDiff(diff))
@@ -34,10 +40,10 @@ export async function load({ locals, params, parent, url }) {
 		const { body, agent } = unsign(text);
 		return { html: body.trim() ? await renderMarkdown(locals.token, body, repo) : '', agent };
 	};
-	const timeline = await Promise.all([
-		...comments.map(async (c) => ({ id: `c${c.id}`, user: c.user, date: c.created_at, ...(await md(c.body)), state: null, inline: [] })),
-		...reviews.map(async (r) => ({
-			id: `r${r.id}`,
+	const reviewItems = await Promise.all(
+		reviews.filter((r) => r.state !== 'PENDING').map(async (r) => ({
+			id: r.id,
+			type: 'review' as const,
 			user: r.user,
 			date: r.submitted_at,
 			...(await md(r.body)),
@@ -63,26 +69,35 @@ export async function load({ locals, params, parent, url }) {
 				})
 			)
 		}))
-	]);
-	timeline.sort((a, b) => a.date.localeCompare(b.date));
+	);
 
 	// A thread is its comments on one line; its first comment carries the resolve reaction.
 	const threads = new Map<string, { root: number; closed: boolean; resolved: boolean }>();
-	for (const c of timeline.flatMap((t) => t.inline)) {
+	for (const c of reviewItems.flatMap((t) => t.inline)) {
 		const t = threads.get(c.thread);
 		threads.set(c.thread, { root: Math.min(t?.root ?? c.id, c.id), closed: !!t?.closed || c.closed, resolved: !!t?.resolved || c.resolved });
 	}
-	for (const c of timeline.flatMap((t) => t.inline)) {
+	for (const c of reviewItems.flatMap((t) => t.inline)) {
 		const t = threads.get(c.thread)!;
 		c.root = t.root === c.id;
 		c.resolved = t.resolved;
 	}
 	const description = await md(pull.body);
+	// Who was asked to review, and each reviewer's latest say.
+	const latest = new Map<string, { login: string; avatar_url: string; state: string; stale: boolean }>();
+	for (const v of reviews) if (!v.dismissed && v.state !== 'PENDING' && v.user.id !== pull.user.id) latest.set(v.user.login, { ...v.user, state: v.state, stale: v.stale });
+	for (const u of pull.requested_reviewers ?? []) latest.set(u.login, { ...u, state: 'REQUESTED', stale: false });
 	const mine = reviews.findLast((v) => v.user.id === user?.id && !v.dismissed && (v.state === 'APPROVED' || v.state === 'REQUEST_CHANGES'));
 	return {
 		body: description.html,
 		options,
-		timeline,
+		reactions: thread.reactions,
+		subscribed: thread.subscribed,
+		timeline: [...thread.items, ...reviewItems].sort((a, b) => a.date.localeCompare(b.date)),
+		reviewers: [...latest.values()],
+		reviewerOptions: reviewerOptions.filter((u) => u.id !== pull.user.id),
+		branches: branches.map((b) => b.name).filter((b) => b !== pull.head.ref),
+		behind,
 		mergeStyles: mergeStyles(r),
 		checks: {
 			state: status.state,
@@ -152,5 +167,16 @@ export const actions = {
 	},
 	cancelAutoMerge: async ({ locals, params }) =>
 		post('merge', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}/merge`, undefined, 'DELETE'),
+	draft: async ({ locals, params, request: req }) =>
+		send('draft', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}`, 'PATCH', { draft: !(await req.formData()).has('ready') }),
+	base: async ({ locals, params, request: req }) =>
+		send('base', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}`, 'PATCH', { base: String((await req.formData()).get('base') ?? '') }),
+	update: async ({ locals, params, request: req }) =>
+		send('update', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}/update?style=${(await req.formData()).get('style') === 'rebase' ? 'rebase' : 'merge'}`, 'POST'),
+	reviewers: async ({ locals, params, request: req }) => {
+		const form = await req.formData();
+		return send('reviewers', locals.token, `/repos/${params.owner}/${params.repo}/pulls/${params.index}/requested_reviewers`, form.has('remove') ? 'DELETE' : 'POST', { reviewers: [String(form.get('login'))] });
+	},
+	...threadActions,
 	...issueActions
 };

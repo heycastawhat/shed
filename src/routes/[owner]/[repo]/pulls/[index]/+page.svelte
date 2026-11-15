@@ -6,6 +6,9 @@
 	import Byline from '#lib/components/Byline.svelte';
 	import Description from '#lib/components/Description.svelte';
 	import Triage from '#lib/components/Triage.svelte';
+	import SidePicker from '#lib/components/SidePicker.svelte';
+	import ThreadItem from '#lib/components/ThreadItem.svelte';
+	import ThreadSide from '#lib/components/ThreadSide.svelte';
 	import { ago } from '#lib/time.js';
 
 	let { data, form } = $props();
@@ -20,6 +23,7 @@
 			? [{ text: `${data.checks.list.filter((c) => c.state === 'success').length} of ${data.checks.list.length} checks passed`, state: mark(data.checks.state), checks: true }]
 			: []),
 		data.pull.mergeable ? { text: `No conflicts with ${data.pull.base.ref}`, state: 'done' } : { text: `Conflicts with ${data.pull.base.ref}`, state: 'fail' },
+		...(data.behind ? [{ text: `${data.behind} commit${data.behind === 1 ? '' : 's'} behind ${data.pull.base.ref}`, state: 'todo', update: true }] : []),
 		...(data.openThreads ? [{ text: `${data.openThreads} open thread${data.openThreads > 1 ? 's' : ''}`, state: 'todo' }] : []),
 		...(own ? [] : [{ text: 'Your approval', state: data.approved ? 'done' : 'todo' }])
 	]);
@@ -45,6 +49,17 @@
 		COMMENT: 'reviewed'
 	};
 	let mentionInput = $state<HTMLTextAreaElement>();
+	const canEdit = $derived(data.repo.permissions.push || own);
+	const locked = $derived(!!data.pull.is_locked && !data.repo.permissions.push);
+	const requested = $derived(new Set(data.reviewers.filter((r) => r.state === 'REQUESTED').map((r) => r.login)));
+	const REVIEW: Record<string, [string, string]> = { REQUESTED: ['clock', 'Review requested'], APPROVED: ['check', 'Approved'], REQUEST_CHANGES: ['x', 'Requested changes'], COMMENT: ['message', 'Commented'] };
+	let updateStyle = $state('merge');
+	function quote(text: string) {
+		draft = (draft.trim() ? `${draft.trimEnd()}\n\n` : '') + text;
+		mentionInput?.focus();
+		mentionInput?.scrollIntoView({ block: 'center' });
+	}
+	const keep = () => async ({ update }: { update: (o?: { reset?: boolean }) => Promise<void> }) => update({ reset: false });
 </script>
 
 <div class="layout">
@@ -52,15 +67,18 @@
 <ol class="timeline">
 	<li>
 		<img class="avatar" src={data.pull.user.avatar_url} alt="" />
-		<Description login={data.pull.user.login} agent={data.agent} agentHref={data.agentHref} created={data.pull.created_at} html={data.body} body={data.pull.body} can={data.repo.permissions.push || own} />
+		<Description login={data.pull.user.login} agent={data.agent} agentHref={data.agentHref} created={data.pull.created_at} html={data.body} body={data.pull.body} can={data.repo.permissions.push || own} reactions={data.reactions} signedIn={!!data.user} onquote={quote} />
 	</li>
-	{#each data.timeline as item (item.id)}
-		<li>
+	{#each data.timeline as item (`${item.type}-${item.id}`)}
+		{#if !('inline' in item)}
+			<ThreadItem {item} repo={data.repo.full_name} me={data.user?.login} admin={data.repo.permissions.admin} onquote={quote} />
+		{:else}
+		<li id="pullrequestreview-{item.id}">
 			<img class="avatar" src={item.user.avatar_url} alt="" />
 			<div class="card">
 			<div class="who">
 				<Byline bold login={item.user.login} agent={item.agent} />
-				{item.state ? (reviewLabel[item.state] ?? 'reviewed') : 'commented'} {ago(item.date)}
+				{reviewLabel[item.state] ?? 'reviewed'} {ago(item.date)}
 			</div>
 			{#if item.html}<article class="markdown">{@html item.html}</article>{/if}
 			{#each item.inline as c (c.id)}
@@ -91,8 +109,9 @@
 			{/each}
 			</div>
 		</li>
+	{/if}
 	{/each}
-	{#if data.pull.state === 'closed'}
+	{#if data.pull.state === 'closed' && !data.timeline.some((e) => e.type === 'merge_pull' || e.type === 'close')}
 		<li class="event">
 			<span class="dot" class:merged={data.pull.merged}><Icon name={data.pull.merged ? 'merge' : 'x'} size={16} /></span>
 			{#if data.pull.merged}
@@ -106,7 +125,18 @@
 
 {#if data.pull.state !== 'closed'}
 <section class="merge">
-	{#if !data.repo.permissions.push}
+	{#if data.pull.draft}
+		<div class="draft-note">
+			<p><strong>This pull request is still a draft.</strong> Mark it ready for review to merge it.</p>
+			{#if canEdit}
+				<form method="POST" action="?/draft" use:enhance={keep}>
+					<input type="hidden" name="ready" />
+					<button class="primary">Ready for review</button>
+				</form>
+			{/if}
+			{#if form?.action === 'draft'}<span class="error">{form.error}</span>{/if}
+		</div>
+	{:else if !data.repo.permissions.push}
 		<p class="muted">You don't have permission to merge this pull request.</p>
 	{:else}
 		<div class="checks">
@@ -128,7 +158,25 @@
 			</div>
 			<ul>
 				{#each rows as r (r.text)}
-					<li class={r.state}><span class="mark">{r.state === 'done' ? '✓' : r.state === 'fail' ? '✕' : '·'}</span>{r.text}</li>
+					<li class={r.state}>
+						<span class="mark">{r.state === 'done' ? '✓' : r.state === 'fail' ? '✕' : '·'}</span>{r.text}
+						{#if 'update' in r}
+							<form class="update" method="POST" action="?/update" use:enhance={() => {
+								busy = true;
+								return async ({ update }) => {
+									await update({ reset: false });
+									busy = false;
+								};
+							}}>
+								{#if form?.action === 'update'}<span class="error">{form.error}</span>{/if}
+								<select name="style" bind:value={updateStyle} aria-label="How to update">
+									<option value="merge">Merge {data.pull.base.ref} in</option>
+									<option value="rebase">Rebase onto {data.pull.base.ref}</option>
+								</select>
+								<button disabled={busy}>Update branch</button>
+							</form>
+						{/if}
+					</li>
 					{#if 'checks' in r}
 						<li class="sub"><ul class="jobs">
 							{#each data.checks.list as c (c.name)}
@@ -187,6 +235,9 @@
 </section>
 {/if}
 
+{#if locked}
+	<p class="locked muted"><Icon name="lock" size={14} />This conversation is locked; only people with write access can comment.</p>
+{:else if data.user}
 <form
 	class="compose"
 	method="POST"
@@ -214,12 +265,66 @@
 	<div class="compose-bar">
 		{#if form?.error && form.action === 'comment'}<span class="error">{form.error}</span>{/if}
 		<span class="muted hint">Ctrl+Enter to send</span>
+		{#if canEdit && !data.pull.merged}
+			{@const close = data.pull.state === 'open'}
+			<input type="hidden" name="to" value={close ? 'closed' : 'open'} />
+			<button class="state" formaction="?/state" disabled={commenting}>
+				<Icon name={close ? 'x' : 'changes'} size={14} />{close ? (draft.trim() ? 'Close with comment' : 'Close pull request') : draft.trim() ? 'Reopen with comment' : 'Reopen'}
+			</button>
+		{/if}
 		<button class="primary" disabled={commenting || !draft.trim()}>{commenting ? 'Commenting…' : 'Comment'}</button>
 	</div>
 </form>
+{/if}
 </div>
 
-<aside><Triage item={data.pull} options={data.options} can={data.repo.permissions.push} list="/{data.repo.full_name}/pulls" /></aside>
+<aside>
+	<div class="side">
+		<SidePicker
+			title="Reviewers"
+			icon="eye"
+			action="reviewers"
+			can={canEdit && data.pull.state === 'open'}
+			options={data.reviewerOptions}
+			on={(u) => requested.has(u.login)}
+			fields={(u) => [['login', u.login], ...(requested.has(u.login) ? [['remove', ''] as [string, string]] : [])]}
+			empty="No reviews yet"
+			shown={data.reviewers.length ? reviewerList : undefined}
+		>
+			{#snippet row(u)}
+				<img class="mini" src={u.avatar_url} alt="" />{u.login}
+			{/snippet}
+		</SidePicker>
+		<Triage item={data.pull} options={data.options} can={data.repo.permissions.push} list="/{data.repo.full_name}/pulls" />
+		{#if data.pull.state === 'open' && data.repo.permissions.push}
+			<section>
+				<h3 class="side-title">Base branch</h3>
+				<form class="base" method="POST" action="?/base" use:enhance={keep}>
+					<select name="base" value={data.pull.base.ref} aria-label="Base branch" onchange={(e) => e.currentTarget.form?.requestSubmit()}>
+						{#each data.branches as b (b)}<option value={b}>{b}</option>{/each}
+					</select>
+				</form>
+				{#if form?.action === 'base'}<p class="error">{form.error}</p>{/if}
+			</section>
+		{/if}
+		{#if data.pull.state === 'open' && canEdit && !data.pull.draft}
+			<form method="POST" action="?/draft" use:enhance={keep}><button class="ghost"><Icon name="pencil" size={14} />Convert to draft</button></form>
+		{/if}
+	</div>
+	<ThreadSide subscribed={data.subscribed} locked={!!data.pull.is_locked} pinned={!!data.pull.pin_order} signedIn={!!data.user} can={data.repo.permissions.push} />
+</aside>
+
+{#snippet reviewerList()}
+	<ul class="reviewers">
+		{#each data.reviewers as r (r.login)}
+			<li title={REVIEW[r.state]?.[1]}>
+				<img class="mini" src={r.avatar_url} alt="" />{r.login}
+				<span class="rstate {r.state}" class:stale={r.stale}><Icon name={REVIEW[r.state]?.[0] ?? 'message'} size={14} /></span>
+			</li>
+		{/each}
+	</ul>
+{/snippet}
+
 </div>
 
 <svelte:window
@@ -521,15 +626,117 @@
 		background: var(--surface);
 		border-top: 1px solid var(--border);
 	}
-	.compose-bar button {
-		margin-left: auto;
-	}
 	.hint {
+		margin-right: auto;
 		font-size: 0.8rem;
 	}
 	.error {
 		color: var(--del-fg);
 		font-size: 0.9rem;
+	}
+	.locked {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 1.5rem;
+		padding: 0.75rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+	}
+	.state {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+	.draft-note {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 1rem;
+	}
+	.draft-note p {
+		flex: 1;
+		min-width: 12rem;
+		padding: 0;
+	}
+	.update {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-left: auto;
+	}
+	.update select {
+		min-width: 0;
+		font-size: 0.85rem;
+		padding: 0.2rem 0.4rem;
+	}
+	.update button {
+		font-size: 0.85rem;
+		padding: 0.2rem 0.6rem;
+	}
+	.side {
+		display: grid;
+		gap: 1.25rem;
+	}
+	.side-title {
+		margin: 0 0 0.6rem;
+		padding-bottom: 0.4rem;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--muted);
+	}
+	.base select {
+		width: 100%;
+		min-width: 0;
+		font-size: 0.85rem;
+		padding: 0.25rem 0.4rem;
+	}
+	.ghost {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0;
+		border-color: transparent;
+		background: none;
+		color: var(--muted);
+		font-size: 0.85rem;
+	}
+	.ghost:hover {
+		color: var(--accent);
+	}
+	.reviewers {
+		display: grid;
+		gap: 0.4rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.reviewers li {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.9rem;
+	}
+	img.mini {
+		width: 20px;
+		height: 20px;
+	}
+	.rstate {
+		margin-left: auto;
+		color: var(--muted);
+	}
+	.rstate.APPROVED {
+		color: var(--accent);
+	}
+	.rstate.REQUEST_CHANGES {
+		color: var(--del-fg);
+	}
+	.rstate.stale {
+		opacity: 0.5;
 	}
 	.markdown {
 		padding: 1rem;

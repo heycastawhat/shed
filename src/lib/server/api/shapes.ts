@@ -97,6 +97,7 @@ export function issueJson(db: Database, origin: string, repo: { full: string; na
 		closed_at: i.closed_at,
 		due_date: i.due_on,
 		is_locked: !!i.locked,
+		pin_order: i.pinned,
 		pull_request: pull ? { merged: !!pull.merged_at, merged_at: pull.merged_at, draft: !!pull.draft, html_url: `${origin}/${repo.full}/pulls/${i.number}` } : null,
 		repository: { id: repo.id, name: repo.name, owner: repo.owner, full_name: repo.full },
 		html_url: `${origin}/${repo.full}/${kind}/${i.number}`,

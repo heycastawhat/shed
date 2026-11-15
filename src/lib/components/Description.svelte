@@ -6,8 +6,31 @@
 	import { ago } from '#lib/time.js';
 	import Byline from './Byline.svelte';
 	import Icon from './Icon.svelte';
+	import Reactions from './Reactions.svelte';
 
-	let { login, agent, agentHref, created, html, body, can }: { login: string; agent?: string; agentHref?: string; created: string; html: string; body: string; can: boolean } = $props();
+	let {
+		login,
+		agent,
+		agentHref,
+		created,
+		html,
+		body,
+		can,
+		reactions,
+		signedIn = false,
+		onquote
+	}: {
+		login: string;
+		agent?: string;
+		agentHref?: string;
+		created: string;
+		html: string;
+		body: string;
+		can: boolean;
+		reactions?: { content: string; users: string[]; mine: boolean }[];
+		signedIn?: boolean;
+		onquote?: (text: string) => void;
+	} = $props();
 	let editing = $state(false);
 	let busy = $state(false);
 	let draft = $state('');
@@ -17,6 +40,10 @@
 <div class="card">
 	<div class="who">
 		<Byline bold {login} {agent} href={agentHref} /> opened this {ago(created)}
+		<span class="tools">
+		{#if onquote && signedIn && body.trim() && !editing}
+			<button class="edit" onclick={() => onquote(`> ${(getSelection()?.toString().trim() || unsign(body).body.trim()).replaceAll('\n', '\n> ')}\n\n`)}><Icon name="quote" size={13} />Quote</button>
+		{/if}
 		{#if can && !editing}
 			<button
 				class="edit"
@@ -26,6 +53,7 @@
 				}}><Icon name="pencil" size={13} />Edit</button
 			>
 		{/if}
+		</span>
 	</div>
 	{#if editing}
 		<form
@@ -65,6 +93,7 @@
 	{:else}
 		<p class="muted markdown">No description provided.</p>
 	{/if}
+	{#if reactions && !editing}<Reactions {reactions} can={signedIn} />{/if}
 </div>
 
 <style>
@@ -72,7 +101,6 @@
 		min-width: 0;
 		border: 1px solid var(--border);
 		border-radius: 8px;
-		overflow: hidden;
 	}
 	.card:focus-within {
 		border-color: var(--accent);
@@ -83,6 +111,7 @@
 		gap: 0.5rem;
 		padding: 0.5rem 1rem;
 		background: var(--surface);
+		border-radius: 8px 8px 0 0;
 		font-size: 0.85rem;
 		color: var(--muted);
 	}
@@ -93,12 +122,15 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
-		margin-left: auto;
 		padding: 0.1rem 0.5rem;
 		border-color: transparent;
 		background: none;
 		color: var(--muted);
 		font-size: 0.8rem;
+	}
+	.tools {
+		display: flex;
+		margin-left: auto;
 	}
 	.edit:hover {
 		color: var(--accent);
@@ -128,6 +160,7 @@
 		padding: 0.5rem 1rem;
 		background: var(--surface);
 		border-top: 1px solid var(--border);
+		border-radius: 0 0 8px 8px;
 	}
 	.hint {
 		margin-right: auto;
