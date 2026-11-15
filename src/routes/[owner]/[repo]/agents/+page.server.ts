@@ -55,7 +55,8 @@ export const actions = {
 		const form = await request.formData();
 		const repo = await api<Repo>(locals.token, `/repos/${params.owner}/${params.repo}`);
 		try {
-			await cloneProject(await host(locals.token, form), repo.name, repo.clone_url);
+			// Over SSH when Shed serves it: agents push without a password prompt, with the host's key (added in Settings → SSH keys).
+			await cloneProject(await host(locals.token, form), repo.name, repo.ssh_url || repo.clone_url);
 		} catch (e) {
 			if (!isHttpError(e)) throw e;
 			const scope = /source-control|scope|forbidden|permission/i.test(e.body.message);

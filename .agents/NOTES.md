@@ -116,8 +116,10 @@ Everything is on branch `shed`, committed, not pushed, not deployed. Open work, 
    settings as grouped cards; go through every page in light/dark/390px; keep code views dense.
 2. **Deploy** (`DEPLOY.md`): needs the owner's OK for each outward step (server, Cloudflare hostname, Forgejo token for `shed import`). x86 image
    has never been built (this machine can't run x86).
-3. **Agents end to end**: `@agent` mentions and T3 tasks haven't been run against Shed (MCP keys pass `shed-mcp.sh`). Running them starts real
-   T3 tasks on the owner's T3 (:3773); ask first.
+3. **Agents end to end**: done 2026-11-16 against real T3 (pairing, clone into T3, `@agent` on an issue with the summary posted back, approvals from
+   Shed's task view, Fix with agent, a hub task); `agents-t3.test.ts` covers the same with a fake T3. Setup clones over SSH, so the T3 host needs its
+   key on the account and Shed's host key in `known_hosts` (T3's git is non-interactive). If T3's clone fails, Shed doesn't hear about it and
+   T3 keeps an empty project.
 4. **Small gaps**: renaming/transferring a repo doesn't update token repo lists, agent key scopes or pins (`forge.json`); `runs-on` only
    resolves `${{ matrix.* }}`; release tags can still be created on mirrors; mobile polish.
 

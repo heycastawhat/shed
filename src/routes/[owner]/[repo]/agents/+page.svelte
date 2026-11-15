@@ -24,7 +24,7 @@
 {#if !data.hosts.length}
 	<form class="setup" method="POST" action="?/setup" use:enhance>
 		<h2>Set up {data.repo.name} for agents</h2>
-		<p class="muted">T3 Code clones the repo onto the host and adds it as a project. Agents then work there, each task in its own worktree.</p>
+		<p class="muted">T3 Code clones the repo onto the host and adds it as a project. Agents then work there, each task in its own worktree.{#if data.repo.ssh_url} It clones over SSH, so add the host's SSH key to your account first.{/if}</p>
 		{#if data.reachable.length > 1}
 			<select name="host" aria-label="Host">
 				{#each data.reachable as h (h.id)}<option value={h.id}>on {h.name}</option>{/each}
