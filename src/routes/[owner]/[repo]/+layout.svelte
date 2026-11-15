@@ -32,11 +32,11 @@
 <div class="head">
 	<h1>
 		<a class="owner" href="/{data.repo.owner.login}">{data.repo.owner.login}</a><span class="sep">/</span><a class="name" href={base}>{data.repo.name}</a>
-		{#if data.repo.private}<span class="private"><Icon name="lock" size={12} />Private</span>{/if}
+		{#if data.repo.private}<span class="private" title="Private"><Icon name="lock" size={12} /><span class="label">Private</span></span>{/if}
 		<form class="pin" method="POST" action="/pin">
 			<input type="hidden" name="repo" value={data.repo.full_name} />
 			<input type="hidden" name="pin" value={pinned ? '0' : '1'} />
-			<button class:on={pinned} title={pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar'}><Icon name="pin" size={13} />{pinned ? 'Pinned' : 'Pin'}</button>
+			<button class:on={pinned} title={pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar'}><Icon name="pin" size={13} /><span class="label">{pinned ? 'Pinned' : 'Pin'}</span></button>
 		</form>
 		<RepoActions repo={data.repo.full_name} social={data.social} signedIn={!!data.user} />
 	</h1>
@@ -183,6 +183,19 @@ git push -u origin {data.repo.default_branch}</pre>
 	}
 	.pin button.on {
 		color: var(--accent);
+	}
+	@container (max-width: 560px) {
+		.pin .label,
+		.private .label {
+			display: none;
+		}
+		.private {
+			margin-left: 0.4rem;
+			padding: 0.15rem 0.35rem;
+		}
+		.pin {
+			margin-left: 0.3rem;
+		}
 	}
 	.proto button {
 		font-size: 0.8rem;
