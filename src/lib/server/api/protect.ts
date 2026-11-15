@@ -16,7 +16,7 @@ export type Protection = {
 };
 
 // Glob patterns like Forgejo's: `*` within a segment, `**` across them; an exact name beats a pattern.
-const glob = (p: string) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '\0').replace(/\*/g, '[^/]*').replace(/\0/g, '.*')}$`);
+export const glob = (p: string) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '\0').replace(/\*/g, '[^/]*').replace(/\0/g, '.*')}$`);
 
 export function protectionFor(db: Database, repoId: number, branch: string) {
 	const rules = db.query<Protection, [number]>('select * from protected_branches where repo_id = ?').all(repoId);

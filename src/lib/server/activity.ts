@@ -5,7 +5,12 @@ import { onPush } from './push.js';
 import { repoDir } from './repos.js';
 import { avatar } from './accounts.js';
 
-export function record(db: Database, e: { userId: number; repoId: number | null; op: string; ref?: string; content?: unknown }) {
+type Activity = { userId: number; repoId: number | null; op: string; ref?: string; content?: unknown };
+const listeners: ((db: Database, e: Activity) => void)[] = [];
+// Webhooks hear about issues, comments and releases here, since every one of those is recorded.
+export const onActivity = (fn: (db: Database, e: Activity) => void) => listeners.push(fn);
+
+export function record(db: Database, e: Activity) {
 	db.query('insert into activity (user_id, repo_id, op, ref, content) values (?, ?, ?, ?, ?)').run(
 		e.userId,
 		e.repoId,
@@ -13,6 +18,13 @@ export function record(db: Database, e: { userId: number; repoId: number | null;
 		e.ref ?? '',
 		typeof e.content === 'string' ? e.content : JSON.stringify(e.content ?? '')
 	);
+	for (const fn of listeners) {
+		try {
+			fn(db, e);
+		} catch (err) {
+			console.error('activity listener', err);
+		}
+	}
 }
 
 // Pushes become feed events: new commits on a branch (an empty list means a new branch, as in Forgejo's feed), tags, deletions.

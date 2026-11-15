@@ -4,6 +4,7 @@ import { atLeast, tokenAccess, type Level } from './access.js';
 import { spawn } from './git.js';
 import { getRepo, repoDir } from './repos.js';
 import { afterPush, refSnapshot } from './push.js';
+import { receivePackSetup } from './pushcheck.js';
 
 // Git's smart HTTP protocol (what `git clone https://…` speaks): GET info/refs, then POST to upload-pack (fetch) or receive-pack (push).
 // git authenticates with Basic auth; the password is a Shed token (the username is ignored).
@@ -55,7 +56,9 @@ export async function gitHttp(db: Database, root: string, request: Request, url:
 	let body = request.body ?? new ReadableStream();
 	if (request.headers.get('content-encoding') === 'gzip') body = body.pipeThrough(new DecompressionStream('gzip'));
 	const before = service === 'git-receive-pack' ? await refSnapshot(dir) : null;
-	const proc = spawn([cmd, '--stateless-rpc', dir], body, env);
+	// Branch protection runs as a pre-receive hook (see pushcheck.ts).
+	const check = before ? await receivePackSetup(db, root, repo.id, level) : { args: [], env: {} };
+	const proc = spawn([...check.args, cmd, '--stateless-rpc', dir], body, { ...env, ...check.env });
 	if (before) proc.exited.then((code) => (code === 0 ? afterPush(db, root, repo, token!.userId, before) : undefined)).catch((e) => console.error('after push', e));
 	return new Response(proc.stdout, { headers: { ...headers, 'content-type': `application/x-${service}-result` } });
 }

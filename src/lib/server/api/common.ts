@@ -9,12 +9,13 @@ import type { Ctx } from './router.js';
 
 export const now = () => new Date().toISOString();
 
-export function repoOf(c: Ctx, need: Level = 'read') {
+// `evenArchived` is for the few admin writes an archived repo still takes: unarchiving it and deleting it.
+export function repoOf(c: Ctx, need: Level = 'read', evenArchived = false) {
 	const row = getRepo(c.db, c.params.owner, c.params.repo);
 	const level: Level = !row ? 'none' : c.token ? tokenAccess(c.db, c.token, row) : access(c.db, c.user?.id, row);
 	if (!row || !atLeast(level, 'read')) error(404, 'Repository not found');
 	if (!atLeast(level, need)) error(403, `You need ${need} access to ${row.owner}/${row.name}`);
-	if (need !== 'read' && row.archived) error(403, `${row.owner}/${row.name} is archived`);
+	if (need !== 'read' && row.archived && !evenArchived) error(403, `${row.owner}/${row.name} is archived`);
 	return { row, level, dir: repoDir(c.root, row.id), full: `${row.owner}/${row.name}` };
 }
 export type RepoCtx = ReturnType<typeof repoOf>;

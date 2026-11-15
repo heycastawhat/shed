@@ -232,16 +232,28 @@ onPush(async ({ db, root, repo, userId, updates }) => {
 	}
 });
 
+type PullEvent = { id: number; number: number; title: string; body: string; head: string; head_sha: string; base: string; merge_base: string | null; user_id: number; state: string; merged_at?: string | null };
+const pullListeners: ((db: Database, origin: string, repo: RepoRow, p: PullEvent, action: string, userId: number) => void)[] = [];
+// Webhooks hear about pull requests here.
+export const onPullEvent = (fn: (typeof pullListeners)[number]) => pullListeners.push(fn);
+
 // pull_request events: opened, synchronize (new commits), reopened, closed, edited.
 export async function pullEvent(
 	db: Database,
 	root: string,
 	origin: string,
 	repo: RepoRow,
-	p: { id: number; number: number; title: string; body: string; head: string; head_sha: string; base: string; merge_base: string | null; user_id: number; state: string; merged_at?: string | null },
+	p: PullEvent,
 	action: string,
 	userId: number
 ) {
+	for (const fn of pullListeners) {
+		try {
+			fn(db, origin, repo, p, action, userId);
+		} catch (e) {
+			console.error('pull listener', e);
+		}
+	}
 	const dir = repoDir(root, repo.id);
 	const baseSha = (await git(dir, ['rev-parse', `refs/heads/${p.base}`]).catch(() => '')).trim();
 	const author = db.query<{ login: string }, [number]>('select login from users where id = ?').get(p.user_id)?.login ?? '';
@@ -258,6 +270,9 @@ export async function pullEvent(
 		base: { ref: p.base, sha: baseSha, repo: repoPayload(repo, origin) },
 		html_url: `${origin}/${repo.owner}/${repo.name}/pulls/${p.number}`
 	};
+	// A closed or merged PR's unfinished runs have nothing left to check.
+	if (action === 'closed')
+		for (const r of db.query<{ id: number }, [number]>("select id from runs where issue_id = ? and status in ('waiting', 'running')").all(p.id)) cancelRun(db, r.id);
 	for (const event of ['pull_request', 'pull_request_target'] as const)
 		await trigger(db, root, repo.id, {
 			event,
