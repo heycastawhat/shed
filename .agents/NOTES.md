@@ -1,314 +1,103 @@
-# forge — notes for agents
+# Shed — notes for agents
 
-A better UI for Forgejo: a SvelteKit app that uses **stock Forgejo as a headless backend** over its REST API.
-The goals are a faster, nicer UI, better code review, and CI built in. It's for a single user (the owner) in a homelab.
+Shed is a self-hosted git host for one person (the owner) and their coding agents: SvelteKit app + its own backend (bare git repos on disk,
+SQLite for everything else). It began as "forge", a UI over Forgejo's API; on 2026-11-15 the owner decided to own the backend instead.
+`PLAN.md` is the design (and a "Later" list, starting with the UI redesign). The git branch is `shed`; `main` is the old Forgejo UI.
 
 ## Decisions (don't re-litigate)
 
-- **Shed replaces Forgejo (decided 2026-11-15).** forge began as a headless UI over Forgejo's API; the owner decided to own the backend instead (own git storage, PRs, CI), as Sink does. The design is `PLAN.md`. Until the new backend lands, the code below still talks to Forgejo.
-- Stack: **Bun + SvelteKit 3 + Svelte 5 runes + TypeScript**, Shiki for highlighting. No CSS framework.
-- Markdown is rendered by Forgejo (`POST /markdown`), so output matches Forgejo and is sanitised by it.
-- Theme: purple accent (`--accent`). The user found stock GitHub green jarring, so **primary actions and the Open badge use the accent**.
-  Green and red are only for diff +/− lines and closed state. State badges differ by icon and fill as well as colour (see `PrState.svelte`).
+- **Own backend, not a Forgejo fork or frontend.** Forgejo is only an import source now (`bin/shed.ts import`).
+- **A Forgejo-compatible REST API is the backbone** (`src/lib/server/api/`). Pages call it in-process through `forgejo.ts`
+  (`api`/`apiPage`/`request` with `locals.token`, an internal token for the signed-in person), so the UI written against Forgejo kept working.
+  Over HTTP it's `/api/v1` with a Shed token. Where Forgejo's API fell short, Shed adds endpoints (revisions, PR comments, resolve, reviewers, …).
+- Stack: **Bun + SvelteKit 3 + Svelte 5 runes + TypeScript**, Shiki, no CSS framework. git is the `git` binary, never libgit2.
+- Sign-in is any OIDC provider (the owner uses Pocket ID) with an allowlist; no passwords.
+- CI speaks **forgejo-runner's protocol**, so the stock runner and `.forgejo/workflows` work unchanged.
+- Theme: purple accent (`--accent`), primary actions and the Open badge use it; green/red only for diff lines and closed state.
+- UI redesign (Sink's visual language, tabs for PRs) is parked in PLAN.md "Later".
 
 ## Layout
 
-- `src/lib/server/forgejo.ts`: API client (`request`/`api`/`apiPage`), `renderMarkdown`, API types.
-- `src/lib/server/auth.ts`: OAuth2 (Forgejo is the provider), sessions, silent token refresh (tokens last 1h). The `forge_session` cookie is an opaque id;
-  the user's one Forgejo refresh token lives encrypted (AES-GCM, `FORGE_SECRET`) in `data/forge.json` via `store.ts`. `userToken(userId)` is the only way to get an access token.
-- **Shell and settings:** `+layout.svelte` has the nav as a sidebar (collapsible to an icon rail with `[`) or a top bar (Settings → Appearance → Navigation, or the palette): Home, Changes, Repos, Agents (waiting badge), chords `G H/C/R/A`, then **pinned repos**
-  (labelled `owner/`name, no tile except in rail mode, `1`–`9` jump to them, hover shows an unpin button posting to `/pin`; `/pin` only checks the repo exists when *pinning*, so deleted repos can still be unpinned).
-  `NOT_REPOS` lists top-level paths that aren't owners; add new top-level routes there. `Palette.svelte` (Ctrl+K) has pages, actions, `Mode: …` and `Theme: …` entries (POST `/settings/appearance?/palette`), repos and PRs, each with an icon.
-  Home shows a "Recently updated" grid of the 6 latest repos above the needs list.
-  `/settings` has a sidebar layout with Account (profile link, signed-in sessions with per-session sign-out, newest 5 shown and the rest in a "Show N older" `<details>`; sessions record a browser/OS label), Appearance (System/Light/Dark via the `forge_theme` cookie;
-  the hook sets `data-theme` on `<html>` while rendering, and the dark CSS blocks are `:root:not([data-theme='light'])` inside the media query plus `[data-theme='dark']`), and Agents.
-  New dark-mode CSS must follow that pattern or it won't respond to the override.
-  **Themes** (colour palettes, on top of the mode): `src/lib/themes.ts` holds them (Forge, Catppuccin, Rosé Pine, Nord, Gruvbox, Mono) and generates CSS that the layout injects.
-  The `forge_palette` cookie makes the hook set `data-palette` on `<html>`. Palettes only set bg/surface/fg/muted/border/accent; use those vars (plus `--warn`, `--add-fg`, `--del-fg`) and never hard-code colours.
-  Appearance shows themes as cards with light/dark previews, then Mode, then Navigation.
-- **Mobile:** under 700px (viewport) the shell becomes a phone header plus an off-canvas drawer, and components add their own `@media (max-width: 700px)` rules (rows wrap, inputs go full width). The repo header uses a container query (640px) and its tab bar scrolls sideways with a fade. Inputs/selects in flex or grid rows need `min-width: 0` (and `minmax(0, 1fr)` tracks) or they push the page wider. Check new pages at 390 and 800px for `scrollWidth > innerWidth`.
-- **Repo pages:** the repo header is muted owner / bold name, a "Private" tag and a ghost Pin button; tabs have icons. The branch picker is a label with an invisible `<select>` laid over it (`field-sizing: content` doesn't work on `<select>` in this Chromium).
-  `CommitList` groups commits by day (en-NZ dates) and falls back to an initial avatar. The PR list has a segmented Open/Closed switch and an empty state.
-  The PR conversation is a timeline (avatar column + connecting line); a merged/closed PR ends with an event dot, and the merge card only renders for open PRs, above the composer.
-  In `DiffView` file headers are sticky (`.file` uses `overflow: clip`, since `hidden` breaks sticky) and the summary uses coloured status squares (modified = `--warn`).
-- Every T3 task has its own page, `/agents/<host>/<thread>` (breadcrumb Agents / repo; works for T3-only projects too). The task panel is `TaskView.svelte`, used there and in the repo Agents tab; its loader/actions are `src/lib/server/task.ts` (`taskDetail`, `taskActions` = answer/respond/steer/stop, spread into each page's actions).
-  TaskView is a chat: your messages as right-hand bubbles, agent replies as plain markdown, steps folded into one line, question/approval cards above an auto-growing composer (Enter sends, Shift+Enter newline), "Open in T3 Code" and Stop in the header.
-  `send()` turns T3 `HttpError`s into `fail(status, { actionError })` with the RPC's own message (`failure()` in t3.ts digs it out of Effect's cause), and ignores "not interruptible" from Stop on a finished run (that used to be a 502 page).
-- `/agents` is the agent hub (sidebar Agents, `G A`): a new-task box (`NewTask.svelte`, shared with the repo tab; lists only repos that have a same-named T3 project on some host), waiting on you (MCP approvals and T3 permission requests, answerable inline), T3 tasks across every project (hover × dismisses one from the hub only, stored in `dismissed` as `task:<host>:<id>:<updatedAt>`, so new activity brings it back; running or waiting tasks can't be dismissed), recent key activity (collapsed). Shared status helpers are in `src/lib/agent-status.ts`.
-- `src/lib/server/agents.ts` (keys), `tools.ts` (the MCP tools, approval gating, `decide`), `src/routes/mcp/+server.ts` (protocol only), `/settings/agents` (UI): see item 10 in the roadmap.
-- `src/lib/diff.ts`: unified diff parser plus `toSplit` (shared with the client). `server/highlight.ts` highlights diffs per hunk.
-- `src/lib/components/DiffView.svelte`: unified/split diff, collapsible files, line comment threads and composer.
-- Routes mirror Forgejo URLs: `/[owner]/[repo]/{tree,blob,raw}/[ref]/[...path]`, `commits/[ref]`, `commit/[sha]`,
-  `pulls`, `pulls/[index]` (conversation, comment + merge actions), `pulls/[index]/{files,commits}`.
-  Refs are URL-encoded as one segment (`feature%2Fx`).
+Backend (`src/lib/server/`):
+- `db.ts`: SQLite, append-only migrations (`user_version`; refuses a newer database). `shed.ts`: the process's db, data dir, OIDC provider,
+  current origin, and the SSH server start. `SHED_DATA` holds `shed.db`, `repos/<id>.git` (+ `<id>.wiki.git`), `attachments/`, `actions/logs/`, `ssh/`, `trash/`.
+- `repos.ts` (create/delete, names, stored by id), `git.ts` (spawn with ignored user/system config), `browse.ts` (read: refs, tree, blobs, log,
+  blame, diffs), `write.ts` (`commitFiles`: commits without a checkout, compare-and-swap ref update), `files.ts`/`edit.ts`/`fork.ts`.
+- `accounts.ts`: users (first sign-in is admin; imported accounts are claimed by email, else username), sessions, personal tokens (`shed_…`),
+  CI task tokens (`shedt_…`, valid while the task runs). `access.ts`: owner/site admin/org owner → admin, org member → write, collaborators,
+  public read; tokens are capped by scopes and repo list. `oidc.ts`: code flow + PKCE.
+- `githttp.ts`: smart HTTP (v0/v2); `ssh.ts`: own SSH server (ssh2). Both run receive-pack with `pushcheck.ts`'s pre-receive hook (branch protection)
+  and call `afterPush` (`push.ts`), whose listeners update PRs (revisions, merged-by-push), start CI, send webhooks and record activity.
+- `api/`: `router.ts` (routes, most-literal match wins, `Paged` → `x-total-count`), `common.ts` (`repoOf(c, need)`), `shapes.ts` (Forgejo JSON),
+  `repos.ts`, `issues.ts`, `pulls.ts` (merge styles, reviews, auto-merge, revisions), `statuses.ts`, `protect.ts`, `notify.ts`, `releases.ts`,
+  `actions.ts`, `hooks.ts`, `keys.ts`, `code.ts`, `search.ts`.
+- `actions/`: `proto*.ts` (runner.v1 protobuf via protobufjs), `rpc.ts` (Connect RPC at `/api/actions/…`), `workflows.ts` (triggers, matrix,
+  single-job payloads like Forgejo's jobparser), `runs.ts` (runs/jobs state machine, statuses, PR events, cancel/rerun).
+- `markdown.ts`: markdown-it with raw HTML escaped (safe for `{@html}`), repo-relative links/images, heading anchors, task lists.
+- `importer.ts` + `bin/shed.ts import <forgejo url>`: users/orgs, repos (all refs), issues, PRs, reviews, line comments, labels, milestones,
+  releases with files, wikis, collaborators. Re-runnable.
+- The agent features from forge are unchanged: T3 Code driving (`t3.ts`, `task.ts`, agents hub), agent keys + MCP (`agents.ts`, `tools.ts`,
+  `/mcp`), approvals, repo rules, `@agent` mentions. They keep their state in `forge.json` (`store.ts`, encrypted with `FORGE_SECRET`).
+
+UI: `src/routes` mirrors Forgejo's URLs (`/[owner]/[repo]/{tree,blob,raw,blame}/[ref]/[...path]`, `commits/[ref]/[...path]`, `commit/[sha]`,
+`compare/base...head`, `pulls/[index]/{files,commits}`, `issues`, `actions/runs/[run]`, `settings/*`, `labels`, `milestones`, `wiki`, `releases`).
+Top level: `/`, `/changes`, `/repos`, `/new`, `/explore`, `/search`, `/notifications`, `/agents`, `/settings/*`, `/admin`; `src/lib/reserved.ts`
+lists these, and logins can't take them. Shell, palette, themes, mobile rules, DiffView and the PR timeline are as described in the older
+sections of git history (`git show 52e2659:.agents/NOTES.md`).
 
 ## Running locally
 
-The dev machine (aarch64, Fedora Aurora, no system node/bun/chromium) was set up from scratch on 2026-11-15:
-- **bun** lives in `~/.bun/bin` (not on PATH by default: `export PATH=$HOME/.bun/bin:$PATH`).
-- **Forgejo 15.0.5** (the version prod runs) is `dev/forgejo/forgejo` (the arm64 release binary) on SQLite at http://localhost:3000, SSH :2222, config `dev/forgejo/custom/conf/app.ini`, log `dev/forgejo/run.log`.
-  On a fresh machine: download the binary, write an app.ini like the current one (`INSTALL_LOCK`, cookie `forge_dev_fj`, `[oauth2] ACCESS_TOKEN_EXPIRATION_TIME = 86400`), `forgejo migrate`, create users `ada` (admin) and `reviewer` with random passwords in `dev/forgejo/.{admin,reviewer}-password`, then `.agents/scripts/seed.sh` (test data plus `.env` with a fresh OAuth app and `FORGE_SECRET`).
-- **Chromium** for tests is Playwright's (`~/.cache/ms-playwright`, installed with `bunx playwright install chromium`); `playwright-core` is a devDependency. The e2e scripts use `/usr/bin/chromium` when it exists, else that one (`CHROMIUM` overrides).
-- **podman** is available (rootless); `podman build --format docker -t forge .` builds the image (`--format docker` keeps `HEALTHCHECK`).
+Dev machine: aarch64 Fedora Aurora; bun in `~/.bun/bin` (`export PATH=$HOME/.bun/bin:$PATH`); Chromium for tests is Playwright's.
+- `.env` has the Pocket ID client (`SHED_OIDC_*`, issuer `https://auth.example.com`), `SHED_ALLOWED_USERS=user:ada`, `SHED_DATA=data`,
+  `SHED_SSH_PORT=2223` (2222 is the old local Forgejo's), `FORGE_SECRET`.
+- `bun run dev --port 5173 --strictPort`. Don't `pkill -f` patterns that match your own shell (it kills it); find the pid with `ss -ltnp`.
+- Signing in without the browser round trip: `bun .agents/scripts/shed-session.ts [login]` prints a `shed_session` cookie; `shed-token.ts [login]`
+  prints an API token. A real sign-in: Pocket ID is passkey-only, so headless tests use a one-time link,
+  `ssh ada@192.0.2.245 'docker exec pocket-id /app/pocket-id one-time-access-token ada'` (don't print the code; each use leaves an admin
+  session on Pocket ID), see `.agents/tmp/shed-login.ts`.
+- Test data: `bin/shed.ts import http://localhost:3000` from the old local Forgejo (`dev/forgejo`, seeded by `.agents/scripts/seed.sh`) into
+  `ada/sample` (PRs, issues, labels, milestones, release, wiki) and `kiwi/website`. Wipe `data/shed.db*`, `data/repos` etc. to start over.
+- CI: `dev/runner/forgejo-runner` (13.2.1, arm64) registered as `dev` with label `host`; `cd dev/runner && ./forgejo-runner daemon`.
+  Test scripts open many PRs and each runs `ci.yml` (a 20 s job), so a backlog builds; closing a PR cancels its runs.
+- Checks: `bun run check` (0 errors/warnings) and `bun test src` (real git clients against in-process HTTP and SSH servers, a real-ish CI
+  flow is tested by hand with the runner). End to end against the dev server:
+  `FJ=localhost:5173 JP=<ada token> RP=<reviewer token> JAR=shed bash .agents/scripts/writes.sh` (needs `.agents/tmp/shed.jar` with a
+  `shed_session` line) and `JT=… RT=… bash .agents/scripts/shed-merges.sh` (merge styles, conflicts, auto-merge, revisions, resolve, protection).
+- Pages and screenshots: `cd .agents/tmp && bun shed-pages.ts "$COOKIE" name=/path /path …` (status, console errors, overflow, `shot-name.png`).
+- Commands that hit localhost need the sandbox off. `git` here has no identity: commit with `-c user.name=the owner -c user.email=owner@example.com`.
 
-1. `cd dev/forgejo && nohup ./forgejo web --config custom/conf/app.ini > run.log 2>&1 &`.
-2. `bun run dev --port 5173 --strictPort` → http://localhost:5173. The OAuth app allows redirects to :5173, :5174 and :3080 (a container test).
-   **Editing an OAuth app's redirect URIs via the API makes Forgejo issue a new client secret**; copy it into `.env` and restart the dev server.
-3. There is no runner on this machine yet (`dev/runner` is gone), so PR checks stay "waiting"; that's enough for the auto-merge path in `writes.sh`.
-4. Check with `bun run check && bun run test`. End to end: `.agents/scripts/login.sh`, then `.agents/scripts/writes.sh` (every write action against throwaway PRs/issues) and `cd .agents/tmp && bun ../scripts/crawl.e2e.ts` (every route; `T3=1` to include the repo Agents tab).
+## Deploying
 
-- **Shed sign-in (branch `shed`):** OIDC against the owner's Pocket ID on server (`https://auth.example.com`, client "Shed", callback `http://localhost:5173/auth/callback`). Pocket ID is passkey-only, so headless tests sign in with a one-time link: `ssh ada@192.0.2.245 'docker exec pocket-id /app/pocket-id one-time-access-token ada'` gives `…/lc/<code>`; open it, then `/login` (see `.agents/tmp/shed-login.ts`). Each use leaves an admin session on Pocket ID, so don't print the code and don't overdo it.
-  Until pages are moved to Shed, `FORGEJO_TOKEN` (a local-Forgejo token for ada) is used for every signed-in person's Forgejo calls (`locals.token` in the hook).
-- Admin login: user `ada`, password in `dev/forgejo/.admin-password`. OAuth client ID and secret are in `.env` (see `.env.example`).
-- The owner's real instance is **git.example.com** (Forgejo 15.0.5). Don't point forge at it or register anything there without asking: it's outward-facing.
+`DEPLOY.md` (server `/opt/stacks/shed`, compose service `shed`, web 3080, SSH 2223, Cloudflare tunnel hostname `shed.example.com`).
+Prepare-only: don't touch server, Pocket ID, Cloudflare or git.example.com without the owner's OK. The image builds with podman on arm64.
+server: Fedora 44, x86_64, 15 GB RAM, ssh `ada@192.0.2.245` (key on this machine); sudo needs a password.
 
-### Test data (`ada/sample` on the local Forgejo, from `seed.sh`)
-- PR #1 `feature/api-retries` (open, by ada; reviewer left a line comment on `retry.ts`), #2 `feature/greeting` (open, by `reviewer`: use it or a fresh reviewer PR for Approve tests), #3 closed, #4 merged.
-- Issues #5–#8: #5 (bug, v0.2, assigned ada), #6 (Backlog, assigned reviewer), #7 (v0.2), #8 closed. Labels bug/enhancement/docs/good first issue; milestones `v0.2` (due 30 Nov 2026) and `Backlog`.
-- Release `v0.1.0` (one asset `sample-0.1.0.txt`) and lightweight tag `v0.0.1`. Wiki pages Home and Setup. Org `kiwi` with `kiwi/website`.
-- `main` has `.forgejo/workflows/ci.yml` (`runs-on: host`). Everything numbered above #8 is a `writes.sh` throwaway; it also leaves `tw-<time>-a.txt` files on main.
-- For a quick throwaway PR, use the API with basic auth `ada:<admin password>`, then close it and delete its branch.
+## Gotchas
 
-## Docker
-
-One image runs forge and T3 Code. Deploy steps are in `DEPLOY.md`. It was built and run with podman on arm64 (2026-11-15): healthy, OAuth login, pages and client navigation with the CSP, the bundled T3 starting, SIGTERM stopping it. Not yet built for x86_64.
-- Build: `AGENTS=both docker compose build`. `AGENTS` is `claude` (the default), `codex` or `both`, and picks which agent CLIs get installed. Run it with `docker compose up -d`, which publishes forge on host port 3080.
-- `bun run build` uses `@sveltejs/adapter-node` 6 (`svelte-adapter-bun` only supports Kit 2), and Bun runs `build/index.js`, which needs no `node_modules`. The build validates env vars while analysing routes, so the Dockerfile passes dummy values.
-  The real values are read at runtime. Without them, `bun --bun` dies with a SIGABRT instead of printing the env error.
-- adapter-node 6 has no `ORIGIN`: it assumes `https` and takes the host from `Host`, and `url.origin` builds the OAuth redirect URI. Behind a TLS proxy that's right. Over plain http, set `PROTOCOL_HEADER=x-forwarded-proto`.
-- `docker-entrypoint.sh` starts `t3 serve` on `127.0.0.1:3773` (`T3_HOST`/`T3_PORT` override this). The first time, it mints a 10-year token for forge into `~/.t3/forge-token`.
-  It sets `T3_URL`/`T3_TOKEN`, overriding `.env`, so the bundled T3 is every user's built-in host. Then it runs forge. If either process exits, the container exits.
-  `t3` is pinned at `t3@0.1.0`, the same version as the desktop app, because `t3.ts` speaks T3's internal RPC. The npm package is a wrapper around a native binary (`@t3code/t3-linux-*`), which the image symlinks directly.
-- The container runs as `bun`, because Claude Code refuses bypass permissions as root. It has five volumes:
-  - `data` → `/data` (`forge.json`)
-  - `t3` → `~/.t3` (state, worktrees, `forge-token`, `git-credentials`)
-  - `projects` → `~/.t3/projects` (T3 clones)
-  - `claude` → `~/.claude` (`CLAUDE_CONFIG_DIR`, so `.claude.json` lives there too)
-  - `codex` → `~/.codex`
-- First run:
-  1. In `.env`, set `FORGEJO_URL`, an OAuth app whose redirect URI is `https://<forge host>/auth/callback`, and `FORGE_SECRET`.
-     Set `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` too, so agents can commit.
-     Never change `FORGE_SECRET` or drop the `data` volume, or everyone has to log in again and all keys die.
-  2. Log the agents in with `docker compose exec -it forge claude` (then `/login`) and/or `docker compose exec -it forge codex login --device-auth`.
-  3. Give T3 clones push access: `docker compose exec forge sh -c 'echo https://<user>:<token>@<forgejo host> > ~/.t3/git-credentials'`.
-  4. T3 is only reachable inside the container, so "Open in T3 Code" links (`http://127.0.0.1:3773/…`) don't work from a browser. Use `docker compose exec forge t3 connect link --headless` (untested), or publish 3773 with `T3_HOST=0.0.0.0`.
-     Pairing links for the bundled T3 come from `t3 auth pairing create --base-dir ~/.t3 --base-url <url>`. Other T3 hosts are still added in Settings → Agents.
-- Verified by hand:
-  - the build in a clean copy without `.env`, and the built server served pages from outside the repo;
-  - the npm `t3`/`claude`/`codex` bins run with Bun standing in for `node`;
-  - the entrypoint: T3 starts, the token is minted, forge serves pages, and SIGTERM stops both;
-  - forge's `t3.ts` (`config`, `survey`) against a headless `t3 serve`, and pairing-link redemption.
-- Not verified:
-  - the Docker build itself, and whether the base image already provides `node`;
-  - volume ownership;
-  - Codex's sandbox inside a container;
-  - whether T3 lists models once the agents are logged in (an unauthenticated headless T3 returned none).
-
-## Gotchas (each one cost time)
-
-- **SvelteKit 3 differs from v2:**
-  - Env vars are declared in `src/env.ts` with `defineEnvVars` and imported from `$app/env/private`.
-  - `#lib/...` imports need the `.js` extension.
-  - `Handle` comes from `@sveltejs/kit/hooks`.
-  - `redirect()` to another origin needs `{ external: [origin] }`.
-  - Check `node_modules/@sveltejs/kit/types/index.d.ts` rather than relying on memory.
-- No `@types/node`: use `Uint8Array.fromBase64` + `TextDecoder`, not `Buffer`.
-- **localhost cookies are shared across ports.** Other local apps' `session` and `i_like_gitea` cookies crashed both the app and Forgejo.
-  The fix is unique names: `forge_session` in the app, and `[session] COOKIE_NAME = forge_dev_fj` in app.ini. Never use generic cookie names.
-- The dev server can keep serving stale component CSS after edits, even on a full reload: an unscoped `li` rule stayed live after it was fixed in the file.
-  If styles don't match the source, restart `bun run dev`.
-- `autofocus` doesn't work on elements inserted after load. Use `{@attach (el) => el.focus()}`.
-- Split diff tables use `table-layout: fixed` and the first row is a colspan hunk header, so column widths come from `<colgroup>`.
-- **Forgejo API quirks:**
-  - Some errors come back as `{"message": ""}` (e.g. 405 when merging a merged PR). `request()` falls back to the status code.
-  - After a branch is deleted, `head.ref` becomes `refs/pull/N/head`. Display `head.label`.
-  - There's no standalone line-comment endpoint. A line comment is `POST /pulls/N/reviews` with `event: COMMENT`, an empty body and one comment.
-    Use `new_position` for new-side lines and `old_position` for old-side ones. When reading, `position` (new) or `original_position` (old) is set.
-  - There's no API to resolve a conversation. The app uses a 🚀 (`rocket`) reaction on the thread's first comment instead.
-    A thread also counts as closed once its line is gone or changed in the current diff, because the API doesn't flag outdated comments.
-  - The contents API returns `content: null` for blobs over its size limit.
-  - The login form may not render `_csrf` (Forgejo checks `Origin`). Scripts must send `Origin` and treat the token as optional.
-- **Forgejo refresh tokens are single-use, and all logins of a user for one OAuth app share one chain.** Redeeming any token invalidates every older one ("token was already used"),
-  so two browsers, or a browser plus an agent key, can't each hold their own. That's why forge keeps a single server-side grant per user and shares the access token. Concurrent refreshes are de-duplicated in `userToken`.
-  Consequence: if `forge.json` is lost or `FORGE_SECRET` changes, log in again and recreate keys.
-- **The agent sandbox proxy blocks `localhost`** (511). To run the local Forgejo/dev server or curl them, run the terminal command unsandboxed. Another session may already have `forgejo web` and `vite` running on :3000/:5173 (the Forgejo queue DB lock fails a second start), so `mcp.sh` only starts what isn't up.
-- There's no prettier config. A bare `bunx prettier` reformats to spaces and double quotes; the house style is tabs, single quotes, no trailing commas, ~180 columns.
-- Icons are MingCute Core Regular (`@mingcute/svelte`, per-icon imports like `@mingcute/svelte/core-regular/robot`), mapped by name in `Icon.svelte`. The owner rejected Lucide as too generic. They are filled shapes, so there is no stroke width to set. After adding a dependency, restart `bun run dev` or SSR fails with "Unknown file extension .svelte".
-- Selected rows (sidebar, settings nav, palette) are a flat `color-mix(var(--fg) 9%)` tint, not an accent stripe. The owner found the stripe looked AI-made.
-- Don't name a class `.agent` inside a component: `app.css` has a global `.agent` pill (the agent label), and it leaks in.
-- The user's shell defines `grep` as a function (ugrep). Use `command grep` in scripts.
-- **Headless UI testing:** `/usr/bin/chromium` works with `playwright-core`; see `scripts/line-comments.e2e.ts`.
-  Wait for `networkidle` before clicking, because clicks before hydration do nothing.
-  Screenshots: `.agents/scripts/login.sh` then, in `.agents/tmp`, `bun shot.ts <light|dark> name=/path …` → `shot-name.png` (`FULL=1` for full page, `COOKIES="forge_palette=nord"` for extra cookies).
-  `login.sh` reuses `app.jar` while it still works (`FRESH=1` forces a new login), because every fresh login adds a sign-in on Settings → Account. About 26 old test sign-ins are still listed there.
-  `.agents/tmp` is scratch (one-off playwright scripts like `chat.ts`, `question.ts`, `hublaunch.ts`, `dismiss.ts`, `paltheme.ts`); none of it is load-bearing.
-- Editing Svelte with Python substring replaces: match on unique text, not indentation plus `{/each}`; one cut the wrong block.
+- **SvelteKit 3:** env vars in `src/env.ts` (`defineEnvVars`) imported from `$app/env/private`; `#lib/...` imports need `.js`; `Handle` from
+  `@sveltejs/kit/hooks`; `redirect()` off-origin needs `{ external }`. Bun types come from `src/bun.d.ts` (a `types` field in tsconfig hides Kit's).
+- Modules imported by `bun test` must not import `$app/env/private` (only `shed.ts`, `actions/secrets.ts` and routes do).
+- adapter-node limits bodies to 512 KB unless `BODY_SIZE_LIMIT` (the image sets Infinity); pushes and uploads need it.
+- localhost cookies are shared across ports: cookie names are unique (`shed_session`, `shed_oidc`).
+- `autofocus` doesn't work on inserted elements; use `{@attach (el) => el.focus()}`. Wait for `networkidle` before clicking in Playwright.
+- House style: tabs, single quotes, no trailing commas, ~180 columns; no prettier config (a bare `bunx prettier` reformats wrongly).
+- Icons are MingCute (`Icon.svelte`); the owner rejected Lucide. Selected rows are a flat tint, not an accent stripe. Don't name a class `.agent`.
+- The user's shell defines `grep` as a function: use `command grep` in scripts.
+- Dev server can serve stale CSS after edits; restart it. After adding a dependency, restart or SSR fails.
 
 ## Security
 
-Decided in the security pass (2026-11-15):
-- **Paths:** `request()` in `forgejo.ts` rejects `.`/`..` segments (they'd escape a repo or an agent key's scope) and maps a network failure to a 502; `tools.ts` validates MCP `repo`/number args.
-- **Cookies:** every cookie is `httpOnly`, `sameSite=lax`, and `secure` when the request is https (`cookie(url, maxAge)` in `auth.ts`; use it for new cookies). Behind the TLS proxy that's always on; plain-http dev still works.
-- **Auth:** pages that need a user redirect to `/login`; forge-side writes (keys, hosts, pins, dismiss, snooze, approvals) resolve the user with `api('/user')`, which 401s anonymously. Forgejo enforces its own writes.
-  Approvals are decided only by their owner (`decide` filters on `userId`). Kit's origin check covers CSRF for form posts.
-- **Agents need write access:** `requirePush()` in `forgejo.ts` gates `@agent` mentions, Fix with agent and NewTask launches, because tasks push with the T3 host's git credentials, not the user's.
-- **T3 hosts (SSRF):** hosts are user-supplied URLs fetched server-side. Private IPs and loopback are **allowed on purpose** (T3 lives on the LAN). The guard is: http(s) only, no credentials/query/fragment in the URL (`hostUrl()` in `t3.ts`), and redirects are never followed (`redirect: 'manual'`, so a 3xx is a failure).
-- **`{@html}`:** only Forgejo-rendered markdown (sanitised by Forgejo), Shiki output, `highlightLines` (escapes token text) and `themeCss` (constants). Never put user text in `{@html}` unescaped.
-- **Redirects:** Kit's `redirect()` throws on any cross-origin target unless `external` is passed (only `/login` → Forgejo does), so user input can't make an open redirect. `/pin` only goes back to a same-origin Referer.
-- **Headers:** `hooks.server.ts` adds `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: DENY` to everything. The CSP (in `vite.config.ts`, `kit.csp`) restricts **scripts only** (`'self'` + Kit's nonce), plus `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`; styles and images stay open because Shiki and the theme CSS are inline and markdown images can be anywhere. Inline `<script>` won't run; don't add any.
-- **Raw files** (`/raw/…`) are served with a `sandbox` CSP (opaque origin), html/js as `text/plain`, and SVG/XML as `attachment` (an `<img>` still renders them).
-- **Errors:** `+error.svelte` shows the message for 4xx and 502-style errors but a generic text for 500s. Kit already hides unexpected errors' messages.
-- **Startup:** `src/env.ts` validates env (FORGEJO_URL and T3_URL http(s) URLs, client id/secret present, FORGE_SECRET ≥ 32 chars; the Dockerfile's build-time dummy is long enough).
-  The `init` hook loads `forge.json` first: a missing file starts empty, but an unreadable or corrupt one **stops the server** rather than being overwritten. Writes go to a temp file then rename, and a failed write doesn't block later ones.
-- `/healthz` (no auth, `ok`) backs the Dockerfile `HEALTHCHECK` (`bun -e fetch(...)`, since the image has no curl).
-
-## Handoff (2026-11-15, read this first)
-
-The owner's goal: production-ready, then **as close to feature parity with Forgejo's own web UI as possible**.
-Deploy is **prepare-only**: `DEPLOY.md` is the runbook for `forge.example.com` on server (`/opt/stacks/forge`) against git.example.com (Forgejo 15.0.5). Don't touch server or register anything on git.example.com until the owner says deploy.
-
-Prod-readiness, done 2026-11-15: Forgejo 15 checked (every write path and route, see "Running locally"), the security pass ("Security"), the mobile pass ("Layout"), the Docker image built and run, and the dead repo tabs filled:
-Actions (runs list from `/actions/runs`, which wraps runs as `{ workflow_runs, total_count }`; logs link to Forgejo), Wiki (read-only, `src/lib/server/wiki.ts`; Forgejo's markdown API ignores `[[Links]]`, so they're rewritten first; edits link to Forgejo), Activity (`ActivityFeed.svelte` + `src/lib/server/feed.ts`, shared with the owner page), and Settings (links out to Forgejo's settings).
-Forgejo 15 has no `/actions/runs/{id}/rerun`, so "Re-run failed checks" reports it can't.
-
-Parity work, not started (the half-built compare, repo settings and `code.ts` were removed; restore from `5416c49` if useful):
-1. **Code and repo header:** Star/Watch/Fork, clone/download menu, web edit/new/upload/delete/rename, blame, file history, Go to file (`t`), permalinks, line anchors.
-2. **PRs and comments:** compare page + new PR from any branch (`home.ts` exports `draft()` for it), reviewers, WIP toggle, close/reopen PR, update branch, edit/delete/quote/react on comments, comment anchors, lock/pin/due date/dependencies/subscribe, cross-reference events.
-3. **Repo settings in forge:** General/Merge/Collaborators/Branch protection/Webhooks/Deploy keys/Actions secrets+variables/Danger zone, `/labels` and `/milestones` management, new-repo options, `/new/migrate`.
-4. **Actions:** run detail page, workflow dispatch, cancel/delete/artifacts, status icons in commit lists. Job logs aren't in the API on 15 or 17.
-5. **Wiki editing, projects, packages, release editing.**
-6. **Notifications, explore, search, orgs, user settings.** `NOT_REPOS` already has `explore`, `notifications`, `search`, `orgs`. Check the OAuth scopes in `auth.ts` before building SSH keys/tokens pages.
-
-Agents share one checkout: give each a distinct area, have them re-read files before editing, and commit only their own hunks. Run 3–4 at a time at most (nine at once hit a usage limit).
-
-## Status and roadmap
-
-Done:
-1. Local Forgejo
-2. OAuth login
-3. Repo browser
-4. Commit and PR diff views
-- Plus merge, PR comments, inline line comments, and state badges.
-5. Merge card: a readiness checklist plus Approve and Merge. `A` approves; `M` arms the merge and a second `M` within 2s merges.
-6. Pending reviews: drafts are kept in localStorage (`review:owner/repo#N`) and submitted as one `POST /reviews`.
-   Forgejo's own PENDING reviews need a non-empty body, so they weren't used.
-7. A "viewed" checkbox per file, in localStorage (`viewed:owner/repo#N`) with a hash of the file's diff, so it unviews itself when the file changes.
-8. Expanding diff context (`DiffView` `source` prop → `/[owner]/[repo]/lines/[ref]/[...path]?from&to`). Expanded lines can't be commented on.
-9. Agents tab (`/[owner]/[repo]/agents`), driving T3 Code through `src/lib/server/t3.ts` (WebSocket RPC).
-   **Hosts:** each user adds T3 servers in Settings → Agents, normally by pasting a **pairing link** from T3's Settings → Connections (`<host>/pair#token=…`, or hosted `…?host=<url>#token=…`; single-use, 5 min).
-   `pair()` redeems it at T3's `POST /oauth/token` (RFC 8693 token exchange, subject type `urn:t3:params:oauth:token-type:environment-bootstrap`, scope `orchestration:read orchestration:operate source-control:write`, client_label `forge`) for a 30-day bearer with no refresh token, so hosts show when the pairing ends and must be re-paired.
-   (T3's MCP OAuth flow is no use here: its tokens only work on `/mcp`.) A URL plus a `t3 auth session issue …` token still works under "Or use a URL and token". Hosts are checked (`getConfig`) on add and stored in `forge.json` (`t3Hosts`, token encrypted).
-   `T3_URL` + `T3_TOKEN` in `.env` is an optional extra host for everyone (id `env`, not removable). Every t3.ts call takes a `Host`; `survey(hosts)` loads all of them and reports a host that's down instead of failing.
-   **Agent questions:** an agent's AskUserQuestion shows up as a pending runtime request of kind `user_input` plus a `user_input_request` turn item with `questions`. Forge renders a card (options + free text) above the reply box and answers with
-   `runtime-request.respond` `{ answers: { [questionId]: value | label | text, or an array for multiSelect } }`, or `thread.user-input.dismiss`. Before this, a question left the run stuck.
-   The task log groups everything between messages into one expandable "Ran 2 commands, thought 3 times" line.
-   **Open in T3 Code:** threads link to the host's own web UI at `<host url>/<environmentId>/<threadId>` (`config()` returns the base). A browser that never paired with that host lands on T3's `/pair` page, which then goes to `/` rather than the thread. Making a pairing link per click would need T3's `access:write` scope, so it's not done.
-   **Set up in T3:** when no host has the repo as a project, the Agents tab offers "Clone into T3 Code": `cloneProject()` calls T3's `projectClone.start` (needs the `source-control:write` scope; pairing asks for it, and the `.env` token was re-minted with it) into `<newProjectsRoot>/<repo name>` (`~/.t3/projects/…` here).
-   The clone uses the repo's `clone_url`, so pushing needs git credentials for Forgejo on that host. Locally there are none globally; `~/.t3/projects/claude-testing` got the same local `credential.helper` as `dev/sample`.
-   The Agents tab merges threads from every host that has the project; the new-task form picks the host; links carry `?host=&thread=` (the same server added twice yields the same thread ids). Fix with agent uses the first reachable host with the project.
-   A repo maps to the T3 project with the same **title**. New tasks run in a T3 worktree off the default branch and reuse the model of your latest T3 thread.
-   It has start, a polled log (every 2s while running), approvals, follow-up/steer and Stop. Stop and steering a *running* agent are untested.
-   **Fix with agent** (Conversation and Files tabs, `src/lib/server/fix.ts`) starts a task on the PR branch (`startFromOrigin`) that commits and pushes the fix.
-   `dev/sample` pushes with a `write:repository` token in `dev/.git-credentials`; T3 worktrees share that config.
-   The local T3 server is the desktop app's, on :3773. `ada/sample` is checked out at `dev/sample` as T3 project "sample".
-
-10. **Agent keys and MCP server** (`.agents/scripts/mcp.sh` tests it end to end). Agents connect *to* forge: Settings → Agents creates a key and shows a `claude mcp add --transport http forge <origin>/mcp --header "Authorization: Bearer fk_…"` line.
-   `/mcp` is a hand-rolled MCP (Streamable HTTP, JSON replies, no SSE) with list/read PRs, diff, `read_file`, comment, reply to thread, resolve thread, open PR, and an **opt-in** `merge_pull_request` (merge now or `when_checks_pass`).
-   A key can only see or call merge if its owner ticked "Also allow it to: merge a PR" (`AgentKey.allow`; tools marked `optIn` in `tools.ts`). New keys ask before merging by default.
-   Keys act as their owner through Forgejo, are scoped to a repo list (`*` = all), and writes are signed "<key name>, an agent acting for @user via forge" and logged (last 500 in `forge.json`, shown on the settings page).
-   **Approval queue:** each key has an `ask` list of write tools. A call to one of those is parked in `forge.json` (`approvals`) and the agent gets "queued as request <id>", then polls the `check_request` tool.
-   The owner approves or denies on `/settings/agents` ("Waiting on you", header badge, 5s poll). Approve runs the stored call as the owner. Decisions are one-shot (409 on a repeat) and only the owner can decide. New keys ask before `open_pull_request` by default; keys made before this have no `ask` and never ask.
-   **Repo rules** (`src/lib/server/rules.ts`): `.forge/agents.json` on the repo's default branch, read on every agent write. Keys: `branchPrefix` (open_pull_request head must start with it; refused),
-   `protectedPaths` (globs; a PR whose compare-diff touches one is queued with a reason; if the file list can't be had it queues too), `ask` (tools that always queue for that repo), `deny` (tools refused).
-   An invalid file **fails closed** (writes refused with a 422; reads still work). The `get_rules` tool lets agents read them first. Lockfiles need `**/*.lock`-style globs; `*` doesn't cross `/`.
-   **Agent labels:** writes carry a `<sub>name, an agent acting for @user via forge</sub>` footer (`src/lib/sign.ts`). The PR conversation and Files tab strip it and show a purple pill with the key's name. It's a label, not proof: anyone can type the same text.
-   Keys are editable in place (name, repos, ask list) under each key on `/settings/agents`. `comment_on_line` lets an agent start a thread on a diff line (path must be in the PR; it can comment but never approve).
-   Tests: `mcp.sh` (auth, reads, token refresh), `mcp-merge.sh` (opt-in merge: hidden/refused, queued, scheduled), `mcp-tools.sh` (open PR, diff, read_file, resolve, comment_on_line), `mcp-approval.sh` (queue), `mcp-rules.sh` (rules); `mcp-clean.sh` revokes their throwaway keys (by name).
-   They create and delete branches/PRs in `ada/sample` themselves; `mcp-rules.sh` also commits and removes `.forge/agents.json` on main.
-   Not built yet: blame markers for agent lines, a way to edit rules in forge's UI (it's a file in the repo for now), and pushing branches through forge (agents push over git). `FORGE_SECRET` must be set in `.env`.
-
-11. Auto-merge: when the head's combined status is `pending`, the merge button becomes "Merge when checks pass" (`merge_when_checks_succeed`); `cancelAutoMerge` is `DELETE /pulls/N/merge`.
-   The API has no auto-merge field, so the state is the latest `pull_scheduled_merge`/`pull_cancel_scheduled_merge` in `/issues/N/timeline`.
-   Forgejo schedules even with no checks at all and then waits for a status forever, so the button is only offered while checks are pending.
-
-12. CI status: the merge card lists each commit status (job name, description, a Logs link to Forgejo's job page) under the "N of M checks passed" row, and the page re-polls every 5s while checks are pending.
-   Forgejo calls a status's state `status`, not `state` (the old count was always 0).
-   Failed checks: "Re-run failed checks" (`?/rerun`: the run number from each status's `target_url` → its id via `/actions/runs` → `POST /actions/runs/<id>/rerun`; 404 on Forgejo versions without it says so) and "Merge anyway" (red, needs a second click or M twice), offered only when the PR is mergeable and nothing is pending; Forgejo itself still refuses if branch protection requires the checks. Job logs aren't in the API, hence the link out.
-
-13. Agent attribution: `Byline.svelte` renders "<agent pill> on behalf of <user>" for PR lists, Changes, the PR header, the conversation, line comments and commit lists.
-   Sources (`sign.ts`): forge's own MCP signature; Claude Code's "Generated with [Claude Code]" PR footer (→ "Claude Code"); and the `Co-Authored-By: <name> <noreply@anthropic.com>` commit trailer (→ e.g. "Claude Opus 5.5").
-   A PR counts as agent-made if its body says so or any of its commits has the trailer (the PR layout fetches commits for this). The sidebar/top bar brand is plain "forge" text now; the rail hides it.
-
-14. Small gaps closed: `/[owner]` is a user/org page (a sticky profile column with orgs or members; a contribution heatmap from `/users/X/heatmap`, 15-minute buckets summed per day; repo cards; recent activity from `activities/feeds`, where `content` is `["N","title"]` JSON for issue events and `{Commits}` for pushes, a push with no commits is a new branch, and runs of pushes to one branch are merged; `/users/<name>` works for orgs, and `/orgs/<name>/members` succeeding is how it tells them apart).
-   Markdown files and READMEs render with `renderMarkdown(…, { ref, dir })`: Forgejo gets `<repo>/src/branch/<ref>/<dir>` as context, and that prefix is rewritten to forge's `blob`/`raw` URLs (folder links redirect blob → tree).
-   The tree view shows each entry's last commit subject and age (`last_commit_sha` from the contents API, then one `git/commits/<sha>` per distinct sha).
-
-15. Issues: repo tab "Issues" (open count, hidden if `has_issues` is off). `/[owner]/[repo]/issues` (Open/Closed switch, `LabelChip.svelte`, New issue), `issues/new`, and `issues/[index]`
-   (timeline of comments plus close/reopen/label/title events, composer with Close/Reopen "with comment", Labels sidebar with a toggle picker). `IssueState.svelte` mirrors `PrState`. Open issues are in the palette.
-   Quirks: the list needs `type=issues` or PRs come back too; `/issues/N` for a PR redirects to `/pulls/N` (`pull_request` is set); `/issues/N/timeline` returns `null`, not `[]`, when empty;
-   label colours come back without `#`; a `label` timeline event has `body` `"1"` for added and `"0"` for removed. Test issues #27–#31 and labels bug/enhancement/docs/good first issue are in `ada/sample`.
-
-16. Labels and editing on issues and PRs. The label picker (now in `Triage.svelte`, see 18) is in the sidebar on the issue page and the PR Conversation tab; the other PR tabs show chips in the header; chips on the PR list and Changes.
-   The label dropdown next to Open/Closed is in `ListFilters.svelte` (see 18); list chips link to the same `?labels=<name>` filter, with × to clear.
-   `EditTitle.svelte` (pencil, Enter saves, Esc cancels) and `Description.svelte` (Edit swaps the first card to a textarea) are allowed for push access or the author.
-   Actions live in `src/lib/server/issue.ts` (`issueActions` = label/edit, spread into both pages; PRs use the `/issues/N` endpoints). The PR layout's title form posts to `<pr>?/edit`, so it works from the Files and Commits tabs too.
-   Editing a body unsigns it first and re-appends the original forge footer on save, so agent attribution survives. ("Generated with Claude Code" is ordinary body text and stays editable.)
-   Quirk: `/issues?labels=` takes label **names**, but `/pulls?labels=` takes label **ids** (a name fails with a `strconv.ParseInt` error), so the PR list maps the name first.
-
-17. Branches and releases: "N branches · N tags" links sit left of the branch picker on the Code tab (the layout fetches `tags?limit=1` for `x-total-count`; the picker hides on these pages).
-   `/[owner]/[repo]/branches`: default first, then by latest commit; last commit with `Byline`; behind/ahead vs the default branch for the 20 newest (two `compare` calls each, which return full commits and files, hence the cap);
-   the open PR (matched on `head.ref`) or "New pull request" (`?/openPr` → `openPush` from `home.ts`, drafted title, straight to the PR); delete with a confirm for push users, never the default or a protected branch (re-checked server-side).
-   `/[owner]/[repo]/releases`: Releases/Tags switch (`?tags`, and Tags when there are no releases); notes via `renderMarkdown(…, { ref: tag, dir: '' })`; assets and source archives link straight to Forgejo (so a private repo needs a Forgejo browser session).
-18. Triage: `Triage.svelte` is the issue/PR sidebar (Labels, Assignees, Milestone), each a `SidePicker.svelte` (generic toggle list of forms posting to `?/<action>`).
-   `issueActions` gained `assign` (toggles one login against the *current* assignees, fetched server-side, so quick clicks on a stale page don't undo each other) and `milestone` (`PATCH milestone: id`, `0` clears); `triageOptions()` loads labels, `/assignees` and open milestones.
-   Lists: `ListFilters.svelte` (Label and Milestone dropdowns, "Assigned to me" toggle; it replaced `LabelFilter.svelte`), assignee avatars (`Assignees.svelte`) and the milestone on each row, and `Pager.svelte` (25 per page, `x-total-count`).
-   All list links go through `listQuery(url, { key: value | null })` in `src/lib/list-query.ts`, which keeps the other params and drops `page`. URL params: `state`, `labels` (name), `milestone` (title), `assignee` (login), `page`; `listFilters()` in `issue.ts` parses them.
-   The issue timeline shows `assignees` events (`assignee` + `removed_assignee`; self-assign reads "self-assigned this") and `milestone` events (`milestone`/`old_milestone`, null on the cleared side).
-   Quirks: the pulls list has no assignee filter, so with `assignee` set the PR list pages through `/issues?type=pulls&assigned_by=` and fetches each `/pulls/N` for its branches. It filters milestones by id (`milestone=`), the issues list by `milestones=` (names or ids).
-   An unknown label or milestone name makes Forgejo **ignore** the filter and return everything, so `listFilters` flags it and the list is emptied by hand; an unknown `assigned_by` user is a 404.
-
-19. `@agent` mentions (`src/lib/mention.ts` finds them, skipping code and quotes; `src/lib/server/mention.ts` acts). A comment posted *through forge* (PR conversation, PR line comment, issue) that mentions `@agent` starts a T3 task on the commenter's own first host with the repo as a project
-   (PR: on the PR branch, pushing to it; line comment: plus the diff lines above it; issue: a new `agent/issue-N-…` branch off the default one) and replies "On it" with the task link, signed with the task's agent ("Claude Code", "Codex"). Open mentions live in `forge.json` (`mentions`).
-   The request hook runs `sweepMentions()` at most every 15s: a finished task gets "Done" plus the agent's last message (cut at ~4000 chars), a failed one a "stopped" note; line-comment replies go to the same line. Mentions made in Forgejo's own UI do nothing yet (stage 3: webhook + a real Forgejo user).
-   Typing `@` in a comment box (PR/issue composers, line comments, descriptions, new issue) opens `MentionPicker.svelte`: `@agent` first, then the repo's `/assignees` (via `/[owner]/[repo]/mentionable`, cached per page load); arrows + Enter/Tab pick, Esc closes. Add it to a new textarea with `bind:this` + `<MentionPicker input={…} />`.
-   `store.read()` caches the load *promise*: two concurrent first loads used to make two copies, and the sweep's `done` flags landed on the lost one, so it posted twice.
-
-20. T3 task attribution: `startTask` (every forge-started task: Fix with agent, `@agent`, NewTask) records `{ repo, branches, host, thread, agent, userId }` in `forge.json` `tasks` (last 500); `agent` is the provider's display name ("Claude", "Codex").
-   `branches` is where the task was told to push (PR head, or `agent/issue-N-…`); for a NewTask it's empty, and `taskOn()` fills it in when a PR shows up from the thread's current branch (T3's `t3/<slug>`, checked only for tasks started in the 3 days before the PR).
-   The PR layout uses it only when no signature/footer/trailer names an agent; the pill links to `/agents/<host>/<thread>` (`Byline`'s `href`). Only tasks started before the PR opened count, so a Fix or `@agent` on a human's PR doesn't credit the PR to the agent. PRs #38 and #39 are closed throwaways from these tests.
-
-Next, in the order discussed:
-1. Deploy to `/opt/stacks` on server. (The session cookie is now an opaque id, so that blocker is gone. Persist `FORGE_DATA` and keep `FORGE_SECRET` stable, or everyone has to log in again and all keys die.)
-2. Agent attribution, the rest: commit lists don't use the T3 task record (item 20). Maybe also a real Forgejo label (`agent/<key name>`) so Forgejo's own UI shows it.
-
-Waiting on the owner (asked, not answered; don't start without a yes):
-- **T3 Code bundled in the Docker image**: done as an image only (see "Docker"); never built, since there's no Docker here, and not deployed. Deploying it to server (`/opt/stacks/forge`) and T3 Connect still need an OK.
-- Smaller offers: a "show dismissed tasks" view on the hub; hub launch redirecting to the new task's page instead of the repo tab; clearing the old test sign-ins.
-
-Agent ideas (designs in `.agents/reference/`, not started):
-- **Agents tab** (`git-host-prototype.html`, `git-host-prototype-agents.png`): tasks with status, a live log, a "Needs your OK" box,
-  Pause / Take over / Stop, and a box for steering the agent. The idea is to drive T3 Code agents from forge over T3 Connect.
-  Everything it needs exists in T3 Code without changes (checked against a fresh clone, 2026-10-16). See "T3 Code API" below.
-- **Agent activity** (`agent-activity.png`): agents connect *to* forge with scoped keys (CLI or MCP server). Repo rules decide what they may do;
-  anything outside the rules waits in a "Waiting on a human" queue. Also: an audit log, and agent lines marked in blame and diffs.
-  Forgejo's scoped access tokens could be the keys, but the approval queue only works if agents go through forge's API rather than Forgejo's.
-
-T3 Code API (from the source, commit 2577baf8; server default port 3773):
-- **Auth:** on the T3 host, `t3 auth session issue --scope orchestration:read --scope orchestration:operate --scope source-control:write --label forge` mints a bearer token.
-  Without `--scope` it is admin. Keep it server-side in forge's `.env`.
-- **MCP at `/mcp`** is the only documented outside-client surface (`docs/user/outside-agents.md`). It has `t3_thread_launch`, `t3_thread_send`
-  (mode `steer`), `t3_thread_read` (view `activity`), `t3_thread_wait` and `t3_thread_interrupt`. It **can't approve permission requests**, only answer questions.
-- **WebSocket RPC** at `/ws?wsTicket=…&orchestrationProtocol=2` (ticket from `POST /api/auth/websocket-ticket`) is what T3's own apps use.
-  It adds a live `subscribeThread` stream and `runtime-request.respond` for approvals. It's internal Effect RPC, so pin the T3 version.
-- **Webhook tasks** answer at `/api/hooks/:taskId/:token`, with optional GitHub-style HMAC and `{{body.x}}` placeholders in the prompt.
-  They don't need T3 Connect when forge can reach the host directly.
-- T3 projects must already exist, so a forge repo needs a matching T3 project (a local checkout).
-
-Known gaps:
-- Unit tests: `bun run test` (`bun test` on `src/lib/*.test.ts`; diff fixtures saved from `ada/sample` plus a hand-made `edge.diff` live in `src/lib/fixtures/`). Test files are excluded from svelte-check (no `bun:test` types).
+- Paths: refs from URLs go through `resolve()`; repo paths are by id; `commitFiles` refuses `..`/`.git` segments; the API router refuses `..`.
+- Auth: cookie sessions (hashed), personal tokens (hashed, scoped, expiring), CI task tokens; the HTTP API ignores cookies (no CSRF);
+  Kit's origin check covers form posts. Private repos 404 for people who can't read them; anonymous git clients are asked to sign in.
+- Markdown is escaped, not sanitised: never put user text in `{@html}` other than `render()`'s output, Shiki output or `highlightLines`.
+- Raw files, wiki files and release files are served with a sandbox CSP; html/js as text; SVG/XML as attachments.
+- Webhooks and T3 hosts may point at private IPs (homelab) but only http(s), never following redirects.
+- CI secrets are encrypted with `FORGE_SECRET` and only decrypted into a task.
 
 ## Working with the owner
 
 - Small confirmed steps. Don't chain unrequested work. Concise replies.
 - Prefers Bun, Svelte, short code, and no comments unless they explain a non-obvious "why".
 - Verify in a real browser (screenshot) when changing UI. The owner checks visually and reports what looks off.
+- Parallel agents in one checkout: give each a distinct area, no migrations from them, they don't commit; 3–4 at most (they hit the 5-hour usage limit).

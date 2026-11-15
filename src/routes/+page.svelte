@@ -44,7 +44,7 @@
 
 {#if !data.user}
 	<section class="login">
-		<h1>forge</h1>
+		<h1>Shed</h1>
 		<a class="button primary" href="/login">Log in with Forgejo</a>
 	</section>
 {:else}

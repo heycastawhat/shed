@@ -11,7 +11,7 @@ export type Theme = { name: string; light: Vars; dark: Vars };
 // `forge` is app.css's own palette; the rest override it through `data-palette` on <html>.
 export const THEMES: Record<string, Theme> = {
 	forge: {
-		name: 'Forge',
+		name: 'Shed',
 		light: {
 			bg: '#ffffff',
 			surface: '#f6f7f9',

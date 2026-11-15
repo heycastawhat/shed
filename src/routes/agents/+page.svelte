@@ -94,7 +94,7 @@
 		{#if !t3}
 			<section class="card">
 				<h2>Tasks</h2>
-				<p class="muted none">Connect T3 Code in <a href="/settings/agents">Settings → Agents</a> to start and watch agent tasks from forge.</p>
+				<p class="muted none">Connect T3 Code in <a href="/settings/agents">Settings → Agents</a> to start and watch agent tasks from Shed.</p>
 			</section>
 		{:else}
 			{#each t3.down as d (d.name)}<p class="down">{d.name} is unreachable: {d.error}</p>{/each}

@@ -98,7 +98,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>forge</title>
+	<title>Shed</title>
 	{@html `<style>${themeCss}</style>`}
 </svelte:head>
 
@@ -133,13 +133,13 @@
 	{#if data.user}
 		<header class="mobile">
 			<button class="icon" onclick={() => (drawer = true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
-			<a class="brand" href="/">forge</a>
+			<a class="brand" href="/">Shed</a>
 			<button class="icon" onclick={() => (prefs.palette = true)} aria-label="Search and commands"><Icon name="search" size={20} /></button>
 			<a class="icon" href="/new" aria-label="New repository"><Icon name="plus" size={20} /></a>
 		</header>
 		{#if drawer}<div class="scrim" role="presentation" onclick={() => (drawer = false)}></div>{/if}
 		<aside aria-label="Main" class:open={drawer} class:extra={prefs.nav === 'bar'}>
-			<a class="brand" href="/">forge</a>
+			<a class="brand" href="/">Shed</a>
 			{@render search()}
 			<nav>
 				{#each items as it (it.href)}
@@ -185,7 +185,7 @@
 	{#if !data.user || prefs.nav === 'bar'}
 		<header class="topbar">
 			<div class="bar">
-				<a class="brand" href="/">forge</a>
+				<a class="brand" href="/">Shed</a>
 				{#if data.user}
 					<nav>
 						{#each items as it (it.href)}

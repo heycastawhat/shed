@@ -35,7 +35,7 @@
 
 <h1>Agents</h1>
 <p class="muted">
-	Let an agent (Claude Code, Codex, anything that speaks MCP) work on your repos through forge. Each key acts as you and can read PRs, comment, resolve threads and open PRs. It can never merge.
+	Let an agent (Claude Code, Codex, anything that speaks MCP) work on your repos through Shed. Each key acts as you and can read PRs, comment, resolve threads and open PRs. It can never merge.
 </p>
 
 {#if data.pending.length}
