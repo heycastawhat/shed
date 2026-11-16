@@ -89,6 +89,11 @@ class ScreensTest {
 	private fun tap(description: String) = rule.onNode(hasContentDescription(description, substring = true)).performClick()
 	private fun shot(name: String) = rule.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
 	private fun at(name: String) { current = name }
+	// Back, then let the screen change finish before the next tap.
+	private fun back() {
+		rule.onNode(hasContentDescription("Back")).performClick()
+		rule.waitForIdle()
+	}
 
 	private fun tour(theme: String) {
 		at("$theme-home")
@@ -108,7 +113,7 @@ class ScreensTest {
 		at("$theme-repo")
 		waitFor("what to water")
 		shot("$theme-repo")
-		rule.onNode(hasContentDescription("Back")).performClick()
+		back()
 		tap("Inbox")
 		at("$theme-inbox")
 		waitFor("Release 0.4")
@@ -121,7 +126,7 @@ class ScreensTest {
 		at("$theme-files")
 		waitFor("waitForBanner")
 		shot("$theme-files")
-		rule.onNode(hasContentDescription("Back")).performClick()
+		back()
 		tap("Agents")
 		at("$theme-agents")
 		waitFor("wants to")
@@ -133,12 +138,13 @@ class ScreensTest {
 		at("$theme-tree")
 		waitFor("clone.ts")
 		shot("$theme-tree")
+		waitFor("what to water")
 		rule.onNode(hasText("clone.ts")).performClick()
 		at("$theme-file")
 		waitFor("banner")
 		shot("$theme-file")
-		rule.onNode(hasContentDescription("Back")).performClick()
-		rule.onNode(hasContentDescription("Back")).performClick()
+		back()
+		back()
 		rule.onNode(hasText("Actions")).performClick()
 		at("$theme-runs")
 		waitFor("Run tests")
@@ -146,9 +152,9 @@ class ScreensTest {
 		at("$theme-run")
 		waitFor("bun test")
 		shot("$theme-run")
-		rule.onNode(hasContentDescription("Back")).performClick()
-		rule.onNode(hasContentDescription("Back")).performClick()
-		rule.onNode(hasContentDescription("Back")).performClick()
+		back()
+		back()
+		back()
 		tap("Settings")
 		at("$theme-settings")
 		waitFor("Appearance")

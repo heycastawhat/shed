@@ -55,6 +55,7 @@ import dev.shed.app.BuildConfig
 import dev.shed.app.session
 import dev.shed.app.settings
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.put
 
 // Laid out as Sink's Settings: a card per topic on the lowest surface.
 @Composable
@@ -129,6 +130,30 @@ fun SettingsScreen(onBack: () -> Unit, onCheckForUpdates: suspend () -> String?)
 						}
 					}
 				) { Text(if (checking) "Checking…" else "Check for updates") }
+			}
+
+			Card("Profile") {
+				val api = LocalApi.current
+				val send = rememberSend()
+				val l = rememberLoad(api, "settings") { api.get<dev.shed.app.UserSettings>("/user/settings") }
+				(l.state as? Load.Ok)?.value?.let { p ->
+					var name by remember(p) { mutableStateOf(p.fullName) }
+					var about by remember(p) { mutableStateOf(p.description) }
+					var place by remember(p) { mutableStateOf(p.location) }
+					var site by remember(p) { mutableStateOf(p.website) }
+					androidx.compose.material3.OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+					androidx.compose.material3.OutlinedTextField(about, { about = it }, label = { Text("About") }, modifier = Modifier.fillMaxWidth())
+					androidx.compose.material3.OutlinedTextField(place, { place = it }, label = { Text("Location") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+					androidx.compose.material3.OutlinedTextField(site, { site = it }, label = { Text("Website") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+					OutlinedButton(enabled = name != p.fullName || about != p.description || place != p.location || site != p.website, onClick = {
+						send {
+							api.send("PATCH", "/user/settings", kotlinx.serialization.json.buildJsonObject {
+								put("full_name", name); put("description", about); put("location", place); put("website", site)
+							}.toString())
+							l.reload()
+						}
+					}) { Text("Save profile") }
+				}
 			}
 
 			Card("Security") {

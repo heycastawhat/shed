@@ -62,6 +62,7 @@ import dev.shed.app.RepoInfo
 import dev.shed.app.Tag
 import dev.shed.app.Token
 import java.net.URLEncoder
+import kotlinx.serialization.json.put
 
 private fun enc(path: String) = path.split('/').joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
 
@@ -147,6 +148,8 @@ fun FileScreen(r: FileRoute) {
 	val markdown = ext == "md" || ext == "markdown"
 	var mode by rememberSaveable { mutableStateOf(if (markdown) "preview" else "code") }
 	var menu by remember { mutableStateOf(false) }
+	var editing by remember { mutableStateOf(false) }
+	val send = rememberSend()
 	val rawUrl = "${api.account.server}/api/v1$base/raw/${enc(r.path)}?ref=${URLEncoder.encode(r.ref, "UTF-8")}"
 	val l = rememberLoad(api, r) {
 		if (image) null
@@ -161,6 +164,7 @@ fun FileScreen(r: FileRoute) {
 			IconButton(onClick = { menu = true }) { Icon(ShedIcons.more, "More") }
 			DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
 				if (markdown) DropdownMenuItem(text = { Text(if (mode == "preview") "Show code" else "Show preview") }, onClick = { menu = false; mode = if (mode == "preview") "code" else "preview" })
+				if (!image && (l.state as? Load.Ok)?.value?.second != null) DropdownMenuItem(text = { Text("Edit") }, onClick = { menu = false; editing = true })
 				if (!image) DropdownMenuItem(text = { Text(if (mode == "blame") "Hide blame" else "Blame") }, onClick = { menu = false; mode = if (mode == "blame") "code" else "blame" })
 				DropdownMenuItem(text = { Text("History") }, onClick = { menu = false; nav.navigate(CommitsRoute(r.owner, r.repo, r.ref, r.path)) })
 				DropdownMenuItem(text = { Text("Open in browser") }, onClick = {
@@ -180,6 +184,21 @@ fun FileScreen(r: FileRoute) {
 					MarkdownText(text, repo = RepoRoute(r.owner, r.repo), ref = r.ref, dir = r.path.substringBeforeLast('/', ""))
 				}
 				else -> CodeView(r.path, text.removeSuffix("\n").split('\n'), Modifier.fillMaxSize(), bottom = pageClearance())
+			}
+			// Edit and commit straight to this branch, as the web's editor does.
+			if (editing && text != null) {
+				var message by remember { mutableStateOf("Update ${r.path.substringAfterLast('/')}") }
+				ComposeSheet("Edit ${r.path.substringAfterLast('/')}", initial = text, action = "Commit to ${r.ref}", extra = {
+					androidx.compose.material3.OutlinedTextField(message, { message = it }, label = { Text("Commit message") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+				}, onDismiss = { editing = false }) { changed ->
+					api.send("PUT", "$base/contents/${enc(r.path)}", kotlinx.serialization.json.buildJsonObject {
+						put("content", Base64.encodeToString(changed.toByteArray(), Base64.NO_WRAP))
+						put("sha", f.sha)
+						put("message", message)
+						put("branch", r.ref)
+					}.toString())
+					l.reload()
+				}
 			}
 		}
 	}

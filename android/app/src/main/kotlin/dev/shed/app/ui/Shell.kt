@@ -268,11 +268,12 @@ fun Shell(account: Account, opens: Flow<String>) {
 
 // A tab's screen: Sink's big title with the account avatar (Settings) on the right, content clearing the floating bar.
 @Composable
-fun TabPage(title: String, content: @Composable ColumnScope.() -> Unit) {
+fun TabPage(title: String, actions: @Composable () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
 	val nav = LocalNav.current
 	val account = LocalApi.current.account
 	val me = LocalMe.current
 	Page(title, trailing = {
+		actions()
 		IconButton(onClick = { nav.navigate(SearchRoute) }) { Icon(ShedIcons.search, "Search") }
 		IconButton(onClick = { nav.navigate(SettingsRoute) }, modifier = Modifier.semantics { contentDescription = "Settings" }) { Avatar(me?.avatarUrl ?: "/avatars/${account.login}.svg", 32.dp) }
 	}, content = content)

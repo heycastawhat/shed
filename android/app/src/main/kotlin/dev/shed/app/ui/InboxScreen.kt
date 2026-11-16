@@ -33,7 +33,10 @@ fun InboxScreen() {
 	val api = LocalApi.current
 	val l = rememberLoad(api) { api.get<List<NotificationThread>>("/notifications?all=true&limit=50") }
 	LaunchedEffect(Unit) { Notifier.changes.collect { l.reload() } }
-	TabPage("Inbox") {
+	val send = rememberSend()
+	TabPage("Inbox", actions = {
+		androidx.compose.material3.IconButton(onClick = { send { api.send("PUT", "/notifications"); l.reload() } }) { androidx.compose.material3.Icon(ShedIcons.read, "Mark all read") }
+	}) {
 		Loading(l) { list ->
 			if (list.isEmpty()) EmptyState("Inbox zero", "Comments, reviews and mentions show up here.", ShedIcons.inbox)
 			else LazyColumn(contentPadding = PaddingValues(bottom = toolbarClearance())) { items(list, key = { it.id }) { n -> NotificationRow(n, onRead = l.reload) } }

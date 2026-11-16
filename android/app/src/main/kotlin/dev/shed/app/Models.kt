@@ -109,7 +109,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class ChangedFile(val filename: String, val status: String = "", val additions: Int = 0, val deletions: Int = 0, @SerialName("previous_filename") val previous: String? = null)
 
 @Serializable data class Entry(val name: String, val path: String, val type: String, val size: Long = 0, val sha: String = "")
-@Serializable data class FileContent(val name: String = "", val path: String = "", val size: Long = 0, val content: String? = null, val encoding: String? = null)
+@Serializable data class FileContent(val name: String = "", val path: String = "", val sha: String = "", val size: Long = 0, val content: String? = null, val encoding: String? = null)
 
 @Serializable data class BranchCommit(val id: String = "", val message: String = "", val timestamp: String = "")
 @Serializable data class Branch(val name: String, val commit: BranchCommit = BranchCommit(), val protected: Boolean = false)
@@ -225,3 +225,4 @@ import kotlinx.serialization.Serializable
 @Serializable data class T3(val targets: List<Target> = emptyList(), val threads: List<AgentThread> = emptyList(), val asks: List<Ask> = emptyList(), val down: List<DownHost> = emptyList())
 @Serializable data class DownHost(val name: String, val error: String = "")
 @Serializable data class Agents(val t3: T3? = null, val pending: List<Approval> = emptyList(), val activity: List<AgentActivity> = emptyList(), val keys: List<AgentKey> = emptyList())
+@Serializable data class UserSettings(@SerialName("full_name") val fullName: String = "", val description: String = "", val website: String = "", val location: String = "")
