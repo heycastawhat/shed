@@ -5,12 +5,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.shed.app.ui.InboxScreen
@@ -32,6 +35,11 @@ class MainActivity : ComponentActivity() {
 	}
 
 	private fun handle(intent: Intent) {
+		intent.getStringExtra(Notifier.EXTRA_URL)?.takeIf { it.isNotEmpty() }?.let { url ->
+			setIntent(Intent(intent).apply { removeExtra(Notifier.EXTRA_URL) })
+			CustomTabsIntent.Builder().build().launchUrl(this, url.toUri())
+			return
+		}
 		val uri = intent.data ?: return
 		if (uri.scheme == "shed" && uri.host == "callback") {
 			setIntent(Intent(intent).setData(null))
@@ -45,7 +53,13 @@ class MainActivity : ComponentActivity() {
 		when (val s = state) {
 			AuthState.Loading -> Box(Modifier.fillMaxSize())
 			is AuthState.SignedOut -> SignInScreen(s.lastServer)
-			is AuthState.SignedIn -> InboxScreen(s.account)
+			is AuthState.SignedIn -> {
+				LaunchedEffect(s.account) {
+					StreamService.start(this@MainActivity)
+					CatchUpWorker.schedule(this@MainActivity)
+				}
+				InboxScreen(s.account)
+			}
 		}
 	}
 }

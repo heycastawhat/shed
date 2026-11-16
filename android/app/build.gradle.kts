@@ -56,6 +56,8 @@ dependencies {
 	implementation(libs.browser)
 	implementation(libs.datastore.preferences)
 	implementation(libs.okhttp)
+	implementation(libs.okhttp.sse)
+	implementation(libs.work.runtime)
 	implementation(libs.serialization.json)
 	implementation(libs.coroutines.android)
 	implementation(libs.coil.compose)

@@ -101,7 +101,11 @@ class Session(private val ctx: Context) {
 		}
 	}
 
-	suspend fun signOut() = ctx.prefs.edit { it.remove(TOKEN); it.remove(LOGIN) }
+	suspend fun signOut() {
+		ctx.prefs.edit { it.remove(TOKEN); it.remove(LOGIN) }
+		CatchUpWorker.cancel(ctx)
+		Notifier.forget(ctx)
+	}
 
 	private companion object {
 		val rng = SecureRandom()

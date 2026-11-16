@@ -20,9 +20,7 @@ export function notify(c: Ctx, r: RepoCtx, i: IssueRow, what: string, text: stri
 	}
 	for (const id of ids) {
 		if (id === actor || muted.has(id)) continue;
-		c.db
-			.query("insert into notifications (user_id, issue_id, repo_id, unread, updated_at) values (?, ?, ?, 1, ?) on conflict (user_id, issue_id) do update set unread = 1, updated_at = excluded.updated_at")
-			.run(id, i.id, r.row.id, now());
+		addNotification(c, id, i, r.row.id, what, text);
 		if (mailEnabled()) {
 			const u = c.db.query<{ email: string | null; notify_email: number }, [number]>('select email, notify_email from users where id = ?').get(id);
 			if (u?.email && u.notify_email) {
@@ -37,6 +35,29 @@ export function notify(c: Ctx, r: RepoCtx, i: IssueRow, what: string, text: stri
 			}
 		}
 	}
+}
+
+// Open /notifications/stream connections, by user. Each new or renewed notification is pushed to them as it's written.
+const listeners = new Map<number, Set<(n: object) => void>>();
+
+export function listen(userId: number, fn: (n: object) => void) {
+	const set = listeners.get(userId) ?? new Set();
+	listeners.set(userId, set.add(fn));
+	return () => {
+		set.delete(fn);
+		if (!set.size) listeners.delete(userId);
+	};
+}
+
+export function addNotification(c: Ctx, userId: number, i: IssueRow, repoId: number, what: string, text = '') {
+	c.db
+		.query("insert into notifications (user_id, issue_id, repo_id, unread, updated_at) values (?, ?, ?, 1, ?) on conflict (user_id, issue_id) do update set unread = 1, updated_at = excluded.updated_at")
+		.run(userId, i.id, repoId, now());
+	const subs = listeners.get(userId);
+	if (!subs?.size) return;
+	const n = c.db.query<Row, [number, number]>('select * from notifications where user_id = ? and issue_id = ?').get(userId, i.id)!;
+	const event = { ...json(c, n), number: i.number, actor: c.user?.login ?? null, what, text: text.trim().slice(0, 300) };
+	for (const fn of subs) fn(event);
 }
 
 type Row = { id: number; issue_id: number; repo_id: number; unread: number; pinned: number; updated_at: string };
@@ -75,6 +96,31 @@ route('GET', '/notifications', (c) => {
 		.filter((n) => (n.unread && want.includes('unread')) || (!n.unread && want.includes('read')) || (n.pinned && want.includes('pinned')));
 	const p = page(c);
 	return new Paged(rows.slice(p.offset, p.offset + p.limit).map((n) => json(c, n)), rows.length);
+});
+// Server-sent events: one `notification` event per new or renewed notification (the usual JSON plus number, actor, what and text),
+// and a comment line every 20 s so proxies and the Cloudflare tunnel keep the connection open. Clients catch up with GET /notifications.
+route('GET', '/notifications/stream', (c) => {
+	const u = me(c);
+	const enc = new TextEncoder();
+	let stop = () => {};
+	const body = new ReadableStream<Uint8Array>({
+		start(ctl) {
+			const send = (s: string) => {
+				try {
+					ctl.enqueue(enc.encode(s));
+				} catch {
+					stop();
+				}
+			};
+			const off = listen(u.id, (n) => send(`event: notification\ndata: ${JSON.stringify(n)}\n\n`));
+			const ping = setInterval(() => send(': ping\n\n'), 20_000);
+			stop = () => (off(), clearInterval(ping));
+			c.request.signal.addEventListener('abort', stop);
+			send('retry: 5000\nevent: ready\ndata: {}\n\n');
+		},
+		cancel: () => stop()
+	});
+	return new Response(body, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-accel-buffering': 'no' } });
 });
 route('GET', '/notifications/new', (c) => ({ new: c.db.query<{ n: number }, [number]>('select count(*) as n from notifications where user_id = ? and unread = 1').get(me(c).id)!.n }));
 route('GET', '/notifications/threads/:id', (c) =>

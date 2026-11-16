@@ -10,6 +10,7 @@ class ShedApp : Application() {
 	override fun onCreate() {
 		super.onCreate()
 		session = Session(this)
+		Notifier.channels(this)
 	}
 }
 
