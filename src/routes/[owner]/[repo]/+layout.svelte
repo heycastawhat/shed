@@ -239,19 +239,23 @@ git push -u origin {data.repo.default_branch}</pre>
 		margin-top: 0.2rem;
 		font-size: 0.85rem;
 	}
+	/* Flex wraps by the tabs' full width, so when they and the ref controls don't fit on one line the controls drop below
+	   instead of the last tabs scrolling out of sight. */
 	nav {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 1.2rem;
+		gap: 0.5rem 1.2rem;
 		margin-top: 1rem;
-		border-bottom: 1px solid var(--border);
 	}
 	.tabs {
 		display: flex;
+		flex: 1 1 auto;
 		gap: 1.2rem;
 		min-width: 0;
 		overflow-x: auto;
 		scrollbar-width: none;
+		border-bottom: 1px solid var(--border);
 	}
 	@supports (animation-timeline: scroll()) {
 		.tabs {
@@ -271,20 +275,12 @@ git push -u origin {data.repo.default_branch}</pre>
 		}
 	}
 	@container (max-width: 640px) {
-		nav {
-			flex-wrap: wrap;
-			border: 0;
-		}
 		.tabs {
 			flex-basis: 100%;
-			border-bottom: 1px solid var(--border);
 		}
 		.refs {
 			flex-wrap: wrap;
-			margin: 0.6rem 0 0;
-		}
-		nav .refs:not(:has(:global(*))) {
-			display: none;
+			margin: 0.1rem 0 0;
 		}
 	}
 	nav a {
@@ -318,7 +314,10 @@ git push -u origin {data.repo.default_branch}</pre>
 		display: flex;
 		align-items: center;
 		gap: 0.9rem;
-		margin: 0 0 0.35rem auto;
+		margin-left: auto;
+	}
+	.refs:not(:has(:global(*))) {
+		display: none;
 	}
 	nav a.count-link {
 		gap: 0.3rem;
