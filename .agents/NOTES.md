@@ -6,7 +6,7 @@ SQLite for everything else). It began as "forge", a UI over Forgejo's API; on 20
 
 ## Decisions (don't re-litigate)
 
-- **Own backend, not a Forgejo fork or frontend.** Forgejo is only an import source now (`bin/shed.ts import`).
+- **Own backend, not a Forgejo fork or frontend.** Forgejo is only an import source now (`bin/shed-admin.ts import`).
 - **A Forgejo-compatible REST API is the backbone** (`src/lib/server/api/`). Pages call it in-process through `forgejo.ts`
   (`api`/`apiPage`/`request` with `locals.token`, an internal token for the signed-in person), so the UI written against Forgejo kept working.
   Over HTTP it's `/api/v1` with a Shed token. Where Forgejo's API fell short, Shed adds endpoints (revisions, PR comments, resolve, reviewers, …).
@@ -39,8 +39,10 @@ Backend (`src/lib/server/`):
   API at `/api/actions_pipeline/`) and v4 (Twirp at `/twirp/…` + signed blob URLs; the runtime token is a signed JWT carrying run and job).
   The scheduler (`startScheduler` in `actions/runs.ts`, started from `shed.ts`) ticks each minute: `on: schedule` crons, due mirrors, expired artifacts.
 - `markdown.ts`: markdown-it with raw HTML escaped (safe for `{@html}`), repo-relative links/images, heading anchors, task lists.
-- `importer.ts` + `bin/shed.ts import <forgejo url>`: users/orgs, repos (all refs), issues, PRs, reviews, line comments, labels, milestones,
+- `importer.ts` + `bin/shed-admin.ts import <forgejo url>`: users/orgs, repos (all refs), issues, PRs, reviews, line comments, labels, milestones,
   releases with files, wikis, collaborators. Re-runnable.
+- `cli/shed.ts`: the client CLI, like `gh` (auth + git credential helper, repo, pr, issue, run, api), only over `/api/v1` with a token;
+  `bun build --compile cli/shed.ts --outfile shed`. The server's own command is `shed-admin` (`bin/shed-admin.ts`).
 - The agent features from forge are unchanged: T3 Code driving (`t3.ts`, `task.ts`, agents hub), agent keys + MCP (`agents.ts`, `tools.ts`,
   `/mcp`), approvals, repo rules, `@agent` mentions. They keep their state in `forge.json` (`store.ts`, encrypted with `FORGE_SECRET`).
 
@@ -60,7 +62,7 @@ Dev machine: aarch64 Fedora Aurora; bun in `~/.bun/bin` (`export PATH=$HOME/.bun
   prints an API token. A real sign-in: Pocket ID is passkey-only, so headless tests use a one-time link,
   `ssh ada@192.0.2.245 'docker exec pocket-id /app/pocket-id one-time-access-token ada'` (don't print the code; each use leaves an admin
   session on Pocket ID), see `.agents/tmp/shed-login.ts`.
-- Test data: `bin/shed.ts import http://localhost:3000` from the old local Forgejo (`dev/forgejo`, seeded by `.agents/scripts/seed.sh`) into
+- Test data: `bin/shed-admin.ts import http://localhost:3000` from the old local Forgejo (`dev/forgejo`, seeded by `.agents/scripts/seed.sh`) into
   `ada/sample` (PRs, issues, labels, milestones, release, wiki) and `kiwi/website`. Wipe `data/shed.db*`, `data/repos` etc. to start over.
 - CI: `dev/runner/forgejo-runner` (13.2.1, arm64) registered as `dev` with label `host`; start it with
   `cd dev/runner && PATH=$PWD/bin:$HOME/.bun/bin:$PATH ./forgejo-runner daemon` (`bin/node` → bun, so JS actions run). Artifact actions on
@@ -114,7 +116,7 @@ Everything is on branch `shed`, committed, not pushed, not deployed. Open work, 
    (tabs per PR/issue/file/commit/run in localStorage, remembers sub-page and scroll); not yet switchable in Settings → Appearance and untested.
    Still to do: Appearance "Layout" choice (Classic / Tabs) with preview cards like Sink; Split layout for lists (PR list beside the open PR);
    settings as grouped cards; go through every page in light/dark/390px; keep code views dense.
-2. **Deploy** (`DEPLOY.md`): needs the owner's OK for each outward step (server, Cloudflare hostname, Forgejo token for `shed import`). x86 image
+2. **Deploy** (`DEPLOY.md`): needs the owner's OK for each outward step (server, Cloudflare hostname, Forgejo token for `shed-admin import`). x86 image
    has never been built (this machine can't run x86).
 3. **Agents end to end**: `@agent` mentions and T3 tasks haven't been run against Shed (MCP keys pass `shed-mcp.sh`). Running them starts real
    T3 tasks on the owner's T3 (:3773); ask first.

@@ -63,7 +63,7 @@ server publishes sites through Cloudflare Tunnel (`cloudflared` service). In the
 (cookies are `Secure`, the OAuth callback is built from the host).
 
 - Cloudflare caps request bodies at 100 MB on the free plan, so a push bigger than that over HTTPS fails; push big repos over SSH
-  (LAN or Tailscale, port 2223), or the first time with `shed import`.
+  (LAN or Tailscale, port 2223), or the first time with `shed-admin import`.
 - SSH doesn't go through the tunnel.
 - The container registry is at the same host (`docker login shed.example.com`); image layers over 100 MB hit the same Cloudflare cap,
   so push big images over the LAN/Tailscale address on port 3080 (add it to the Docker daemon's insecure registries) or keep layers small.
@@ -76,8 +76,8 @@ Make a Forgejo token that can read everything (Forgejo → Settings → Applicat
 read:organization, read:issue), then:
 
 ```sh
-docker compose exec -e FORGEJO_TOKEN=<token> shed shed import https://git.example.com            # every repo the token can see
-docker compose exec -e FORGEJO_TOKEN=<token> shed shed import https://git.example.com ada/forge  # or just some
+docker compose exec -e FORGEJO_TOKEN=<token> shed shed-admin import https://git.example.com            # every repo the token can see
+docker compose exec -e FORGEJO_TOKEN=<token> shed shed-admin import https://git.example.com ada/forge  # or just some
 ```
 
 It copies owners (users, orgs and members), repos with all branches and tags, issues, PRs (with reviews and line comments),

@@ -85,7 +85,7 @@ reactions. PRs and issues share one number sequence per repo, as in Forgejo, so 
 
 ## Importing from Forgejo
 
-`shed import <forgejo url> <token>`: for each repo, `git clone --mirror` into the repos folder, then copy issues, PRs
+`shed-admin import <forgejo url> <token>`: for each repo, `git clone --mirror` into the repos folder, then copy issues, PRs
 (with their reviews and line comments), labels, milestones, releases and comments through Forgejo's API. Forgejo users map
 to Shed accounts by email. Re-runnable per repo. Forgejo stays up until Shed has done a few weeks of real use.
 
