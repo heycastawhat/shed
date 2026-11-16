@@ -7,7 +7,11 @@ const imports = Object.fromEntries([...svelte.matchAll(/import (\w+) from '@ming
 const names = [...svelte.slice(svelte.indexOf('const ICONS')).matchAll(/^\s+'?([\w-]+)'?: (\w+),?$/gm)].map((m) => [m[1], m[2]] as const);
 
 type El = { tag: string; attributes: Record<string, string> };
-const camel = (s: string) => s.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+const KEYWORDS = new Set(['package', 'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for', 'fun', 'if', 'in', 'interface', 'is', 'null', 'object', 'return', 'super', 'this', 'throw', 'true', 'try', 'typealias', 'typeof', 'val', 'var', 'when', 'while']);
+const camel = (s: string) => {
+	const n = s.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+	return KEYWORDS.has(n) ? `\`${n}\`` : n;
+};
 const path = (a: Record<string, string>) => {
 	if (a.d) return a.d;
 	throw new Error('only paths are supported');

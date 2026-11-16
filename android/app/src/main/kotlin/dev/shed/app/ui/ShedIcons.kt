@@ -277,7 +277,7 @@ object ShedIcons {
 		}
 	}
 
-	val package: ImageVector by lazy {
+	val `package`: ImageVector by lazy {
 		icon("package") {
 			path("M5 10h11M5 10v8a1 1 0 0 0 1 1h10M5 10 3 5h11l2 5m0 0v9m0-9h4m-4 0 1-5h4l-1 5m-4 9h3a1 1 0 0 0 1-1v-8m-8 6h1", stroke = true, fill = false, width = 2f, round = true, evenOdd = false)
 		}
