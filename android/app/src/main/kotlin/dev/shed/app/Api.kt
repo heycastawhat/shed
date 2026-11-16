@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -18,6 +19,9 @@ class ApiError(val status: Int, message: String) : Exception(message)
 class Api(val account: Account) {
 	suspend inline fun <reified T> get(path: String): T =
 		call(request(path).build()) { json.decodeFromString<T>(it) }
+
+	suspend inline fun <reified T> post(path: String, body: String): T =
+		call(request(path).post(body.toRequestBody("application/json".toMediaType())).build()) { json.decodeFromString<T>(it) }
 
 	suspend fun text(path: String): String = call(request(path).header("accept", "*/*").build()) { it }
 
@@ -34,6 +38,17 @@ class Api(val account: Account) {
 
 	companion object {
 		val http = OkHttpClient()
+
+		// The signed-in account, for the image loader: images from its own server (avatars, repo images) carry its token.
+		@Volatile var current: Account? = null
+		val images: OkHttpClient by lazy {
+			http.newBuilder().addInterceptor { chain ->
+				val req = chain.request()
+				val a = current
+				val same = a != null && req.url.host.equals(a.server.toHttpUrlOrNull()?.host, ignoreCase = true)
+				chain.proceed(if (same && req.header("authorization") == null) req.newBuilder().header("authorization", "token ${a!!.token}").build() else req)
+			}.build()
+		}
 		val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
 		suspend fun <T> call(req: Request, parse: (String) -> T): T = withContext(Dispatchers.IO) {
@@ -85,7 +100,7 @@ class Api(val account: Account) {
 	@SerialName("avatar_url") val avatarUrl: String = ""
 )
 
-@Serializable data class Label(val name: String, val color: String = "")
+@Serializable data class Label(val id: Long = 0, val name: String, val color: String = "")
 
 @Serializable data class PullMeta(val merged: Boolean = false, val draft: Boolean = false)
 
@@ -104,6 +119,8 @@ class Api(val account: Account) {
 	val state: String,
 	val user: User,
 	val labels: List<Label> = emptyList(),
+	val assignees: List<User>? = null,
+	val milestone: Milestone? = null,
 	val comments: Int = 0,
 	@SerialName("created_at") val createdAt: String,
 	@SerialName("updated_at") val updatedAt: String,
@@ -120,6 +137,23 @@ class Api(val account: Account) {
 
 @Serializable data class RepoInfo(
 	val id: Long,
+	val parent: RepoRef? = null,
+	@SerialName("has_issues") val hasIssues: Boolean = true,
+	@SerialName("has_wiki") val hasWiki: Boolean = false,
+	@SerialName("default_merge_style") val defaultMergeStyle: String = "merge",
+	@SerialName("default_delete_branch_after_merge") val deleteBranchAfterMerge: Boolean = false,
+	@SerialName("allow_merge_commits") val allowMerge: Boolean = true,
+	@SerialName("allow_rebase") val allowRebase: Boolean = true,
+	@SerialName("allow_rebase_explicit") val allowRebaseMerge: Boolean = true,
+	@SerialName("allow_squash_merge") val allowSquash: Boolean = true,
+	@SerialName("allow_fast_forward_only_merge") val allowFastForward: Boolean = true,
+	val permissions: Permissions = Permissions(),
+	@SerialName("watchers_count") val watchers: Int = 0,
+	@SerialName("release_counter") val releases: Int = 0,
+	val mirror: Boolean = false,
+	@SerialName("html_url") val htmlUrl: String = "",
+	@SerialName("clone_url") val cloneUrl: String = "",
+	@SerialName("ssh_url") val sshUrl: String = "",
 	val name: String,
 	@SerialName("full_name") val fullName: String,
 	val owner: User,
@@ -134,3 +168,5 @@ class Api(val account: Account) {
 	@SerialName("open_pr_counter") val openPulls: Int = 0,
 	@SerialName("updated_at") val updatedAt: String = ""
 )
+
+@Serializable data class Permissions(val admin: Boolean = false, val push: Boolean = false, val pull: Boolean = true)

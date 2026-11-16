@@ -131,6 +131,12 @@ fun SettingsScreen(onBack: () -> Unit, onCheckForUpdates: suspend () -> String?)
 				) { Text(if (checking) "Checking…" else "Check for updates") }
 			}
 
+			Card("Security") {
+				val nav = LocalNav.current
+				InfoRow(ShedIcons.key, "SSH keys", "For git over SSH.")
+				OutlinedButton(onClick = { nav.navigate(KeysRoute) }) { Text("Manage SSH keys") }
+			}
+
 			Card("Account") {
 				Row(verticalAlignment = Alignment.CenterVertically) {
 					Avatar(me?.avatarUrl ?: "/avatars/${account.login}.svg", 36.dp)

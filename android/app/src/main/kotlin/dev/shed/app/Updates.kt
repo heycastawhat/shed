@@ -10,16 +10,16 @@ import okhttp3.Request
 data class Update(val version: String, val apkUrl: String, val pageUrl: String)
 
 @Serializable
-private data class Release(
+private data class GhRelease(
 	@SerialName("tag_name") val tag: String,
 	@SerialName("html_url") val page: String,
 	val draft: Boolean = false,
 	val prerelease: Boolean = false,
-	val assets: List<Asset> = emptyList()
+	val assets: List<GhAsset> = emptyList()
 )
 
 @Serializable
-private data class Asset(val name: String, @SerialName("browser_download_url") val url: String)
+private data class GhAsset(val name: String, @SerialName("browser_download_url") val url: String)
 
 /**
  * The APK is sideloaded, so nothing else says a new one is out: ask GitHub for the latest release (the Android workflow
@@ -37,7 +37,7 @@ object Updates {
 			.build()
 		val release = Api.http.newCall(req).execute().use { res ->
 			if (!res.isSuccessful) throw ApiError(res.code, "GitHub said ${res.code}")
-			Api.json.decodeFromString<Release>(res.body.string())
+			Api.json.decodeFromString<GhRelease>(res.body.string())
 		}
 		val version = release.tag.removePrefix("v")
 		val apk = release.assets.firstOrNull { it.name.endsWith(".apk") } ?: return@withContext null

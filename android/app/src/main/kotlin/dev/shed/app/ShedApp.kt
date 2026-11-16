@@ -22,7 +22,7 @@ class ShedApp : Application(), SingletonImageLoader.Factory {
 	// Shed's generated avatars are SVG.
 	override fun newImageLoader(context: PlatformContext) = ImageLoader.Builder(context)
 		.components {
-			add(OkHttpNetworkFetcherFactory(callFactory = { Api.http }))
+			add(OkHttpNetworkFetcherFactory(callFactory = { Api.images }))
 			add(SvgDecoder.Factory())
 		}
 		.build()

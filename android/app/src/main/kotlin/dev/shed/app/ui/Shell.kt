@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -30,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -62,8 +65,22 @@ import kotlinx.serialization.Serializable
 @Serializable data object AgentsRoute
 @Serializable data object InboxRoute
 @Serializable data object SettingsRoute
+@Serializable data object SearchRoute
+@Serializable data object KeysRoute
 @Serializable data class RepoRoute(val owner: String, val repo: String)
 @Serializable data class ThreadRoute(val owner: String, val repo: String, val number: Long)
+@Serializable data class ListRoute(val owner: String, val repo: String, val pulls: Boolean)
+@Serializable data class NewThreadRoute(val owner: String, val repo: String, val pull: Boolean)
+@Serializable data class TreeRoute(val owner: String, val repo: String, val ref: String, val path: String)
+@Serializable data class FileRoute(val owner: String, val repo: String, val ref: String, val path: String)
+@Serializable data class CommitsRoute(val owner: String, val repo: String, val ref: String, val path: String)
+@Serializable data class CommitRoute(val owner: String, val repo: String, val sha: String)
+@Serializable data class BranchesRoute(val owner: String, val repo: String)
+@Serializable data class ReleasesRoute(val owner: String, val repo: String)
+@Serializable data class RunsRoute(val owner: String, val repo: String)
+@Serializable data class RunRoute(val owner: String, val repo: String, val number: Long)
+@Serializable data class WikiRoute(val owner: String, val repo: String, val page: String)
+@Serializable data class ProfileRoute(val name: String)
 
 private val TABS = listOf(
 	NavPlace(HomeRoute, "Home", ShedIcons.home, ShedIcons.homeFilled),
@@ -79,15 +96,30 @@ val LocalNav = compositionLocalOf<NavHostController> { error("No nav") }
 val LocalMe = compositionLocalOf<User?> { null }
 
 // A Shed web URL as a native screen, when there is one: /owner/repo/(pulls|issues)/n and /owner/repo.
-// Same host as the server, whatever the scheme or port (a server typed as a LAN address still matches).
+// A Shed web URL as a native screen, when there is one (same host as the server, whatever the scheme or port).
+// Paths mirror the web's: /owner/repo/{pulls,issues}/n, tree|blob|src|raw/ref/path, commits/ref/path, commit/sha, branches,
+// releases, actions(/runs/n), wiki(/page), /owner/repo, /owner.
 fun routeFor(server: String, url: String): Any? {
 	val u = url.toUri()
 	if (u.host == null || !u.host.equals(server.toUri().host, ignoreCase = true)) return null
 	val base = server.toUri().path.orEmpty().trimEnd('/')
-	val parts = u.path.orEmpty().removePrefix(base).trim('/').split('/')
-	return when {
-		parts.size >= 4 && (parts[2] == "pulls" || parts[2] == "issues") -> parts[3].toLongOrNull()?.let { ThreadRoute(parts[0], parts[1], it) }
-		parts.size == 2 -> RepoRoute(parts[0], parts[1])
+	val parts = u.path.orEmpty().removePrefix(base).trim('/').split('/').filter { it.isNotEmpty() }.map { android.net.Uri.decode(it) }
+	if (parts.isEmpty()) return null
+	if (parts.size == 1) return if (parts[0] in setOf("changes", "repos", "notifications", "agents", "explore", "search", "settings", "new", "admin", "login")) null else ProfileRoute(parts[0])
+	val (o, r) = parts
+	val rest = parts.drop(2)
+	val tail = { from: Int -> rest.drop(from).joinToString("/") }
+	return when (rest.firstOrNull()) {
+		null -> RepoRoute(o, r)
+		"pulls", "issues" -> rest.getOrNull(1)?.toLongOrNull()?.let { ThreadRoute(o, r, it) } ?: ListRoute(o, r, rest[0] == "pulls")
+		"tree", "src" -> rest.getOrNull(1)?.let { TreeRoute(o, r, it, tail(2)) }
+		"blob", "raw", "blame" -> rest.getOrNull(1)?.let { if (rest.size > 2) FileRoute(o, r, it, tail(2)) else TreeRoute(o, r, it, "") }
+		"commits" -> CommitsRoute(o, r, rest.getOrNull(1) ?: "", tail(2))
+		"commit" -> rest.getOrNull(1)?.let { CommitRoute(o, r, it) }
+		"branches", "tags" -> BranchesRoute(o, r)
+		"releases" -> ReleasesRoute(o, r)
+		"actions" -> if (rest.getOrNull(1) == "runs") rest.getOrNull(2)?.toLongOrNull()?.let { RunRoute(o, r, it) } else RunsRoute(o, r)
+		"wiki" -> WikiRoute(o, r, rest.getOrNull(1) ?: "")
 		else -> null
 	}
 }
@@ -95,10 +127,10 @@ fun routeFor(server: String, url: String): Any? {
 // As Sink's shell: screens draw to the bottom edge and the tabs float over them as a pill; pages below the tabs rise
 // over the screen they came from, with the theme's expressive motion, and the pill slides away under them.
 @Composable
-fun Shell(account: Account, links: Flow<String>) {
+fun Shell(account: Account, opens: Flow<String>) {
 	val nav = rememberNavController()
 	val ctx = LocalContext.current
-	val api = remember(account) { Api(account) }
+	val api = remember(account) { Api(account).also { Api.current = account } }
 	val entry by nav.currentBackStackEntryAsState()
 	val tab = entry?.destination.tab()
 	val haptics = rememberHaptics()
@@ -116,7 +148,7 @@ fun Shell(account: Account, links: Flow<String>) {
 	}
 
 	LaunchedEffect(nav) {
-		links.collect { url ->
+		opens.collect { url ->
 			val route = routeFor(account.server, url)
 			if (route != null) nav.navigate(route) else CustomTabsIntent.Builder().build().launchUrl(ctx, url.toUri())
 		}
@@ -151,7 +183,17 @@ fun Shell(account: Account, links: Flow<String>) {
 		)
 	}
 
-	CompositionLocalProvider(LocalApi provides api, LocalNav provides nav, LocalMe provides me) {
+	// Links in Markdown (and anywhere else) to this Shed open native screens; others open in a browser tab.
+	val links = remember(nav, account) {
+		object : UriHandler {
+			override fun openUri(uri: String) {
+				val route = routeFor(account.server, uri)
+				if (route != null) nav.navigate(route) else runCatching { CustomTabsIntent.Builder().build().launchUrl(ctx, uri.toUri()) }
+			}
+		}
+	}
+
+	CompositionLocalProvider(LocalApi provides api, LocalNav provides nav, LocalMe provides me, LocalUriHandler provides links) {
 		Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
 			val isTab = { d: NavDestination -> d.tab() != null }
 			NavHost(
@@ -179,8 +221,22 @@ fun Shell(account: Account, links: Flow<String>) {
 				composable<AgentsRoute> { AgentsScreen() }
 				composable<InboxRoute> { InboxScreen() }
 				composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onCheckForUpdates = checkForUpdates) }
+				composable<SearchRoute> { SearchScreen() }
+				composable<KeysRoute> { KeysScreen() }
 				composable<RepoRoute> { RepoScreen(it.toRoute()) }
 				composable<ThreadRoute> { ThreadScreen(it.toRoute()) }
+				composable<ListRoute> { ListScreen(it.toRoute()) }
+				composable<NewThreadRoute> { NewThreadScreen(it.toRoute()) }
+				composable<TreeRoute> { TreeScreen(it.toRoute()) }
+				composable<FileRoute> { FileScreen(it.toRoute()) }
+				composable<CommitsRoute> { CommitsScreen(it.toRoute()) }
+				composable<CommitRoute> { CommitScreen(it.toRoute()) }
+				composable<BranchesRoute> { BranchesScreen(it.toRoute()) }
+				composable<ReleasesRoute> { ReleasesScreen(it.toRoute()) }
+				composable<RunsRoute> { RunsScreen(it.toRoute()) }
+				composable<RunRoute> { RunScreen(it.toRoute()) }
+				composable<WikiRoute> { WikiScreen(it.toRoute()) }
+				composable<ProfileRoute> { ProfileScreen(it.toRoute()) }
 			}
 			AnimatedVisibility(
 				visible = tab != null,
@@ -217,6 +273,7 @@ fun TabPage(title: String, content: @Composable ColumnScope.() -> Unit) {
 	val account = LocalApi.current.account
 	val me = LocalMe.current
 	Page(title, trailing = {
+		IconButton(onClick = { nav.navigate(SearchRoute) }) { Icon(ShedIcons.search, "Search") }
 		IconButton(onClick = { nav.navigate(SettingsRoute) }, modifier = Modifier.semantics { contentDescription = "Settings" }) { Avatar(me?.avatarUrl ?: "/avatars/${account.login}.svg", 32.dp) }
 	}, content = content)
 }
