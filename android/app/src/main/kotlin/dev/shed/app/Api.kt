@@ -56,3 +56,15 @@ class Api(val account: Account) {
 	val repository: Repo,
 	val subject: Subject
 )
+
+// What /notifications/stream sends: a notification plus who did what.
+@Serializable data class StreamEvent(
+	val id: Long,
+	@SerialName("updated_at") val updatedAt: String,
+	val repository: Repo,
+	val subject: Subject,
+	val number: Long? = null,
+	val actor: String? = null,
+	val what: String? = null,
+	val text: String? = null
+)

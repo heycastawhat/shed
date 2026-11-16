@@ -1,6 +1,15 @@
 package dev.shed.app.ui
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.text.format.DateUtils
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,11 +44,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import dev.shed.app.Account
 import dev.shed.app.Api
 import dev.shed.app.ApiError
 import dev.shed.app.NotificationThread
+import dev.shed.app.Notifier
 import dev.shed.app.session
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -55,6 +66,14 @@ fun InboxScreen(account: Account) {
 	var loading by remember { mutableStateOf(false) }
 	var reload by remember { mutableIntStateOf(0) }
 	var menu by remember { mutableStateOf(false) }
+
+	val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+	LaunchedEffect(Unit) {
+		if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+			askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+	}
+	LaunchedEffect(Unit) { Notifier.changes.collect { reload++ } }
+	val power = ctx.getSystemService(PowerManager::class.java)
 
 	LaunchedEffect(reload) {
 		loading = true
@@ -77,6 +96,16 @@ fun InboxScreen(account: Account) {
 					Box {
 						TextButton(onClick = { menu = true }) { Text(account.login) }
 						DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+							if (!power.isIgnoringBatteryOptimizations(ctx.packageName)) DropdownMenuItem(
+								text = { Text("Keep notifications instant") },
+								onClick = {
+									menu = false
+									// Exempting the app from battery optimisation lets Android keep the stream open and restart it from the background.
+									@SuppressLint("BatteryLife")
+									val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${ctx.packageName}".toUri())
+									ctx.startActivity(i)
+								}
+							)
 							DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; scope.launch { ctx.session.signOut() } })
 						}
 					}
