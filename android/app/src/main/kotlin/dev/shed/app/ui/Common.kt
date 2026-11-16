@@ -32,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ripple
@@ -114,9 +115,12 @@ fun <T> Loading(l: Loaded<T>, modifier: Modifier = Modifier, content: @Composabl
 // A screen as Sink's are: drawn to the edges on the lowest surface, under a big title.
 @Composable
 fun Page(title: String, sub: String? = null, onBack: (() -> Unit)? = null, trailing: @Composable () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
-	Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest).statusBarsPadding()) {
-		ScreenTitle(title, sub, onBack, trailing)
-		content()
+	// A Surface, so text takes onSurface (outside one it would default to black, unreadable in the dark theme).
+	Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+		Column(Modifier.fillMaxSize().statusBarsPadding()) {
+			ScreenTitle(title, sub, onBack, trailing)
+			content()
+		}
 	}
 }
 

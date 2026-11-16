@@ -37,6 +37,7 @@ class ScreensTest {
 				val path = request.url.encodedPath.removePrefix("/api/v1")
 				val q = request.url.query.orEmpty()
 				val body = when {
+					path.startsWith("/avatars/") -> return MockResponse.Builder().addHeader("content-type", "image/svg+xml").body(avatar(path)).build()
 					path == "/user" -> USER
 					path == "/notifications/new" -> """{"new":2}"""
 					path == "/notifications" -> NOTIFICATIONS
@@ -81,6 +82,8 @@ class ScreensTest {
 		shot("$theme-home")
 		tap("Changes")
 		at("$theme-changes")
+		waitFor("Fix flaky clone test")
+		rule.onNode(hasText("Created")).performClick()
 		waitFor("Add blame endpoint")
 		shot("$theme-changes")
 		tap("Repos")
@@ -119,7 +122,14 @@ class ScreensTest {
 
 	private companion object {
 		const val USER = """{"id":1,"login":"ada","full_name":"Ada","avatar_url":"/avatars/ada.svg"}"""
-		const val NOW = "2026-11-16T09:00:00Z"
+		val NOW: String = java.time.Instant.now().minusSeconds(3 * 3600).toString()
+		// A coloured circle with the initial, like Shed's generated avatars.
+		fun avatar(path: String): String {
+			val name = path.substringAfterLast('/').substringBefore('.')
+			val fill = listOf("#5b5bd6", "#8b5cf6", "#3e8fb0", "#c2703a", "#3f9a78")[name.hashCode().mod(5)]
+			return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="$fill"/>""" +
+				"""<text x="16" y="21" font-size="15" text-anchor="middle" fill="#fff" font-family="sans-serif">${name.first().uppercase()}</text></svg>"""
+		}
 		fun user(login: String) = """{"login":"$login","avatar_url":"/avatars/$login.svg"}"""
 		fun pull(n: Int, title: String, by: String, labels: String = "[]", comments: Int = 0, draft: Boolean = false, body: String = "") =
 			"""{"id":$n,"number":$n,"title":"$title","body":${kotlinx.serialization.json.JsonPrimitive(body)},"state":"open","user":${user(by)},"labels":$labels,"comments":$comments,""" +
