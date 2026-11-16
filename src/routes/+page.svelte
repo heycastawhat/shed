@@ -45,7 +45,7 @@
 {#if !data.user}
 	<section class="login">
 		<h1>Shed</h1>
-		<a class="button primary" href="/login">Sign in</a>
+		<a class="button primary" href="/login" data-sveltekit-reload>Sign in</a>
 	</section>
 {:else}
 	<h1>{part}, {name}</h1>

@@ -14,7 +14,7 @@
 	{#if message}<p class="message">{message}</p>{/if}
 	<p class="links">
 		<a href="/">Home</a>
-		{#if page.status === 401}<a href="/login">Log in</a>{/if}
+		{#if page.status === 401}<a href="/login" data-sveltekit-reload>Log in</a>{/if}
 	</p>
 </section>
 

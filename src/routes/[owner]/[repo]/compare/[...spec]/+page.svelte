@@ -73,7 +73,7 @@
 			<span>There's already an open pull request for these branches: <a href="{base}/pulls/{data.existing.number}">{data.existing.title} #{data.existing.number}</a></span>
 		</div>
 	{:else if !data.user}
-		<div class="note"><a href="/login">Sign in</a> to open a pull request.</div>
+		<div class="note"><a href="/login" data-sveltekit-reload>Sign in</a> to open a pull request.</div>
 	{:else}
 		<form
 			class="open"
