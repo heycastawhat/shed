@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import dev.shed.app.CombinedStatus
 import dev.shed.app.Commit
 import dev.shed.app.LineComment
@@ -208,7 +209,7 @@ fun ChecksTab(p: Pull, route: ThreadRoute) {
 			items(runs, key = { "run${it.id}" }) { run -> RunRow(run) { nav.navigate(RunRoute(route.owner, route.repo, run.number)) } }
 			if (status.statuses.isNotEmpty()) item { SectionLabel("Statuses", Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp)) }
 			items(status.statuses, key = { "st${it.id}:${it.context}" }) { s ->
-				CardRow({ if (s.targetUrl.isNotBlank()) androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(ctx, androidx.core.net.toUri(s.targetUrl)) }) {
+				CardRow({ if (s.targetUrl.isNotBlank()) androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(ctx, s.targetUrl.toUri()) }) {
 					Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
 						StatusDot(s.state)
 						Column(Modifier.weight(1f)) {
