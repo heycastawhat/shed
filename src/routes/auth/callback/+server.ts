@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { isAllowed, signIn, startSession } from '#lib/server/accounts.js';
 import { cookie, describeUa } from '#lib/server/auth.js';
-import { exchange, type Pending } from '#lib/server/oidc.js';
+import { exchange, safeNext, type Pending } from '#lib/server/oidc.js';
 import { allowlist, db, provider } from '#lib/server/shed.js';
 
 export async function GET({ url, cookies, request }) {
@@ -15,5 +15,5 @@ export async function GET({ url, cookies, request }) {
 	if (!isAllowed(allowlist, claims)) error(403, `${claims.preferred_username ?? claims.email ?? 'This account'} isn't allowed to sign in to this Shed`);
 	const id = startSession(db, signIn(db, claims), describeUa(request.headers.get('user-agent')));
 	cookies.set('shed_session', id, cookie(url, 30 * 24 * 60 * 60));
-	redirect(303, '/');
+	redirect(303, safeNext(pending.next) ?? '/');
 }

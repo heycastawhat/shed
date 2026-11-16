@@ -11,7 +11,7 @@ import { actionsCtx, signingKey } from '#lib/server/actions/secrets.js';
 import { artifactBlob, artifactPipeline, artifactTwirp } from '#lib/server/actions/artifacts.js';
 import { sweepMentions } from '#lib/server/mention.js';
 import { read } from '#lib/server/store.js';
-import { isTheme } from '#lib/themes.js';
+import { isTheme, themeColor } from '#lib/themes.js';
 
 // Load forge.json and open shed.db (the import above) before serving anything, so a corrupt file stops the server instead of failing every request.
 export const init: ServerInit = async () => {
@@ -55,7 +55,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const palette = event.cookies.get('forge_palette');
 	const attrs = (theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : '') + (isTheme(palette) ? ` data-palette="${palette}"` : '');
 	const response = await resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('<html lang="en">', `<html lang="en"${attrs}>`)
+		transformPageChunk: ({ html }) => html.replace('<html lang="en">', `<html lang="en"${attrs}>`).replace('%shed.themeColor%', themeColor(theme, palette))
 	});
 	for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!response.headers.has(k)) response.headers.set(k, v);
 	return response;

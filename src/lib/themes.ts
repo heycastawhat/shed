@@ -164,3 +164,11 @@ export const themeCss = Object.entries(THEMES)
 		return `${p}{${block(t.light)}}@media (prefers-color-scheme: dark){${p}:not([data-theme='light']){${block(t.dark)}}}${p}[data-theme='dark']{${block(t.dark)}}`;
 	})
 	.join('');
+
+// <meta name="theme-color"> for the browser's and the installed app's status bar: the shell colour of the chosen palette and mode.
+export function themeColor(theme: string | undefined, palette: string | undefined) {
+	const t = THEMES[isTheme(palette) ? palette : 'forge'];
+	const meta = (v: Vars, media = '') => `<meta name="theme-color" content="${v.shell ?? v.surface}"${media && ` media="${media}"`} />`;
+	if (theme === 'light' || theme === 'dark') return meta(t[theme]);
+	return meta(t.light, '(prefers-color-scheme: light)') + meta(t.dark, '(prefers-color-scheme: dark)');
+}
