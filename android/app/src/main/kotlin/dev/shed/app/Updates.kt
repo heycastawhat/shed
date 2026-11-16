@@ -36,6 +36,8 @@ object Updates {
 			.header("Accept", "application/vnd.github+json")
 			.build()
 		val release = Api.http.newCall(req).execute().use { res ->
+			// GitHub answers 404 for a private repo, or one with no releases yet.
+			if (res.code == 404) throw ApiError(404, "no public release of the app on GitHub yet")
 			if (!res.isSuccessful) throw ApiError(res.code, "GitHub said ${res.code}")
 			Api.json.decodeFromString<GhRelease>(res.body.string())
 		}
