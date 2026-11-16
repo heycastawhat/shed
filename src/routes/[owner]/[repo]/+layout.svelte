@@ -21,6 +21,15 @@
 			(/\/commits?\//.test(page.route.id ?? '') ? 'commits' : 'code')
 	);
 
+	// On a narrow screen the tab row scrolls; bring the current section's tab into view rather than leaving it off to the right.
+	function showActive(tabs: HTMLElement) {
+		$effect(() => {
+			void section;
+			const a = tabs.querySelector<HTMLElement>('a.active');
+			if (a && tabs.scrollWidth > tabs.clientWidth) tabs.scrollLeft = a.offsetLeft - tabs.offsetLeft - (tabs.clientWidth - a.offsetWidth) / 2;
+		});
+	}
+
 	function switchRef(ref: string) {
 		const path = page.params.path ?? '';
 		const route = page.route.id?.match(/\/(tree|blob|commits|blame|edit)\//)?.[1] ?? 'tree';
@@ -50,7 +59,7 @@
 	{/if}
 	{#if data.repo.description}<p>{data.repo.description}</p>{/if}
 	<nav>
-		<div class="tabs">
+		<div class="tabs" {@attach showActive}>
 			<a href={base} class:active={section === 'code'}><Icon name="code" size={15} />Code</a>
 			<a href="{base}/commits/{refPath(data.ref)}" class:active={section === 'commits'}><Icon name="commit" size={15} />Commits</a>
 			<a href="{base}/pulls" class:active={section === 'pulls'}>
@@ -263,15 +272,17 @@ git push -u origin {data.repo.default_branch}</pre>
 			animation-timeline: scroll(self inline);
 		}
 	}
+	/* Fade whichever ends have more tabs past them. */
 	@keyframes tabs-fade {
 		from {
 			mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
 		}
-		99% {
-			mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+		2%,
+		98% {
+			mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
 		}
 		to {
-			mask-image: none;
+			mask-image: linear-gradient(to right, transparent, #000 2.5rem);
 		}
 	}
 	@container (max-width: 640px) {

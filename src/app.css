@@ -74,6 +74,7 @@ a {
 /* Buttons are Material pills: outlined by default, tonal for .tonal, filled for .primary. */
 button,
 .button {
+	white-space: nowrap;
 	font: inherit;
 	font-weight: 500;
 	padding: 0.38rem 0.95rem;
