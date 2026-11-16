@@ -79,9 +79,12 @@ val LocalNav = compositionLocalOf<NavHostController> { error("No nav") }
 val LocalMe = compositionLocalOf<User?> { null }
 
 // A Shed web URL as a native screen, when there is one: /owner/repo/(pulls|issues)/n and /owner/repo.
+// Same host as the server, whatever the scheme or port (a server typed as a LAN address still matches).
 fun routeFor(server: String, url: String): Any? {
-	if (!url.startsWith(server)) return null
-	val parts = url.removePrefix(server).substringBefore('?').substringBefore('#').trim('/').split('/')
+	val u = url.toUri()
+	if (u.host == null || !u.host.equals(server.toUri().host, ignoreCase = true)) return null
+	val base = server.toUri().path.orEmpty().trimEnd('/')
+	val parts = u.path.orEmpty().removePrefix(base).trim('/').split('/')
 	return when {
 		parts.size >= 4 && (parts[2] == "pulls" || parts[2] == "issues") -> parts[3].toLongOrNull()?.let { ThreadRoute(parts[0], parts[1], it) }
 		parts.size == 2 -> RepoRoute(parts[0], parts[1])

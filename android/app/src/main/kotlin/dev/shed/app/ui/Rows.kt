@@ -20,7 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.shed.app.Issue
@@ -84,12 +87,15 @@ fun RepoRow(r: RepoInfo, onClick: () -> Unit) {
 			Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
 				Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
 					Text(
-						buildString { append(r.owner.login); append(" / ") },
+						buildAnnotatedString {
+							withStyle(SpanStyle(color = c.onSurfaceVariant)) { append("${r.owner.login} / ") }
+							withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(r.name) }
+						},
 						style = MaterialTheme.typography.titleMedium,
-						color = c.onSurfaceVariant,
-						maxLines = 1
+						maxLines = 1,
+						overflow = TextOverflow.Ellipsis,
+						modifier = Modifier.weight(1f, fill = false)
 					)
-					Text(r.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
 					if (r.private) ShedIcon(ShedIcons.lock, 14.dp)
 					if (r.fork) ShedIcon(ShedIcons.fork, 14.dp)
 					if (r.archived) ShedIcon(ShedIcons.archive, 14.dp)

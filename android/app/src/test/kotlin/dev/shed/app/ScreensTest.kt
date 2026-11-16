@@ -59,8 +59,9 @@ class ScreensTest {
 
 	@After fun stop() = server.close()
 
-	private fun shell(dark: Boolean) = rule.setContent {
-		ShedTheme(mode = if (dark) "dark" else "light") { Shell(Account(server.url("/").toString().trimEnd('/'), "ada", "token"), emptyFlow()) }
+	private fun shell(dark: Boolean) {
+		BASE = server.url("/").toString().trimEnd('/')
+		rule.setContent { ShedTheme(mode = if (dark) "dark" else "light") { Shell(Account(BASE, "ada", "token"), emptyFlow()) } }
 	}
 
 	private var current = "start"
@@ -122,6 +123,7 @@ class ScreensTest {
 
 	private companion object {
 		const val USER = """{"id":1,"login":"ada","full_name":"Ada","avatar_url":"/avatars/ada.svg"}"""
+		var BASE = ""
 		val NOW: String = java.time.Instant.now().minusSeconds(3 * 3600).toString()
 		// A coloured circle with the initial, like Shed's generated avatars.
 		fun avatar(path: String): String {
@@ -140,8 +142,8 @@ class ScreensTest {
 		val REPOS = "[${repo("garden", "Plants, watering schedules and a small web UI", 3, 2)},${repo("dotfiles", "Shell, editor and terminal setup", 0, 0, private = true)},${repo("notes", "", 1, 5)}]"
 		fun thread(id: Int, title: String, type: String, state: String, unread: Boolean, n: Int) =
 			"""{"id":$id,"unread":$unread,"pinned":false,"updated_at":"$NOW","repository":{"full_name":"ada/garden"},""" +
-				""""subject":{"title":"$title","type":"$type","state":"$state","html_url":"http://shed/ada/garden/${if (type == "Pull") "pulls" else "issues"}/$n"}}"""
-		val NOTIFICATIONS = "[${thread(1, "Fix flaky clone test over SSH", "Pull", "open", true, 12)},${thread(2, "Release 0.4 checklist", "Issue", "open", true, 7)},${thread(3, "Move CI to the new runner", "Pull", "merged", false, 5)}]"
+				""""subject":{"title":"$title","type":"$type","state":"$state","html_url":"$BASE/ada/garden/${if (type == "Pull") "pulls" else "issues"}/$n"}}"""
+		val NOTIFICATIONS get() = "[${thread(1, "Fix flaky clone test over SSH", "Pull", "open", true, 12)},${thread(2, "Release 0.4 checklist", "Issue", "open", true, 7)},${thread(3, "Move CI to the new runner", "Pull", "merged", false, 5)}]"
 		val COMMENTS = """[{"id":1,"body":"Looks good. Can we keep the old timeout as a fallback?","user":${user("ada")},"created_at":"$NOW"},""" +
 			"""{"id":2,"body":"Done in the second commit.","user":${user("kiwi")},"created_at":"$NOW"}]"""
 	}
