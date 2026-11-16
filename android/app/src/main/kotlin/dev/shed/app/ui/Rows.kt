@@ -132,7 +132,7 @@ fun RepoRow(r: RepoInfo, showOwner: Boolean = true, onClick: () -> Unit) {
 			}
 			if (r.description.isNotBlank()) Text(r.description, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
 			Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-				r.language?.let { lang ->
+				r.language?.takeIf { it.isNotBlank() }?.let { lang ->
 					Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
 						Box(Modifier.size(8.dp).clip(CircleShape).background(LANGUAGE[lang] ?: c.outline))
 						Meta(lang)

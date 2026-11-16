@@ -104,7 +104,9 @@ fun <T> Loading(l: Loaded<T>, modifier: Modifier = Modifier, content: @Composabl
 	PullToRefreshBox(isRefreshing = l.refreshing && l.state is Load.Ok, onRefresh = l.reload, modifier = modifier.fillMaxSize()) {
 		when (val s = l.state) {
 			Load.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
-			is Load.Failed -> Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+			// A server older than the app has no route for newer screens (Agents, wiki, blame): say so rather than show the error.
+			is Load.Failed -> if (s.message.startsWith("No API route")) EmptyState("Update Shed to use this", "Your Shed server is older than the app; this screen needs a newer server.", ShedIcons.refresh)
+			else Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
 				Text(s.message, color = MaterialTheme.colorScheme.error)
 				Button(onClick = l.reload) { Text("Try again") }
 			}
