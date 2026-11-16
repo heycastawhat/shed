@@ -70,7 +70,8 @@ type Data = {
 	dismissed: Record<number, string[]>;
 };
 
-const file = `${FORGE_DATA}/forge.json`;
+const dir = FORGE_DATA;
+const file = `${dir}/forge.json`;
 let data: Promise<Data> | undefined;
 let writing = Promise.resolve();
 
@@ -121,7 +122,7 @@ export async function update(fn: (d: Data) => void) {
 	for (const u of Object.keys(d.dismissed)) d.dismissed[+u] = d.dismissed[+u].slice(-100);
 	// A failed write mustn't poison the chain for every later one.
 	const next = writing.then(async () => {
-		await mkdir(FORGE_DATA, { recursive: true });
+		await mkdir(dir, { recursive: true });
 		await writeFile(`${file}.tmp`, JSON.stringify(d), { mode: 0o600 });
 		await rename(`${file}.tmp`, file);
 	});

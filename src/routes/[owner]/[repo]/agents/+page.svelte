@@ -12,7 +12,7 @@
 
 	// T3 has a live event stream, but polling the projection while something runs keeps forge stateless.
 	$effect(() => {
-		if (!data.threads.some((t) => t.activeRunId || t.pendingRuntimeRequest)) return;
+		if (!data.threads.some((t) => t.activeRunId || t.pendingRuntimeRequest) && !data.cloning.some((c) => c.phase === 'running')) return;
 		const timer = setInterval(invalidateAll, 2000);
 		return () => clearInterval(timer);
 	});
@@ -21,10 +21,26 @@
 {#each data.down as d (d.name)}
 	<p class="down">{d.name} is unreachable: {d.error}</p>
 {/each}
-{#if !data.hosts.length}
+{#each data.cloning as c (c.host)}
+	<form class="setup" method="POST" action="?/retry" use:enhance>
+		{#if c.phase === 'running'}
+			<h2>Cloning {data.repo.name} on {c.name}…</h2>
+			<p class="muted">{c.percent ?? 0}%</p>
+		{:else}
+			<h2>Cloning {data.repo.name} on {c.name} failed</h2>
+			<p class="error">{c.error}</p>
+			<p class="muted">T3 Code runs git without prompts, so the host's SSH key has to be on your account (Settings → SSH keys) and this server's host key in the host's known_hosts.</p>
+			<input type="hidden" name="host" value={c.host} />
+			<input type="hidden" name="project" value={c.project} />
+			<button class="primary">Try again</button>
+			{#if form && 'setupError' in form}<p class="error">{form.setupError}</p>{/if}
+		{/if}
+	</form>
+{/each}
+{#if !data.hosts.length && !data.cloning.length}
 	<form class="setup" method="POST" action="?/setup" use:enhance>
 		<h2>Set up {data.repo.name} for agents</h2>
-		<p class="muted">T3 Code clones the repo onto the host and adds it as a project. Agents then work there, each task in its own worktree.</p>
+		<p class="muted">T3 Code clones the repo onto the host and adds it as a project. Agents then work there, each task in its own worktree.{#if data.repo.ssh_url} It clones over SSH, so add the host's SSH key to your account first.{/if}</p>
 		{#if data.reachable.length > 1}
 			<select name="host" aria-label="Host">
 				{#each data.reachable as h (h.id)}<option value={h.id}>on {h.name}</option>{/each}
@@ -35,7 +51,7 @@
 		<button class="primary" disabled={!data.reachable.length}>Clone into T3 Code{data.reachable.length === 1 ? ` on ${data.reachable[0].name}` : ''}</button>
 		{#if form && 'setupError' in form}<p class="error">{form.setupError}</p>{/if}
 	</form>
-{:else}
+{:else if data.hosts.length}
 	<div class="agents" class:solo={!data.threads.length}>
 		<aside>
 			<NewTask targets={[{ repo: data.repo.full_name, base: data.repo.default_branch, hosts: data.hosts }]} error={form?.error} />

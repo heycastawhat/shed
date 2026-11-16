@@ -139,7 +139,7 @@ async function rpc<T>(host: Host, tag: string, payload: unknown, firstChunkOnly 
 	});
 }
 
-export type Snapshot = { threads: AgentThread[]; projects: { id: string; title: string }[] };
+export type Snapshot = { threads: AgentThread[]; archivedThreads?: AgentThread[]; projects: { id: string; title: string }[] };
 
 export async function shell(host: Host) {
 	const { snapshot } = await rpc<{ snapshot: Snapshot }>(
@@ -277,6 +277,11 @@ export async function launchFromForm(token: string | undefined, repo: string, fo
 	});
 	return `agents?host=${encodeURIComponent(host.id)}&thread=${encodeURIComponent(thread)}`;
 }
+
+// T3 clones in the background and keeps the project even if the clone fails, so the repo's Agents tab asks for the clone's state.
+export type Clone = { projectId: string; phase: 'running' | 'done' | 'failed' | 'cancelled'; percent: number | null; error: string | null };
+export const clones = (host: Host) => rpc<Clone[]>(host, 'subscribeProjectClones', {}, true);
+export const retryClone = (host: Host, projectId: string) => rpc(host, 'projectClone.retry', { projectId });
 
 // Clones a repo onto the host as a new T3 project, where T3's own UI would put it. Needs the token's source-control:write scope.
 export async function cloneProject(host: Host, title: string, remoteUrl: string) {
