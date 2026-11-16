@@ -46,7 +46,7 @@
 		</label>
 		<label class="choice">
 			<input type="radio" name="visibility" value="public" checked={v?.visibility === 'public'} />
-			<span><strong>Public</strong><span class="muted">Anyone who can reach this forge can see it</span></span>
+			<span><strong>Public</strong><span class="muted">Anyone who can reach this Shed can see it</span></span>
 		</label>
 	</fieldset>
 
@@ -73,7 +73,7 @@
 			<span>Default branch</span>
 			<input name="branch" value={v?.branch ?? 'main'} />
 		</label>
-		<p class="muted note">With nothing ticked the repository starts empty, and forge shows you the commands to push an existing project into it.</p>
+		<p class="muted note">With nothing ticked the repository starts empty, and Shed shows you the commands to push an existing project into it.</p>
 	</fieldset>
 
 	{#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}

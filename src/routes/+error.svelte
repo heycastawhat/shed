@@ -6,7 +6,7 @@
 	const title = $derived(page.status === 404 ? 'Not found' : page.status === 401 || page.status === 403 ? 'Not allowed' : page.status >= 500 ? 'Something broke' : 'Error');
 </script>
 
-<svelte:head><title>{title} · forge</title></svelte:head>
+<svelte:head><title>{title} · Shed</title></svelte:head>
 
 <section>
 	<p class="status">{page.status}</p>
