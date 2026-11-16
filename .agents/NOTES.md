@@ -80,7 +80,7 @@ Dev machine: aarch64 Fedora Aurora; bun in `~/.bun/bin` (`export PATH=$HOME/.bun
 ## Deploying
 
 `DEPLOY.md` (server `/opt/stacks/shed`, compose service `shed`, web 3080, SSH 2223, Cloudflare tunnel hostname `shed.example.com`).
-Live since 2026-11-16 at https://shed.example.com. The code reaches server through the **private** GitHub repo `heycastawhat/shed`, which
+Live since 2026-11-16 at https://shed.example.com. The code reaches server through the **public** GitHub repo `heycastawhat/shed`, which
 holds a scrubbed copy published by `.agents/tmp/github/publish.sh` (never `git push` there). server's checkout uses `git@github.com:heycastawhat/shed.git`
 with a read-only deploy key (`~/.ssh/shed_deploy` on server, set as the checkout's `core.sshCommand`). Redeploy: commit, run publish.sh, then on server
 `cd /opt/stacks/shed && git fetch -q && git reset -q --hard origin/shed && docker compose build && docker compose up -d` (publish rewrites history,
@@ -125,7 +125,8 @@ Everything is on branch `shed`. Open work, each its own thread:
 2. **Deploy**: done 2026-11-16/17 (see Deploying). The owner's 7 Forgejo repos imported (no issues/PRs there). CI runner on server
    (`/opt/stacks/shed-runner`, DEPLOY.md §6) proven on `ada/ci-smoke`. Bundled T3 has SSH/HTTPS git access (§7); Claude isn't signed in
    inside the container yet (needs the owner). Forgejo is stopped (`docker compose down` in `/opt/stacks/forgejo`, data and volumes kept).
-   GitHub repo still private: old unscrubbed commits are still fetchable there by SHA, so it can't go public as is.
+   GitHub: the first repo kept unscrubbed commits by SHA, so it was renamed `heycastawhat/shed-old` (private, keep it so) and a fresh
+   `heycastawhat/shed` made public 2026-11-17 after an audit of every commit. Releases and Actions secrets need recreating there.
 3. **Agents end to end**: done 2026-11-16 against real T3 (pairing, clone into T3, `@agent` on an issue with the summary posted back, approvals from
    Shed's task view, Fix with agent, a hub task); `agents-t3.test.ts` covers the same with a fake T3. Setup clones over SSH, so the T3 host needs its
    key on the account and Shed's host key in `known_hosts` (T3's git is non-interactive). A failed or running clone shows on the repo's
