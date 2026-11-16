@@ -122,8 +122,10 @@ Everything is on branch `shed`. Open work, each its own thread:
    `.settings-form` in `app.css`; repo settings style their `section`s the same in their layout). Every page was checked in light, dark and 390px
    (`.agents/tmp/pass.ts` writes contact sheets to `.agents/tmp/pass/`; `tabs-test.ts`, `split-test.ts` drive the layouts). Not done: Split's
    pane lists open items only (first 50, no filters).
-2. **Deploy**: done 2026-11-16 (see Deploying). The owner's 7 Forgejo repos imported (no issues/PRs there). Not yet: CI runner on server
-   (DEPLOY.md §6), agent logins in the container (§7), turning Forgejo off.
+2. **Deploy**: done 2026-11-16/17 (see Deploying). The owner's 7 Forgejo repos imported (no issues/PRs there). CI runner on server
+   (`/opt/stacks/shed-runner`, DEPLOY.md §6) proven on `ada/ci-smoke`. Bundled T3 has SSH/HTTPS git access (§7); Claude isn't signed in
+   inside the container yet (needs the owner). Forgejo is stopped (`docker compose down` in `/opt/stacks/forgejo`, data and volumes kept).
+   GitHub repo still private: old unscrubbed commits are still fetchable there by SHA, so it can't go public as is.
 3. **Agents end to end**: done 2026-11-16 against real T3 (pairing, clone into T3, `@agent` on an issue with the summary posted back, approvals from
    Shed's task view, Fix with agent, a hub task); `agents-t3.test.ts` covers the same with a fake T3. Setup clones over SSH, so the T3 host needs its
    key on the account and Shed's host key in `known_hosts` (T3's git is non-interactive). A failed or running clone shows on the repo's

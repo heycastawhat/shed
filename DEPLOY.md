@@ -97,18 +97,24 @@ forgejo-runner register --no-interactive --instance https://shed.example.com --t
 forgejo-runner daemon
 ```
 
-(Run it in its own compose stack with the Docker socket, as Forgejo's docs describe.) Actions like `actions/checkout@v4` come
+On server it runs as its own stack, `/opt/stacks/shed-runner` (done 2026-11-17): image `code.forgejo.org/forgejo/runner:13.2.1`, the Docker
+socket mounted (`group_add` the host's docker gid, `security_opt: label=disable` for SELinux), `.env` holding `SHED_RUNNER_TOKEN`, and a
+command that registers once (`test -f .runner || forgejo-runner register …`) then runs `forgejo-runner daemon`. `ada/ci-smoke` is a private
+test repo whose one workflow checks out and prints its README. Actions like `actions/checkout@v4` come
 from `https://data.forgejo.org` unless `SHED_ACTIONS_URL` says otherwise. Secrets and variables are per repo (API for now:
 `PUT /api/v1/repos/<o>/<r>/actions/secrets/<NAME>`).
 
 ## 7. Agents (optional)
 
 ```sh
-docker compose exec -it shed claude                      # then /login
+docker compose exec -it shed claude                      # then /login (or CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token` in .env)
 docker compose exec -it shed codex login --device-auth   # if built with codex
-# Let T3 clones push: a Shed token with push access.
-docker compose exec shed sh -c 'echo https://ada:<token>@shed.example.com > ~/.t3/git-credentials'
 ```
+
+The bundled T3 clones repos over SSH (the repo's `ssh_url`, `ssh://git@server:2223/…`), so the container has its own key and SSH config in
+the `t3` volume, `~/.t3/ssh/` (`id_ed25519`, `known_hosts` with Shed's host key, `config` mapping `server` to the LAN address), and `.env`
+has `GIT_SSH_COMMAND=ssh -F /home/bun/.t3/ssh/config`. The public key is on ada's account (Settings → SSH keys, "Bundled T3 (container)").
+`~/.t3/git-credentials` holds a non-expiring push token for HTTPS. Done 2026-11-17, except the Claude sign-in.
 
 ## Updating, backups, rollback
 
