@@ -60,7 +60,10 @@ fun HomeScreen() {
 				.distinctBy { it.repo.fullName + it.ref }
 				.take(3)
 				.map { Push(it.repo.fullName, it.ref.removePrefix("refs/heads/"), it.created) }
-			Home(r, m, notes.await(), pushes, repos.await(), feed.await())
+			// Unread activity on something already listed above would show it twice.
+			val listed = (r + m).map { "${it.repository?.fullName}#${it.number}" }.toSet()
+			val unread = notes.await().filter { n -> n.subject.htmlUrl.substringAfterLast('/').toLongOrNull()?.let { "${n.repository.fullName}#$it" } !in listed }
+			Home(r, m, unread, pushes, repos.await(), feed.await())
 		}
 	}
 	TabPage("Home") {

@@ -103,7 +103,7 @@ class ScreensTest {
 		tap("Changes")
 		at("$theme-changes")
 		waitFor("Fix flaky clone test")
-		rule.onNode(hasText("Created")).performClick()
+		rule.onNode(hasText("Mine")).performClick()
 		waitFor("Add blame endpoint")
 		shot("$theme-changes")
 		tap("Repos")
