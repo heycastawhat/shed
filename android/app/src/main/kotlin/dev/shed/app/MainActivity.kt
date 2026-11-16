@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
 
 	private fun handle(intent: Intent) {
 		intent.getStringExtra(Notifier.EXTRA_URL)?.takeIf { it.isNotEmpty() }?.let { url ->
-			setIntent(Intent(intent).removeExtra(Notifier.EXTRA_URL))
+			setIntent(Intent(intent).apply { removeExtra(Notifier.EXTRA_URL) })
 			CustomTabsIntent.Builder().build().launchUrl(this, url.toUri())
 			return
 		}
