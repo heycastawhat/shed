@@ -14,7 +14,7 @@ SQLite for everything else). It began as "forge", a UI over Forgejo's API; on 20
 - Sign-in is any OIDC provider (the owner uses Pocket ID) with an allowlist; no passwords.
 - CI speaks **forgejo-runner's protocol**, so the stock runner and `.forgejo/workflows` work unchanged.
 - Theme: purple accent (`--accent`), primary actions and the Open badge use it; green/red only for diff lines and closed state.
-- UI redesign (Sink's visual language, tabs for PRs) is under way: see Handoff.
+- UI: Sink's visual language (Material 3 from a seed, Roboto Flex, tinted shell, pills, grouped settings cards); Classic, Tabs and Split layouts. Code views stay dense.
 
 ## Layout
 
@@ -113,13 +113,15 @@ server: Fedora 44, x86_64, 15 GB RAM, ssh `ada@192.0.2.245` (key on this machine
 ## Handoff (2026-11-16)
 
 Everything is on branch `shed`. Open work, each its own thread:
-1. **UI redesign** (PLAN.md "Later"). Done: Material 3 palettes from seeds (`.agents/scripts/m3-palettes.ts` → `src/lib/themes.ts`; roles
-   `--shell`, `--on-accent`, `--accent-container`, `--on-accent-container`, mixed for hand-picked themes in `app.css`), Roboto Flex
-   (`.wordmark`, wide headings), shell = tinted sidebar + rounded `.sheet`, pill nav/buttons (`.tonal`, `.primary`), `--radius` 12px,
-   phone bottom tab bar. Started: Tabs layout — `prefs.tabs` (cookie `forge_tabs`, `/prefs`), `TabStrip.svelte` rendered in the sheet when on
-   (tabs per PR/issue/file/commit/run in localStorage, remembers sub-page and scroll); not yet switchable in Settings → Appearance and untested.
-   Still to do: Appearance "Layout" choice (Classic / Tabs) with preview cards like Sink; Split layout for lists (PR list beside the open PR);
-   settings as grouped cards; go through every page in light/dark/390px; keep code views dense.
+1. **UI redesign**: done 2026-11-17 (PLAN.md "Later"). Material 3 palettes from seeds (`.agents/scripts/m3-palettes.ts` → `src/lib/themes.ts`;
+   roles `--shell`, `--on-accent`, `--accent-container`, `--on-accent-container`), Roboto Flex, tinted shell + rounded `.sheet`, pill nav/buttons,
+   phone bottom tab bar. Layouts (Settings → Appearance, drawn cards; `prefs.layout`, cookie `forge_layout`): Classic; Tabs (`TabStrip.svelte`,
+   sticky, tabs per PR/issue/file/commit/run in localStorage, keeps sub-page and scroll; DiffView's sticky headers sit under it via `--sticky-top`;
+   hidden on phones); Split (`SplitPane.svelte` + `pulls/`, `issues/` layout loads in `server/split.ts`: open PRs/issues beside the open one at
+   ≥1200px, loaded once per repo and streamed). Settings pages are grouped cards (`.settings-card`, `.setting-row`, `.settings-list`,
+   `.settings-form` in `app.css`; repo settings style their `section`s the same in their layout). Every page was checked in light, dark and 390px
+   (`.agents/tmp/pass.ts` writes contact sheets to `.agents/tmp/pass/`; `tabs-test.ts`, `split-test.ts` drive the layouts). Not done: Split's
+   pane lists open items only (first 50, no filters).
 2. **Deploy**: done 2026-11-16 (see Deploying). The owner's 7 Forgejo repos imported (no issues/PRs there). Not yet: CI runner on server
    (DEPLOY.md §6), agent logins in the container (§7), turning Forgejo off.
 3. **Agents end to end**: done 2026-11-16 against real T3 (pairing, clone into T3, `@agent` on an issue with the summary posted back, approvals from
