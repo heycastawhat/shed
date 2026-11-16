@@ -30,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.navigation.NavDestination
@@ -212,7 +214,7 @@ fun TabPage(title: String, content: @Composable ColumnScope.() -> Unit) {
 	val account = LocalApi.current.account
 	val me = LocalMe.current
 	Page(title, trailing = {
-		IconButton(onClick = { nav.navigate(SettingsRoute) }) { Avatar(me?.avatarUrl ?: "/avatars/${account.login}.svg", 32.dp) }
+		IconButton(onClick = { nav.navigate(SettingsRoute) }, modifier = Modifier.semantics { contentDescription = "Settings" }) { Avatar(me?.avatarUrl ?: "/avatars/${account.login}.svg", 32.dp) }
 	}, content = content)
 }
 

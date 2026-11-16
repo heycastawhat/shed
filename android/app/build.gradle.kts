@@ -2,6 +2,7 @@ plugins {
 	alias(libs.plugins.android.application)
 	alias(libs.plugins.kotlin.compose)
 	alias(libs.plugins.kotlin.serialization)
+	alias(libs.plugins.roborazzi)
 }
 
 
@@ -39,6 +40,10 @@ android {
 		}
 	}
 
+	// Screenshot tests (src/test): Robolectric renders the real screens against a fake Shed and Roborazzi saves them,
+	// so layouts can be checked without a device: ./gradlew :app:recordRoborazziDebug -> app/build/outputs/roborazzi.
+	testOptions { unitTests.isIncludeAndroidResources = true }
+
 	buildFeatures {
 		compose = true
 		// BuildConfig.VERSION_NAME for Settings and the update check.
@@ -54,6 +59,14 @@ dependencies {
 	implementation(libs.compose.material3)
 	implementation(libs.compose.tooling.preview)
 	debugImplementation(libs.compose.tooling)
+	debugImplementation(libs.compose.ui.test.manifest)
+	testImplementation(platform(libs.compose.bom))
+	testImplementation(libs.compose.ui.test)
+	testImplementation(libs.junit)
+	testImplementation(libs.robolectric)
+	testImplementation(libs.roborazzi)
+	testImplementation(libs.roborazzi.compose)
+	testImplementation(libs.mockwebserver)
 	implementation(libs.activity.compose)
 	implementation(libs.core.ktx)
 	implementation(libs.lifecycle.viewmodel.compose)

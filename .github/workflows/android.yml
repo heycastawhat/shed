@@ -52,6 +52,16 @@ jobs:
           java-version: 21
       # The runner image ships the Android SDK; Gradle fetches the platform version it needs.
       - uses: gradle/actions/setup-gradle@v6
+      # Screenshots of every screen, rendered by Robolectric against a fake Shed (see app/src/test). They don't block a release.
+      - name: Screenshots
+        continue-on-error: true
+        run: ./gradlew --no-daemon :app:recordRoborazziDebug
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screenshots
+          path: android/app/build/outputs/roborazzi
+          if-no-files-found: ignore
       - name: Signing key
         env:
           KEYSTORE_B64: ${{ secrets.SHED_KEYSTORE_B64 }}
