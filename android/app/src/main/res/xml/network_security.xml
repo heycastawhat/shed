@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext allowed so a Shed on the LAN (http://192.168.x.x:3000) works; the sign-in screen warns for other http:// addresses. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<!-- API 31+: the system splash is the launcher icon on its purple. -->
+	<style name="Theme.Shed" parent="android:Theme.Material.Light.NoActionBar">
+		<item name="android:windowBackground">@color/splash</item>
+		<item name="android:statusBarColor">@android:color/transparent</item>
+		<item name="android:navigationBarColor">@android:color/transparent</item>
+		<item name="android:windowSplashScreenBackground">@color/icon_background</item>
+		<item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+	</style>
+</resources>

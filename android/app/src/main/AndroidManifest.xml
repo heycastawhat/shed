@@ -14,6 +14,7 @@
 		android:enableOnBackInvokedCallback="true"
 		android:icon="@mipmap/ic_launcher"
 		android:label="Shed"
+		android:networkSecurityConfig="@xml/network_security"
 		android:roundIcon="@mipmap/ic_launcher"
 		android:supportsRtl="true"
 		android:theme="@style/Theme.Shed">

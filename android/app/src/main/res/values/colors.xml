@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<color name="icon_background">#5B5BD6</color>
+	<!-- The window behind the first frame: the theme's surfaceContainerLowest. -->
+	<color name="splash">#FFFFFFFF</color>
 </resources>
