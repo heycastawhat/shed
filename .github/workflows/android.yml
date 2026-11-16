@@ -35,13 +35,18 @@ jobs:
       # (The tag a release makes is pushed with GITHUB_TOKEN, which doesn't start another run.)
       - name: Version
         id: version
+        env:
+          FLOOR: 0.1.10
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             v="${GITHUB_REF_NAME#v}"
             echo "release=true" >> "$GITHUB_OUTPUT"
           elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" = shed-android ]; then
             last=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | sort -V | tail -1)
-            if [ -z "$last" ]; then v=0.1.0; else IFS=. read -r major minor patch <<< "$last"; v="$major.$minor.$((patch + 1))"; fi
+            if [ -n "$last" ]; then IFS=. read -r major minor patch <<< "$last"; v="$major.$minor.$((patch + 1))"; fi
+            # Never below FLOOR: the repo was recreated once (losing its tags) after phones had 0.1.9, and the update
+            # check only offers a higher version.
+            v=$(printf '%s\n%s\n' "${v:-0.0.0}" "$FLOOR" | sort -V | tail -1)
             echo "release=true" >> "$GITHUB_OUTPUT"
           else
             v="0.0.0-dev.$GITHUB_RUN_NUMBER"
