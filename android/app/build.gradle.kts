@@ -62,4 +62,7 @@ dependencies {
 	implementation(libs.coroutines.android)
 	implementation(libs.coil.compose)
 	implementation(libs.coil.okhttp)
+	implementation(libs.coil.svg)
+	implementation(libs.markdown.m3)
+	implementation(libs.markdown.coil3)
 }
