@@ -1,7 +1,7 @@
 # Deploying Shed
 
 Target: `https://shed.example.com` on server (`/opt/stacks/shed`, docker compose), signing in with Pocket ID (`https://auth.example.com`),
-replacing Forgejo at `git.example.com` once it's been used for a while. Nothing here has been done yet; each step needs the owner's OK
+replacing Forgejo at `git.example.com` once it's been used for a while. Steps 1–5 were done on 2026-11-16; each step needs the owner's OK
 because it touches outward-facing systems.
 
 ## 1. Sign-in (done)
@@ -15,7 +15,7 @@ Pocket ID already has an OIDC client called **Shed** with callback URLs `https:/
 ```sh
 ssh server
 sudo mkdir -p /opt/stacks/shed && sudo chown $USER /opt/stacks/shed
-git clone -b shed https://git.example.com/ada/forge.git /opt/stacks/shed   # or rsync the checkout
+git clone -b shed https://github.com/heycastawhat/shed.git /opt/stacks/shed
 cd /opt/stacks/shed
 cp .env.example .env
 ```
@@ -112,7 +112,8 @@ docker compose exec shed sh -c 'echo https://ada:<token>@shed.example.com > ~/.t
 
 ## Updating, backups, rollback
 
-- Update: `git pull && docker compose build && docker compose up -d`.
+- Update: `git fetch && git reset --hard origin/shed && docker compose build && docker compose up -d` (the GitHub copy's history is
+  rewritten on each publish, so reset rather than pull; `.env` is untracked).
 - Back up the `data` volume (`shed.db`, `repos/`, wikis, release files, CI logs and artifacts, `lfs/`, `packages/`, `avatars/`,
   `ssh/host_ed25519`) and `FORGE_SECRET`.
   For a consistent copy of the database: `docker compose exec shed bun -e "require('bun:sqlite').Database.open('/data/shed.db').run(\"vacuum into '/data/backup.db'\")"`.

@@ -80,7 +80,10 @@ Dev machine: aarch64 Fedora Aurora; bun in `~/.bun/bin` (`export PATH=$HOME/.bun
 ## Deploying
 
 `DEPLOY.md` (server `/opt/stacks/shed`, compose service `shed`, web 3080, SSH 2223, Cloudflare tunnel hostname `shed.example.com`).
-Prepare-only: don't touch server, Pocket ID, Cloudflare or git.example.com without the owner's OK. The image builds with podman on arm64.
+Live since 2026-11-16 at https://shed.example.com. server's checkout tracks the public GitHub repo (`github.com/heycastawhat/shed`, scrubbed
+by `.agents/tmp/github/publish.sh`; never `git push` there). Redeploy: commit, run publish.sh, then on server
+`cd /opt/stacks/shed && git fetch -q && git reset -q --hard origin/shed && docker compose build && docker compose up -d` (history is rewritten on
+every publish, so reset, not pull; `.env` is untracked). Ask the owner before touching server, Pocket ID or Cloudflare. Forgejo still runs; don't push there.
 server: Fedora 44, x86_64, 15 GB RAM, ssh `ada@192.0.2.245` (key on this machine); sudo needs a password.
 
 ## Gotchas
@@ -108,7 +111,7 @@ server: Fedora 44, x86_64, 15 GB RAM, ssh `ada@192.0.2.245` (key on this machine
 
 ## Handoff (2026-11-16)
 
-Everything is on branch `shed`, committed, not pushed, not deployed. Open work, each its own thread:
+Everything is on branch `shed`. Open work, each its own thread:
 1. **UI redesign** (PLAN.md "Later"). Done: Material 3 palettes from seeds (`.agents/scripts/m3-palettes.ts` → `src/lib/themes.ts`; roles
    `--shell`, `--on-accent`, `--accent-container`, `--on-accent-container`, mixed for hand-picked themes in `app.css`), Roboto Flex
    (`.wordmark`, wide headings), shell = tinted sidebar + rounded `.sheet`, pill nav/buttons (`.tonal`, `.primary`), `--radius` 12px,
@@ -116,8 +119,8 @@ Everything is on branch `shed`, committed, not pushed, not deployed. Open work, 
    (tabs per PR/issue/file/commit/run in localStorage, remembers sub-page and scroll); not yet switchable in Settings → Appearance and untested.
    Still to do: Appearance "Layout" choice (Classic / Tabs) with preview cards like Sink; Split layout for lists (PR list beside the open PR);
    settings as grouped cards; go through every page in light/dark/390px; keep code views dense.
-2. **Deploy** (`DEPLOY.md`): needs the owner's OK for each outward step (server, Cloudflare hostname, Forgejo token for `shed-admin import`). x86 image
-   has never been built (this machine can't run x86).
+2. **Deploy**: done 2026-11-16 (see Deploying). The owner's 7 Forgejo repos imported (no issues/PRs there). Not yet: CI runner on server
+   (DEPLOY.md §6), agent logins in the container (§7), turning Forgejo off.
 3. **Agents end to end**: done 2026-11-16 against real T3 (pairing, clone into T3, `@agent` on an issue with the summary posted back, approvals from
    Shed's task view, Fix with agent, a hub task); `agents-t3.test.ts` covers the same with a fake T3. Setup clones over SSH, so the T3 host needs its
    key on the account and Shed's host key in `known_hosts` (T3's git is non-interactive). A failed or running clone shows on the repo's
