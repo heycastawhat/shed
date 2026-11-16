@@ -4,8 +4,6 @@ plugins {
 	alias(libs.plugins.kotlin.serialization)
 }
 
-// Release builds are signed with the key CI passes in (SHED_KEYSTORE etc.), so each APK installs over the last one.
-val keystore = System.getenv("SHED_KEYSTORE")?.let(::file)?.takeIf { it.exists() }
 
 android {
 	namespace = "dev.shed.app"
@@ -15,16 +13,20 @@ android {
 		applicationId = "dev.shed.app"
 		minSdk = 29
 		targetSdk = 37
-		versionCode = System.getenv("SHED_VERSION_CODE")?.toIntOrNull() ?: 1
-		versionName = System.getenv("SHED_VERSION_NAME") ?: "dev"
+		// CI sets these from the release tag (v0.1.2 -> 0.1.2, code from the run number).
+		versionCode = providers.environmentVariable("SHED_VERSION_CODE").orNull?.toInt() ?: 1
+		versionName = providers.environmentVariable("SHED_VERSION_NAME").orNull ?: "0.1.0-dev"
 	}
 
+	// Release key from the environment (GitHub Actions secrets). Without it, release builds use the debug key,
+	// which is fine for trying a build but can't update an APK from a GitHub release.
+	val keystore = providers.environmentVariable("SHED_KEYSTORE").orNull
 	signingConfigs {
 		if (keystore != null) create("release") {
-			storeFile = keystore
-			storePassword = System.getenv("SHED_KEYSTORE_PASSWORD")
-			keyAlias = System.getenv("SHED_KEY_ALIAS")
-			keyPassword = System.getenv("SHED_KEY_PASSWORD")
+			storeFile = file(keystore)
+			storePassword = providers.environmentVariable("SHED_KEYSTORE_PASSWORD").get()
+			keyAlias = providers.environmentVariable("SHED_KEY_ALIAS").get()
+			keyPassword = providers.environmentVariable("SHED_KEY_PASSWORD").get()
 		}
 	}
 
@@ -37,7 +39,11 @@ android {
 		}
 	}
 
-	buildFeatures { compose = true }
+	buildFeatures {
+		compose = true
+		// BuildConfig.VERSION_NAME for Settings and the update check.
+		buildConfig = true
+	}
 }
 
 kotlin { jvmToolchain(21) }

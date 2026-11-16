@@ -1,6 +1,8 @@
 package dev.shed.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -8,9 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,13 +37,13 @@ fun ThreadScreen(r: ThreadRoute) {
 			Thread(issue.await(), comments.await())
 		}
 	}
-	Scaffold(topBar = { BackBar("#${r.number}", "${r.owner}/${r.repo}") }) { pad ->
-		Loading(l, Modifier.padding(pad)) { t ->
+	BackPage("#${r.number}", "${r.owner}/${r.repo}") {
+		Loading(l) { t ->
 			val i = t.issue
-			LazyColumn {
+			LazyColumn(contentPadding = PaddingValues(bottom = pageClearance())) {
 				item {
-					Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-						Text(i.title, style = MaterialTheme.typography.headlineSmall)
+					Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+						Text(i.title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
 						Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
 							StateChip(i.state, i.pullRequest != null, i.pullRequest?.merged == true, i.pullRequest?.draft == true)
 							Text("${i.user.login} opened ${ago(i.createdAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -59,10 +60,14 @@ fun ThreadScreen(r: ThreadRoute) {
 	}
 }
 
+// A comment as one of Sink's cards.
 @Composable
 private fun Post(login: String, avatar: String, at: String, body: String) {
-	Column(Modifier.fillMaxWidth()) {
-		HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+	Surface(
+		shape = RoundedCornerShape(20.dp),
+		color = MaterialTheme.colorScheme.surfaceContainerLow,
+		modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+	) {
 		Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
 			Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
 				Avatar(avatar, 24.dp)

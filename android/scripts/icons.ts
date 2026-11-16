@@ -16,9 +16,12 @@ const path = (a: Record<string, string>) => {
 	if (a.d) return a.d;
 	throw new Error('only paths are supported');
 };
+// The tab icons also come filled, for the open tab in the nav bar (as Sink's app swaps outlined for filled).
+const FILLED = new Set(['home', 'changes', 'repos', 'agents', 'bell']);
+const all = names.flatMap(([n, v]) => (FILLED.has(n) ? [[n, v, imports[v]] as const, [`${n}-filled`, v, imports[v].replace('core-regular', 'core-filled')] as const] : [[n, v, imports[v]] as const]));
 const out: string[] = [];
-for (const [name, v] of names) {
-	const file = `node_modules/@mingcute/icons/dist/styles/${imports[v]}.js`;
+for (const [name, , style] of all) {
+	const file = `node_modules/@mingcute/icons/dist/styles/${style}.js`;
 	const src = readFileSync(file, 'utf8');
 	const icon = JSON.parse(src.slice(src.indexOf('{'), src.lastIndexOf('}') + 1).replace(/;\s*export.*$/s, '')) as { elements: El[] };
 	const paths = icon.elements.map((e) => {
@@ -61,4 +64,4 @@ ${out.join('\n\n')}
 }
 `;
 writeFileSync('android/app/src/main/kotlin/dev/shed/app/ui/ShedIcons.kt', kt);
-console.log(`${names.length} icons`);
+console.log(`${all.length} icons`);

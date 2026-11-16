@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import dev.shed.app.ui.ShedTheme
+import dev.shed.app.ui.theme.ShedTheme
 import dev.shed.app.ui.Shell
 import dev.shed.app.ui.SignInScreen
 import kotlinx.coroutines.channels.Channel
@@ -35,7 +35,11 @@ class MainActivity : ComponentActivity() {
 		enableEdgeToEdge()
 		super.onCreate(savedInstanceState)
 		if (savedInstanceState == null) handle(intent)
-		setContent { ShedTheme { Surface(Modifier.fillMaxSize()) { App() } } }
+		setContent {
+			val dynamic by settings.dynamicColor.collectAsStateWithLifecycle(initialValue = false)
+			val mode by settings.themeMode.collectAsStateWithLifecycle(initialValue = "auto")
+			ShedTheme(dynamicColor = dynamic, mode = mode) { Surface(Modifier.fillMaxSize()) { App() } }
+		}
 	}
 
 	override fun onNewIntent(intent: Intent) {

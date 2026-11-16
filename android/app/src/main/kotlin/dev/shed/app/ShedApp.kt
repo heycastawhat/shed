@@ -11,6 +11,7 @@ import coil3.svg.SvgDecoder
 class ShedApp : Application(), SingletonImageLoader.Factory {
 	lateinit var session: Session
 		private set
+	val settings by lazy { Settings(this) }
 
 	override fun onCreate() {
 		super.onCreate()
@@ -28,3 +29,4 @@ class ShedApp : Application(), SingletonImageLoader.Factory {
 }
 
 val Context.session: Session get() = (applicationContext as ShedApp).session
+val Context.settings: Settings get() = (applicationContext as ShedApp).settings

@@ -111,12 +111,15 @@ class Session(private val ctx: Context) {
 		val rng = SecureRandom()
 		fun b64(b: ByteArray): String = Base64.encodeToString(b, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 		fun random(n: Int) = b64(ByteArray(n).also(rng::nextBytes))
+		/** What people type, as a server address: adds https:// (http:// for LAN addresses, as Sink does) and strips a trailing slash. */
 		fun normalise(input: String): String? {
-			val s = input.trim().trimEnd('/')
+			var s = input.trim().trimEnd('/')
 			if (s.isEmpty()) return null
-			val withScheme = if ("://" in s) s else "https://$s"
-			val u = withScheme.toUri()
-			return if ((u.scheme == "https" || u.scheme == "http") && !u.host.isNullOrEmpty()) withScheme else null
+			if (!s.startsWith("http://") && !s.startsWith("https://")) {
+				val lan = Regex("""^(localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|[\w-]+\.local)""").containsMatchIn(s)
+				s = (if (lan) "http://" else "https://") + s
+			}
+			return if (!s.toUri().host.isNullOrEmpty()) s else null
 		}
 	}
 }

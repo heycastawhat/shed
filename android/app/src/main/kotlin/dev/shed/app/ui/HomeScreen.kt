@@ -1,10 +1,9 @@
 package dev.shed.app.ui
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,26 +32,29 @@ fun HomeScreen() {
 			Home(r, m, notes.await())
 		}
 	}
-	Scaffold(topBar = { TabBar("Home") }) { pad ->
-		Loading(l, Modifier.padding(pad)) { h ->
-			if (h.review.isEmpty() && h.mentioned.isEmpty() && h.activity.isEmpty()) Column { Empty("Nothing needs you.") }
-			else LazyColumn {
+	TabPage("Home") {
+		Loading(l) { h ->
+			if (h.review.isEmpty() && h.mentioned.isEmpty() && h.activity.isEmpty()) EmptyState("All clear", "Nothing needs you right now.", ShedIcons.done)
+			else LazyColumn(contentPadding = PaddingValues(bottom = toolbarClearance())) {
 				if (h.review.isNotEmpty()) {
-					item { SectionTitle("Review requested") }
+					item { Section("Review requested") }
 					items(h.review, key = { "r${it.id}" }) { i -> IssueRow(i) { nav.navigate(threadOf(i)) } }
 				}
 				if (h.mentioned.isNotEmpty()) {
-					item { SectionTitle("Mentioned") }
+					item { Section("Mentioned") }
 					items(h.mentioned, key = { "m${it.id}" }) { i -> IssueRow(i) { nav.navigate(threadOf(i)) } }
 				}
 				if (h.activity.isNotEmpty()) {
-					item { SectionTitle("New activity") }
+					item { Section("New activity") }
 					items(h.activity, key = { "n${it.id}" }) { n -> NotificationRow(n) }
 				}
 			}
 		}
 	}
 }
+
+@Composable
+fun Section(text: String) = SectionLabel(text, Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp))
 
 fun threadOf(i: Issue): ThreadRoute {
 	val (owner, repo) = (i.repository?.fullName ?: "/").split('/', limit = 2)

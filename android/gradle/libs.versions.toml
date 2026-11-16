@@ -2,6 +2,8 @@
 agp = "9.5.1"
 kotlin = "2.4.21"
 compose-bom = "2026.09.00"
+# Material 3 Expressive (MaterialExpressiveTheme, the expressive motion and shapes), as in Sink's app.
+material3 = "1.5.0-beta02"
 activity = "1.13.0"
 core = "1.19.1"
 lifecycle = "2.11.0"
@@ -18,7 +20,7 @@ markdown = "0.46.0"
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
 compose-ui = { module = "androidx.compose.ui:ui" }
-compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 compose-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-tooling = { module = "androidx.compose.ui:ui-tooling" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }

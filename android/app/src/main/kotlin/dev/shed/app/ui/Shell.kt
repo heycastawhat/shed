@@ -1,39 +1,38 @@
 package dev.shed.app.ui
 
 import android.content.Intent
-import android.os.PowerManager
-import android.provider.Settings
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -44,8 +43,12 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import dev.shed.app.Account
 import dev.shed.app.Api
+import dev.shed.app.BuildConfig
+import dev.shed.app.Notifier
+import dev.shed.app.Update
+import dev.shed.app.Updates
 import dev.shed.app.User
-import dev.shed.app.session
+import dev.shed.app.settings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -56,18 +59,19 @@ import kotlinx.serialization.Serializable
 @Serializable data object ReposRoute
 @Serializable data object AgentsRoute
 @Serializable data object InboxRoute
+@Serializable data object SettingsRoute
 @Serializable data class RepoRoute(val owner: String, val repo: String)
 @Serializable data class ThreadRoute(val owner: String, val repo: String, val number: Long)
 
-private data class Tab(val route: Any, val label: String, val icon: ImageVector)
-
 private val TABS = listOf(
-	Tab(HomeRoute, "Home", ShedIcons.home),
-	Tab(ChangesRoute, "Changes", ShedIcons.changes),
-	Tab(ReposRoute, "Repos", ShedIcons.repos),
-	Tab(AgentsRoute, "Agents", ShedIcons.agents),
-	Tab(InboxRoute, "Inbox", ShedIcons.bell)
+	NavPlace(HomeRoute, "Home", ShedIcons.home, ShedIcons.homeFilled),
+	NavPlace(ChangesRoute, "Changes", ShedIcons.changes, ShedIcons.changesFilled),
+	NavPlace(ReposRoute, "Repos", ShedIcons.repos, ShedIcons.reposFilled),
+	NavPlace(AgentsRoute, "Agents", ShedIcons.agents, ShedIcons.agentsFilled),
+	NavPlace(InboxRoute, "Inbox", ShedIcons.bell, ShedIcons.bellFilled)
 )
+
+private fun NavDestination?.tab() = TABS.firstOrNull { t -> this?.hasRoute(t.route::class) == true }?.route
 
 val LocalNav = compositionLocalOf<NavHostController> { error("No nav") }
 val LocalMe = compositionLocalOf<User?> { null }
@@ -83,15 +87,28 @@ fun routeFor(server: String, url: String): Any? {
 	}
 }
 
+// As Sink's shell: screens draw to the bottom edge and the tabs float over them as a pill; pages below the tabs rise
+// over the screen they came from, with the theme's expressive motion, and the pill slides away under them.
 @Composable
 fun Shell(account: Account, links: Flow<String>) {
 	val nav = rememberNavController()
 	val ctx = LocalContext.current
 	val api = remember(account) { Api(account) }
 	val entry by nav.currentBackStackEntryAsState()
+	val tab = entry?.destination.tab()
+	val haptics = rememberHaptics()
+	val motion = MaterialTheme.motionScheme
+
 	var me by remember(account) { mutableStateOf<User?>(null) }
 	LaunchedEffect(api) { me = runCatching { api.get<User>("/user") }.getOrNull() }
-	val onTab = TABS.any { t -> entry?.destination?.hasRoute(t.route::class) == true }
+
+	// Unread count for the Inbox tab, kept fresh by the notification stream.
+	var unread by remember { mutableIntStateOf(0) }
+	LaunchedEffect(api) {
+		suspend fun count() = runCatching { unread = api.get<NewCount>("/notifications/new").new }
+		count()
+		Notifier.changes.collect { count() }
+	}
 
 	LaunchedEffect(nav) {
 		links.collect { url ->
@@ -100,83 +117,108 @@ fun Shell(account: Account, links: Flow<String>) {
 		}
 	}
 
+	// A newer APK on GitHub: asked about once a day, or from Settings (as Sink's app does).
+	val settings = ctx.settings
+	var update by remember { mutableStateOf<Update?>(null) }
+	LaunchedEffect(Unit) {
+		if (BuildConfig.DEBUG || System.currentTimeMillis() - settings.updateCheckedAt() < Updates.DAY_MS) return@LaunchedEffect
+		val found = runCatching { Updates.check(BuildConfig.VERSION_NAME) }.getOrElse { return@LaunchedEffect }
+		settings.setUpdateCheckedAt(System.currentTimeMillis())
+		if (found != null && found.version != settings.skippedVersion()) update = found
+	}
+	val checkForUpdates: suspend () -> String? = {
+		runCatching { Updates.check(BuildConfig.VERSION_NAME) }.fold(
+			onSuccess = { found ->
+				settings.setUpdateCheckedAt(System.currentTimeMillis())
+				update = found
+				if (found == null) "You have the latest version" else null
+			},
+			onFailure = { "Couldn't check: ${it.message}" }
+		)
+	}
+	val scope = rememberCoroutineScope()
+	update?.let { u ->
+		UpdateDialog(
+			u,
+			onDownload = { update = null; ctx.startActivity(Intent(Intent.ACTION_VIEW, u.apkUrl.toUri())) },
+			onSkip = { update = null; scope.launch { settings.skipVersion(u.version) } },
+			onLater = { update = null }
+		)
+	}
+
 	CompositionLocalProvider(LocalApi provides api, LocalNav provides nav, LocalMe provides me) {
-		Scaffold(bottomBar = {
-			if (onTab) NavigationBar {
-				TABS.forEach { t ->
-					NavigationBarItem(
-						selected = entry?.destination?.hasRoute(t.route::class) == true,
-						onClick = {
-							nav.navigate(t.route) {
-								popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-								launchSingleTop = true
-								restoreState = true
-							}
-						},
-						icon = { ShedIcon(t.icon, 22.dp, LocalContentColor.current) },
-						label = { Text(t.label) }
-					)
+		Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
+			val isTab = { d: NavDestination -> d.tab() != null }
+			NavHost(
+				nav,
+				startDestination = HomeRoute,
+				modifier = Modifier.fillMaxSize(),
+				// A page rises over the screen it came from, which settles back a little; tabs fade through.
+				enterTransition = {
+					if (!isTab(targetState.destination)) slideInVertically(motion.defaultSpatialSpec()) { it / 12 } + fadeIn(motion.defaultEffectsSpec())
+					else fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), initialScale = 0.96f)
+				},
+				exitTransition = {
+					if (!isTab(targetState.destination)) fadeOut(motion.fastEffectsSpec()) + scaleOut(motion.defaultSpatialSpec(), targetScale = 0.96f)
+					else fadeOut(motion.fastEffectsSpec())
+				},
+				popEnterTransition = { fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), initialScale = 0.96f) },
+				popExitTransition = {
+					if (!isTab(initialState.destination)) slideOutVertically(motion.defaultSpatialSpec()) { it / 10 } + fadeOut(motion.fastEffectsSpec())
+					else fadeOut(motion.fastEffectsSpec())
 				}
-			}
-		}) { pad ->
-			NavHost(nav, startDestination = HomeRoute, modifier = Modifier.padding(pad).consumeWindowInsets(pad)) {
+			) {
 				composable<HomeRoute> { HomeScreen() }
 				composable<ChangesRoute> { ChangesScreen() }
 				composable<ReposRoute> { ReposScreen() }
 				composable<AgentsRoute> { AgentsScreen() }
 				composable<InboxRoute> { InboxScreen() }
+				composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onCheckForUpdates = checkForUpdates) }
 				composable<RepoRoute> { RepoScreen(it.toRoute()) }
 				composable<ThreadRoute> { ThreadScreen(it.toRoute()) }
+			}
+			AnimatedVisibility(
+				visible = tab != null,
+				enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.defaultEffectsSpec()),
+				exit = slideOutVertically(motion.fastSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec()),
+				modifier = Modifier.align(Alignment.BottomStart)
+			) {
+				FloatingNavBar(
+					TABS,
+					tab,
+					mapOf(InboxRoute to unread),
+					onSelect = { t ->
+						if (tab != t.route) haptics.tick()
+						nav.navigate(t.route) {
+							// Tabs keep one copy each and remember where you were in them.
+							popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+							launchSingleTop = true
+							restoreState = true
+						}
+					},
+					modifier = Modifier.navigationBarsPadding().padding(start = 16.dp, bottom = TOOLBAR_BOTTOM)
+				)
 			}
 		}
 	}
 }
 
-// The top bar for the tab screens: a title, search (coming), and the account menu.
-@OptIn(ExperimentalMaterial3Api::class)
+@Serializable private data class NewCount(val new: Int = 0)
+
+// A tab's screen: Sink's big title with the account avatar (Settings) on the right, content clearing the floating bar.
 @Composable
-fun TabBar(title: String) {
-	val ctx = LocalContext.current
+fun TabPage(title: String, content: @Composable ColumnScope.() -> Unit) {
+	val nav = LocalNav.current
 	val account = LocalApi.current.account
-	val scope = rememberCoroutineScope()
-	var menu by remember { mutableStateOf(false) }
-	val power = ctx.getSystemService(PowerManager::class.java)
-	TopAppBar(
-		title = { Text(title) },
-		actions = {
-			Box {
-				IconButton(onClick = { menu = true }) { Avatar(LocalMe.current?.avatarUrl ?: "/avatars/${account.login}.svg", 30.dp) }
-				DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-					DropdownMenuItem(text = { Text("Signed in as ${account.login}") }, onClick = {}, enabled = false)
-					if (!power.isIgnoringBatteryOptimizations(ctx.packageName)) DropdownMenuItem(
-						text = { Text("Keep notifications instant") },
-						onClick = {
-							menu = false
-							// Exempting the app from battery optimisation lets Android keep the stream open and restart it from the background.
-							@Suppress("BatteryLife")
-							ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${ctx.packageName}".toUri()))
-						}
-					)
-					DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; scope.launch { ctx.session.signOut() } })
-				}
-			}
-		}
-	)
+	val me = LocalMe.current
+	Page(title, trailing = {
+		IconButton(onClick = { nav.navigate(SettingsRoute) }) { Avatar(me?.avatarUrl ?: "/avatars/${account.login}.svg", 32.dp) }
+	}, content = content)
 }
 
-// For screens below the tabs: a title and a back arrow.
-@OptIn(ExperimentalMaterial3Api::class)
+// A page below the tabs: the big title with a back arrow.
 @Composable
-fun BackBar(title: String, subtitle: String? = null, actions: @Composable () -> Unit = {}) {
+fun BackPage(title: String, sub: String? = null, trailing: @Composable () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
 	val nav = LocalNav.current
-	TopAppBar(
-		title = {
-			Column {
-				Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-				subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-			}
-		},
-		navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { ShedIcon(ShedIcons.left, 24.dp, LocalContentColor.current) } },
-		actions = { actions() }
-	)
+	Page(title, sub, onBack = { nav.popBackStack() }, trailing = trailing, content = content)
 }

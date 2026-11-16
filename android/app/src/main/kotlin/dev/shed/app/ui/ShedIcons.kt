@@ -33,6 +33,12 @@ object ShedIcons {
 		}
 	}
 
+	val homeFilled: ImageVector by lazy {
+		icon("home-filled") {
+			path("M13.2 2.65a2 2 0 0 0-2.4 0l-7 5.25A2 2 0 0 0 3 9.5V19a2 2 0 0 0 2 2h3.9a1.1 1.1 0 0 0 1.1-1.1V15a2 2 0 1 1 4 0v4.9a1.1 1.1 0 0 0 1.1 1.1H19a2 2 0 0 0 2-2V9.5a2 2 0 0 0-.8-1.6z", stroke = false, fill = true, width = 0f, round = false, evenOdd = false)
+		}
+	}
+
 	val merge: ImageVector by lazy {
 		icon("merge") {
 			path("M6 16a2 2 0 1 1 0 4 2 2 0 0 1 0-4m0 0V8m0 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 0v1a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3v1m0 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4", stroke = true, fill = false, width = 2f, round = true, evenOdd = false)
@@ -143,15 +149,33 @@ object ShedIcons {
 		}
 	}
 
+	val changesFilled: ImageVector by lazy {
+		icon("changes-filled") {
+			path("M6 3a2.998 2.998 0 0 1 1 5.825v6.349A2.999 2.999 0 0 1 6 21a3 3 0 0 1-1-5.826V8.825A2.998 2.998 0 0 1 6 3m6.793.172a1 1 0 1 1 1.414 1.414L13.793 5H16a3 3 0 0 1 3 3v7.174A2.999 2.999 0 0 1 18 21a3 3 0 0 1-1-5.826V8a1 1 0 0 0-1-1h-2.207l.414.414a1 1 0 0 1-1.414 1.414l-2.121-2.121a1 1 0 0 1 0-1.414z", stroke = false, fill = true, width = 0f, round = false, evenOdd = false)
+		}
+	}
+
 	val repos: ImageVector by lazy {
 		icon("repos") {
 			path("M3 10h18M9.52 4H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V7.5a1 1 0 0 0-1-1h-7.52a1 1 0 0 1-.78-.375l-1.4-1.75A1 1 0 0 0 9.52 4Z", stroke = true, fill = false, width = 2f, round = false, evenOdd = false)
 		}
 	}
 
+	val reposFilled: ImageVector by lazy {
+		icon("repos-filled") {
+			path("M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8h20zM9.52 3a2 2 0 0 1 1.561.751l1.4 1.749H20a2 2 0 0 1 2 2V9H2V5a2 2 0 0 1 2-2z", stroke = false, fill = true, width = 0f, round = false, evenOdd = false)
+		}
+	}
+
 	val agents: ImageVector by lazy {
 		icon("agents") {
 			path("M9 12v2m6-2v2m-3-9v2m0-2a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm-7 6h-.5a1.5 1.5 0 0 0 0 3H5zm14 0h.5a1.5 1.5 0 0 1 0 3H19zM8 19h8a3 3 0 0 0 3-3v-6a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3Z", stroke = true, fill = false, width = 2f, round = true, evenOdd = false)
+		}
+	}
+
+	val agentsFilled: ImageVector by lazy {
+		icon("agents-filled") {
+			path("M12 2a2 2 0 0 1 1 3.73V6h3a4 4 0 0 1 4 4v.05a2.501 2.501 0 0 1 0 4.9V16a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-1.05a2.5 2.5 0 0 1 0-4.9V10a4 4 0 0 1 4-4h3v-.27A2 2 0 0 1 12 2m-3 9a1 1 0 0 0-1 1v2a1 1 0 1 0 2 0v-2a1 1 0 0 0-1-1m6 0a1 1 0 0 0-1 1v2a1 1 0 1 0 2 0v-2a1 1 0 0 0-1-1", stroke = false, fill = true, width = 0f, round = false, evenOdd = false)
 		}
 	}
 
@@ -360,6 +384,12 @@ object ShedIcons {
 	val bell: ImageVector by lazy {
 		icon("bell") {
 			path("M15 17a3 3 0 1 1-6 0M6 9v3.528a2 2 0 0 1-.211.894l-1.717 3.433a.1.1 0 0 0 .09.145h15.676a.1.1 0 0 0 .09-.145l-1.717-3.433a2 2 0 0 1-.211-.894V9A6 6 0 0 0 6 9Z", stroke = true, fill = false, width = 2f, round = false, evenOdd = false)
+		}
+	}
+
+	val bellFilled: ImageVector by lazy {
+		icon("bell-filled") {
+			path("M14.826 19A3 3 0 0 1 12 21a3 3 0 0 1-2.825-2zM12 2a7 7 0 0 1 7 7v3.528a1 1 0 0 0 .106.447l1.717 3.433A1.1 1.1 0 0 1 19.838 18H4.162a1.1 1.1 0 0 1-.984-1.592l1.717-3.433A1 1 0 0 0 5 12.528V9a7 7 0 0 1 7-7", stroke = false, fill = true, width = 0f, round = false, evenOdd = false)
 		}
 	}
 
