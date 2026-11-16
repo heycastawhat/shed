@@ -14,4 +14,6 @@ import './mirror.js';
 import './packages.js';
 import './orgs.js';
 import './search.js';
+import './view.js';
+import './agents.js';
 export { dispatch } from './router.js';
