@@ -3,6 +3,7 @@ package dev.shed.app
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -134,7 +135,7 @@ class ScreensTest {
 		tap("Repos")
 		rule.onNode(hasText("Plants, watering", substring = true)).performClick()
 		waitFor("what to water")
-		rule.onNode(hasText("Code")).performClick()
+		rule.onAllNodes(hasText("Code")).onFirst().performClick()
 		at("$theme-tree")
 		waitFor("clone.ts")
 		shot("$theme-tree")
@@ -145,7 +146,8 @@ class ScreensTest {
 		shot("$theme-file")
 		back()
 		back()
-		rule.onNode(hasText("Actions")).performClick()
+		waitFor("Actions")
+		rule.onAllNodes(hasText("Actions")).onFirst().performClick()
 		at("$theme-runs")
 		waitFor("Run tests")
 		rule.onAllNodes(hasText("Run tests", substring = true))[1].performClick()
