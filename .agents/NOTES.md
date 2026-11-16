@@ -80,10 +80,11 @@ Dev machine: aarch64 Fedora Aurora; bun in `~/.bun/bin` (`export PATH=$HOME/.bun
 ## Deploying
 
 `DEPLOY.md` (server `/opt/stacks/shed`, compose service `shed`, web 3080, SSH 2223, Cloudflare tunnel hostname `shed.example.com`).
-Live since 2026-11-16 at https://shed.example.com. server's checkout tracks the public GitHub repo (`github.com/heycastawhat/shed`, scrubbed
-by `.agents/tmp/github/publish.sh`; never `git push` there). Redeploy: commit, run publish.sh, then on server
-`cd /opt/stacks/shed && git fetch -q && git reset -q --hard origin/shed && docker compose build && docker compose up -d` (history is rewritten on
-every publish, so reset, not pull; `.env` is untracked). Ask the owner before touching server, Pocket ID or Cloudflare. Forgejo still runs; don't push there.
+Live since 2026-11-16 at https://shed.example.com. The code reaches server through the **private** GitHub repo `heycastawhat/shed`, which
+holds a scrubbed copy published by `.agents/tmp/github/publish.sh` (never `git push` there). server's checkout uses `git@github.com:heycastawhat/shed.git`
+with a read-only deploy key (`~/.ssh/shed_deploy` on server, set as the checkout's `core.sshCommand`). Redeploy: commit, run publish.sh, then on server
+`cd /opt/stacks/shed && git fetch -q && git reset -q --hard origin/shed && docker compose build && docker compose up -d` (publish rewrites history,
+so reset, not pull; `.env` is untracked). Ask the owner before touching server, Pocket ID or Cloudflare. Forgejo still runs; don't push there.
 server: Fedora 44, x86_64, 15 GB RAM, ssh `ada@192.0.2.245` (key on this machine); sudo needs a password.
 
 ## Gotchas

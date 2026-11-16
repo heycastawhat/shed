@@ -15,7 +15,7 @@ Pocket ID already has an OIDC client called **Shed** with callback URLs `https:/
 ```sh
 ssh server
 sudo mkdir -p /opt/stacks/shed && sudo chown $USER /opt/stacks/shed
-git clone -b shed https://github.com/heycastawhat/shed.git /opt/stacks/shed
+git clone -b shed git@github.com:heycastawhat/shed.git /opt/stacks/shed   # private: needs a read-only deploy key
 cd /opt/stacks/shed
 cp .env.example .env
 ```
