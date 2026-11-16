@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { page } from '$app/state';
 	import { ago } from '#lib/time.js';
 
 	let { data, form } = $props();
@@ -9,7 +8,11 @@
 <svelte:head><title>SSH keys</title></svelte:head>
 
 <h1>SSH keys</h1>
-<p class="muted">For git over SSH. Add the public half of a key (the <code>.pub</code> file), then clone with the SSH address on any repo's page, e.g. <code>git clone ssh://git@{page.url.hostname}:2222/owner/repo.git</code>.</p>
+{#if data.ssh}
+	<p class="muted">For git over SSH. Add the public half of a key (the <code>.pub</code> file), then clone with the SSH address on any repo's page, e.g. <code>git clone {data.ssh}/owner/repo.git</code>.</p>
+{:else}
+	<p class="muted">This Shed has git over SSH turned off (<code>SHED_SSH_PORT=0</code>); keys added here work once it's on.</p>
+{/if}
 
 <section class="settings-card">
 	<h2>Add a key</h2>

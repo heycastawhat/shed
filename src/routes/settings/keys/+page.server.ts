@@ -1,11 +1,12 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit';
 import { api, request } from '#lib/server/forgejo.js';
+import { getSshBase } from '#lib/server/shedrepo-shape.js';
 
 type Key = { id: number; title: string; fingerprint: string; created_at: string; last_used_at: string | null };
 
 export async function load({ locals }) {
 	if (!locals.user) redirect(303, '/login');
-	return { keys: await api<Key[]>(locals.token, '/user/keys') };
+	return { keys: await api<Key[]>(locals.token, '/user/keys'), ssh: getSshBase() };
 }
 
 const send = async (token: string | undefined, path: string, init: RequestInit) => {

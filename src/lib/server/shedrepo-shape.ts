@@ -6,6 +6,7 @@ import type { RepoRow } from './repos.js';
 // Where SSH clone URLs point, set once the server knows its host name; empty when SSH is off.
 let sshBase = '';
 export const setSshBase = (b: string) => (sshBase = b);
+export const getSshBase = () => sshBase;
 
 export function toRepo(row: RepoRow, owner: UserRow, level: Level, empty: boolean, origin: string): Repo {
 	const full = `${row.owner}/${row.name}`;
