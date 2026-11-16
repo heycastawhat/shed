@@ -30,7 +30,7 @@
 	});
 </script>
 
-<svelte:head><title>Agents · forge</title></svelte:head>
+<svelte:head><title>Agents · Shed</title></svelte:head>
 
 <header class="top">
 	<h1>Agents</h1>

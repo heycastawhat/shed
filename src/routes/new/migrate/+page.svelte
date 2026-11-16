@@ -9,7 +9,7 @@
 <svelte:head><title>Copy a repository</title></svelte:head>
 
 <h1>Copy a repository</h1>
-<p class="muted">Copy every branch and tag from another server by its HTTPS address, once or as a mirror that keeps following it. To bring over issues and PRs from Forgejo or Gitea too, use <code>shed import</code> (see DEPLOY.md).</p>
+<p class="muted">Copy every branch and tag from another server by its HTTPS address, once or as a mirror that keeps following it. To bring over issues and PRs from Forgejo or Gitea too, use <code>shed-admin import</code> (see DEPLOY.md).</p>
 
 <form
 	method="POST"

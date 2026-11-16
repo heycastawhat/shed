@@ -149,12 +149,12 @@
 <section class="settings-card">
 	<h2 id="t3">T3 Code</h2>
 	<p class="muted">
-		Drive <a href="https://t3.codes">T3 Code</a> agents from forge: start tasks from a repo's Agents tab, answer their permission requests and steer them. A repo runs on any
+		Drive <a href="https://t3.codes">T3 Code</a> agents from Shed: start tasks from a repo's Agents tab, answer their permission requests and steer them. A repo runs on any
 		host with a T3 project of the same name.
 	</p>
 	<ol class="steps muted">
 		<li>In T3 Code on the host, open <strong>Settings → Connections</strong> and create a pairing link.</li>
-		<li>Paste it below within 5 minutes. forge swaps it for a token that lasts 30 days.</li>
+		<li>Paste it below within 5 minutes. Shed swaps it for a token that lasts 30 days.</li>
 	</ol>
 	<ul class="settings-list">
 		{#each data.t3 as h (h.id)}
