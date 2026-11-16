@@ -62,31 +62,47 @@ class ScreensTest {
 		ShedTheme(mode = if (dark) "dark" else "light") { Shell(Account(server.url("/").toString().trimEnd('/'), "ada", "token"), emptyFlow()) }
 	}
 
-	private fun waitFor(text: String) = rule.waitUntil(10_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+	private var current = "start"
+
+	// On a timeout, a screenshot of what was there instead (an error, a spinner) says why.
+	private fun waitFor(text: String) = try {
+		rule.waitUntil(10_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+	} catch (e: Throwable) {
+		shot("failed-$current")
+		throw AssertionError("Waiting for \"$text\" on $current; requests: ${server.requestCount}", e)
+	}
 	private fun tap(description: String) = rule.onNode(hasContentDescription(description, substring = true)).performClick()
 	private fun shot(name: String) = rule.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
+	private fun at(name: String) { current = name }
 
 	private fun tour(theme: String) {
+		at("$theme-home")
 		waitFor("Fix flaky clone test")
 		shot("$theme-home")
 		tap("Changes")
+		at("$theme-changes")
 		waitFor("Add blame endpoint")
 		shot("$theme-changes")
 		tap("Repos")
+		at("$theme-repos")
 		waitFor("garden")
 		shot("$theme-repos")
 		rule.onNode(hasText("Plants, watering", substring = true)).performClick()
+		at("$theme-repo")
 		waitFor("what to water")
 		shot("$theme-repo")
 		rule.onNode(hasContentDescription("Back")).performClick()
 		tap("Inbox")
+		at("$theme-inbox")
 		waitFor("Release 0.4")
 		shot("$theme-inbox")
 		rule.onNode(hasText("Fix flaky clone test", substring = true)).performClick()
+		at("$theme-thread")
 		waitFor("banner first")
 		shot("$theme-thread")
 		rule.onNode(hasContentDescription("Back")).performClick()
 		tap("Settings")
+		at("$theme-settings")
 		waitFor("Appearance")
 		shot("$theme-settings")
 	}

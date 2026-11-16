@@ -9,7 +9,8 @@ on:
   push:
     branches: ['**']
     tags: ['v*']
-    paths: ['android/**', '.github/workflows/android.yml']
+    # Test-only changes don't cut a release; run the workflow by hand for their screenshots.
+    paths: ['android/**', '!android/app/src/test/**', '.github/workflows/android.yml']
   workflow_dispatch:
 
 # One release at a time, so two quick pushes don't both pick the same version.
