@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -145,19 +146,21 @@ fun ScreenTitle(title: String, sub: String? = null, onBack: (() -> Unit)? = null
 	}
 }
 
+// Small and secondary: a quiet note where a list would be, in the accent's own colours (not the tertiary pink).
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun EmptyState(title: String, body: String, icon: ImageVector) {
-	Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-		Box(
-			Modifier.size(112.dp).clip(MaterialShapes.Ghostish.toShape()).background(MaterialTheme.colorScheme.tertiaryContainer),
-			contentAlignment = Alignment.Center
-		) { Icon(icon, null, Modifier.size(44.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer) }
-		Spacer(Modifier.height(24.dp))
-		Text(title, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
-		if (body.isNotEmpty()) {
-			Spacer(Modifier.height(8.dp))
-			Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+fun EmptyState(title: String, body: String, icon: ImageVector, modifier: Modifier = Modifier) {
+	Row(
+		modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(16.dp),
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		Box(Modifier.size(44.dp).clip(MaterialShapes.Cookie6Sided.toShape()).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+			Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+		}
+		Spacer(Modifier.width(14.dp))
+		Column(Modifier.weight(1f)) {
+			Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
+			if (body.isNotEmpty()) Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 		}
 	}
 }

@@ -70,7 +70,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class RepoRoute(val owner: String, val repo: String)
 @Serializable data class ThreadRoute(val owner: String, val repo: String, val number: Long)
 @Serializable data class ListRoute(val owner: String, val repo: String, val pulls: Boolean)
-@Serializable data class NewThreadRoute(val owner: String, val repo: String, val pull: Boolean)
+@Serializable data class NewThreadRoute(val owner: String, val repo: String, val pull: Boolean, val head: String = "")
 @Serializable data class TreeRoute(val owner: String, val repo: String, val ref: String, val path: String)
 @Serializable data class FileRoute(val owner: String, val repo: String, val ref: String, val path: String)
 @Serializable data class CommitsRoute(val owner: String, val repo: String, val ref: String, val path: String)
@@ -242,7 +242,7 @@ fun Shell(account: Account, opens: Flow<String>) {
 				visible = tab != null,
 				enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.defaultEffectsSpec()),
 				exit = slideOutVertically(motion.fastSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec()),
-				modifier = Modifier.align(Alignment.BottomStart)
+				modifier = Modifier.align(Alignment.BottomCenter)
 			) {
 				FloatingNavBar(
 					TABS,
@@ -257,7 +257,7 @@ fun Shell(account: Account, opens: Flow<String>) {
 							restoreState = true
 						}
 					},
-					modifier = Modifier.navigationBarsPadding().padding(start = 16.dp, bottom = TOOLBAR_BOTTOM)
+					modifier = Modifier.navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = TOOLBAR_BOTTOM)
 				)
 			}
 		}

@@ -47,7 +47,7 @@ fun ProfileScreen(r: ProfileRoute) {
 					SectionLabel("Repos", Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp))
 				}
 				if (repos.isEmpty()) item { Text("No repos you can see.", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-				items(repos.sortedByDescending { it.updatedAt }, key = { it.id }) { x -> RepoRow(x) { nav.navigate(RepoRoute(x.owner.login, x.name)) } }
+				item { RepoGroup(repos.sortedByDescending { it.updatedAt }, showOwner = false) { x -> nav.navigate(RepoRoute(x.owner.login, x.name)) } }
 			}
 		}
 	}

@@ -226,3 +226,13 @@ import kotlinx.serialization.Serializable
 @Serializable data class DownHost(val name: String, val error: String = "")
 @Serializable data class Agents(val t3: T3? = null, val pending: List<Approval> = emptyList(), val activity: List<AgentActivity> = emptyList(), val keys: List<AgentKey> = emptyList())
 @Serializable data class UserSettings(@SerialName("full_name") val fullName: String = "", val description: String = "", val website: String = "", val location: String = "")
+@Serializable data class FeedRepo(@SerialName("full_name") val fullName: String)
+@Serializable data class FeedItem(
+	val id: Long,
+	@SerialName("op_type") val op: String,
+	@SerialName("act_user") val user: User? = null,
+	val repo: FeedRepo,
+	@SerialName("ref_name") val ref: String = "",
+	val content: String = "",
+	val created: String = ""
+)

@@ -151,6 +151,8 @@ class Api(val account: Account) {
 	@SerialName("watchers_count") val watchers: Int = 0,
 	@SerialName("release_counter") val releases: Int = 0,
 	val mirror: Boolean = false,
+	val empty: Boolean = false,
+	val language: String? = null,
 	@SerialName("html_url") val htmlUrl: String = "",
 	@SerialName("clone_url") val cloneUrl: String = "",
 	@SerialName("ssh_url") val sshUrl: String = "",

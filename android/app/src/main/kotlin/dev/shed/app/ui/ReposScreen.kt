@@ -38,7 +38,15 @@ fun ReposScreen() {
 		}
 		Loading(l) { list ->
 			if (list.isEmpty()) EmptyState("No repos yet", "Make one with New repo, or push to a new one.", ShedIcons.repos)
-			else LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = toolbarClearance())) { items(list, key = { it.id }) { r -> RepoRow(r) { nav.navigate(RepoRoute(r.owner.login, r.name)) } } }
+			else LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = toolbarClearance())) {
+				// Yours first, then those you reach through orgs or as a collaborator.
+				val (mine, others) = list.partition { it.owner.login == api.account.login }
+				item { RepoGroup(mine, showOwner = false) { r -> nav.navigate(RepoRoute(r.owner.login, r.name)) } }
+				if (others.isNotEmpty()) {
+					item { Section("Shared with you") }
+					item { RepoGroup(others) { r -> nav.navigate(RepoRoute(r.owner.login, r.name)) } }
+				}
+			}
 		}
 	}
 	if (creating) {

@@ -103,7 +103,7 @@ fun NewThreadScreen(r: NewThreadRoute) {
 	var title by rememberSaveable { mutableStateOf("") }
 	var body by rememberSaveable { mutableStateOf("") }
 	var draft by rememberSaveable { mutableStateOf(false) }
-	var head by rememberSaveable { mutableStateOf("") }
+	var head by rememberSaveable { mutableStateOf(r.head) }
 	var into by rememberSaveable { mutableStateOf("") }
 	var labels by remember { mutableStateOf(setOf<String>()) }
 	var picking by remember { mutableStateOf<String?>(null) }
