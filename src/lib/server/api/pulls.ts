@@ -11,7 +11,7 @@ import { afterPush, onPush, refSnapshot } from '../push.js';
 import { repoDir, type RepoRow } from '../repos.js';
 import { now, refSha, repoOf, slice, userByLogin, userJson, userRow, type RepoCtx } from './common.js';
 import { addComment, createIssue, crossReference, event, issueOf, repoRef, touch } from './issues.js';
-import { notify } from './notify.js';
+import { addNotification, notify } from './notify.js';
 import { checkRefWrite, protectionFor } from './protect.js';
 import { commitsJson } from './repos.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
@@ -365,9 +365,7 @@ function requestReview(c: Ctx, r: RepoCtx, p: PullRow, login: string, remove: bo
 	else {
 		c.db.query('insert or ignore into review_requests (issue_id, user_id) values (?, ?)').run(p.id, u.id);
 		c.db.query('insert or ignore into subscriptions (user_id, issue_id) values (?, ?)').run(u.id, p.id);
-		c.db
-			.query("insert into notifications (user_id, issue_id, repo_id, unread, updated_at) values (?, ?, ?, 1, ?) on conflict (user_id, issue_id) do update set unread = 1, updated_at = excluded.updated_at")
-			.run(u.id, p.id, r.row.id, now());
+		if (u.id !== c.user?.id) addNotification(c, u.id, p, r.row.id, 'requested your review');
 	}
 	event(c.db, p.id, me(c).id, 'review_request', { reviewer: u.id, removed: remove });
 }
