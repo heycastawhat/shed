@@ -27,7 +27,7 @@ export async function wikiPages(repoDir: string) {
 }
 
 // [[Page]] and [[Text|Page]] become links to the page; other relative links and images resolve inside the wiki.
-const wikiLinks = (md: string) => md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, a: string, b?: string) => `[${a}](${encodeURIComponent((b ?? a).trim().replaceAll(' ', '-'))})`);
+export const wikiLinks = (md: string) => md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, a: string, b?: string) => `[${a}](${encodeURIComponent((b ?? a).trim().replaceAll(' ', '-'))})`);
 
 export async function wikiPage(repoDir: string, repo: string, name: string) {
 	const dir = wikiDir(repoDir);

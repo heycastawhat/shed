@@ -19,7 +19,8 @@ const call = async (method: string, path: string, body?: unknown) => {
 		user: getUser(db, owner)!,
 		token: null
 	});
-	return { status: res.status, json: await res.json() };
+	const text = await res.text();
+	return { status: res.status, json: text ? JSON.parse(text) : null };
 };
 
 beforeAll(async () => {
@@ -49,4 +50,16 @@ test('blame says which commit last touched each line', async () => {
 	const [one, two] = r.json.ranges.map((x: { sha: string }) => r.json.commits[x.sha].summary);
 	expect([one, two]).toEqual(['First', 'Second']);
 	expect((await call('GET', '/repos/ada/garden/blame/nope.ts')).status).toBe(404);
+});
+
+test('wiki pages can be written, read with [[links]] made plain, renamed and deleted', async () => {
+	expect((await call('GET', '/repos/ada/garden/wiki/pages')).json).toEqual([]);
+	expect((await call('POST', '/repos/ada/garden/wiki/new', { title: 'Home', content: 'See [[Watering]].' })).json).toEqual({ sub_url: 'Home' });
+	const home = (await call('GET', '/repos/ada/garden/wiki/page/Home')).json;
+	expect(home).toMatchObject({ title: 'Home', content: 'See [Watering](Watering).' });
+	await call('POST', '/repos/ada/garden/wiki/new', { title: 'Watering', content: 'Daily.' });
+	await call('PATCH', '/repos/ada/garden/wiki/page/Watering', { title: 'Water', content: 'Twice a day.' });
+	expect((await call('GET', '/repos/ada/garden/wiki/pages')).json.map((p: { sub_url: string }) => p.sub_url)).toEqual(['Home', 'Water']);
+	expect((await call('DELETE', '/repos/ada/garden/wiki/page/Water')).status).toBe(204);
+	expect((await call('GET', '/repos/ada/garden/wiki/page/Water')).status).toBe(404);
 });

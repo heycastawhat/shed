@@ -16,4 +16,5 @@ import './orgs.js';
 import './search.js';
 import './view.js';
 import './agents.js';
+import './wiki.js';
 export { dispatch } from './router.js';
