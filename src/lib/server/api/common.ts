@@ -3,6 +3,7 @@ import { error } from '@sveltejs/kit';
 import { access, atLeast, tokenAccess, type Level } from '../access.js';
 import { toUser, type UserRow } from '../accounts.js';
 import { git, gitTry } from '../git.js';
+import { primaryLanguage } from '../language.js';
 import { getRepo, repoDir, type RepoRow } from '../repos.js';
 import { toRepo } from '../shedrepo-shape.js';
 import type { Ctx } from './router.js';
@@ -33,6 +34,7 @@ export async function repoJson(c: Ctx, row: RepoRow) {
 	const dir = repoDir(c.root, row.id);
 	const empty = !(await git(dir, ['for-each-ref', '--count=1', '--format=x', 'refs/heads'])).trim();
 	const r = toRepo(row, userRow(c.db, row.owner_id), level, empty, c.origin);
+	const head = empty ? null : (await gitTry(dir, ['rev-parse', '--verify', '--quiet', `refs/heads/${row.default_branch}^{commit}`]))?.trim();
 	const n = (sql: string) => c.db.query<{ n: number }, [number]>(sql).get(row.id)!.n;
 	const extra = c.db.query<{ has_issues: number; has_wiki: number; default_merge_style: string; delete_branch_after_merge: number; merge_styles: string; fork_of: number | null }, [number]>(
 		'select has_issues, has_wiki, default_merge_style, delete_branch_after_merge, merge_styles, fork_of from repos where id = ?'
@@ -40,6 +42,7 @@ export async function repoJson(c: Ctx, row: RepoRow) {
 	const styles: string[] = JSON.parse(extra.merge_styles);
 	return {
 		...r,
+		language: head ? await primaryLanguage(dir, head) : null,
 		open_pr_counter: n("select count(*) as n from issues where repo_id = ? and is_pull = 1 and state = 'open'"),
 		open_issues_count: n("select count(*) as n from issues where repo_id = ? and is_pull = 0 and state = 'open'"),
 		stars_count: n('select count(*) as n from stars where repo_id = ?'),

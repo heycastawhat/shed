@@ -63,3 +63,7 @@ test('wiki pages can be written, read with [[links]] made plain, renamed and del
 	expect((await call('DELETE', '/repos/ada/garden/wiki/page/Water')).status).toBe(204);
 	expect((await call('GET', '/repos/ada/garden/wiki/page/Water')).status).toBe(404);
 });
+
+test('a repo says its main language, by bytes on the default branch', async () => {
+	expect((await call('GET', '/repos/ada/garden')).json.language).toBe('TypeScript');
+});
