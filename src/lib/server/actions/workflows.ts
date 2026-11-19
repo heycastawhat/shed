@@ -124,7 +124,7 @@ export function expandMatrix(matrix: unknown): Record<string, unknown>[] {
 	for (const ex of (m.exclude as Record<string, unknown>[] | undefined) ?? []) combos = combos.filter((c) => !Object.entries(ex).every(([k, v]) => same(c[k], v)));
 	const original = new Set(axes.map(([k]) => k));
 	for (const inc of (m.include as Record<string, unknown>[] | undefined) ?? []) {
-		const hits = combos.filter((c) => Object.entries(inc).every(([k, v]) => !original.has(k) || same(c[k], v)));
+		const hits = axes.length ? combos.filter((c) => Object.entries(inc).every(([k, v]) => !original.has(k) || same(c[k], v))) : [];
 		if (hits.length && Object.keys(inc).some((k) => original.has(k) || combos.length)) for (const h of hits) Object.assign(h, Object.fromEntries(Object.entries(inc).filter(([k]) => !original.has(k) || same(h[k], inc[k]))));
 		else combos.push({ ...inc });
 	}

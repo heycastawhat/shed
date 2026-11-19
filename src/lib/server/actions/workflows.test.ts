@@ -46,6 +46,21 @@ test('matrix expansion', () => {
 	expect(expandMatrix(undefined)).toEqual([{}]);
 });
 
+test('include-only matrices create a separate job for every entry', () => {
+	const include = [{ os: 'linux' }, { os: 'windows' }];
+	expect(expandMatrix({ include })).toEqual(include);
+	expect(expandMatrix({ include: [{ os: 'linux' }, { os: 'linux' }] })).toEqual([{ os: 'linux' }, { os: 'linux' }]);
+	const w = parseWorkflow('on: workflow_dispatch\njobs:\n  included:\n    runs-on: "${{ matrix.os }}"\n    strategy:\n      matrix:\n        include: [{ os: linux }, { os: windows }]\n    steps: [{ run: echo included }]\n');
+	expect(planJobs(w).map(({ name, runsOn }) => ({ name, runsOn }))).toEqual([
+		{ name: 'included (linux)', runsOn: ['linux'] },
+		{ name: 'included (windows)', runsOn: ['windows'] }
+	]);
+	expect(expandMatrix({ include: [] })).toEqual([{}]);
+	expect(expandMatrix({ os: ['linux', 'windows'], include: [{ extra: true }, { os: 'linux', extra: false }, { os: 'mac' }] })).toEqual([
+		{ os: 'linux', extra: false }, { os: 'windows', extra: true }, { os: 'mac' }
+	]);
+});
+
 test('jobs become single-job workflows', () => {
 	const w = parseWorkflow(`
 name: CI
