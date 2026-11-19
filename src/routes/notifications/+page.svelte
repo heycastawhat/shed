@@ -34,7 +34,7 @@
 			{#each g.notes as n (n.id)}
 				<li class:unread={n.unread}>
 					<span class="kind {n.subject.state}"><Icon name={icon(n)} size={16} /></span>
-					<a class="title" href="/notifications/{n.id}">
+					<a class="title" href="/notifications/{n.id}" data-sveltekit-reload>
 						<strong>{n.subject.title}</strong>
 						<span class="muted">#{n.number} · {n.subject.type === 'Pull' ? 'Pull request' : 'Issue'} · {ago(n.updated_at)}</span>
 					</a>
