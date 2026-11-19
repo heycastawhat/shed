@@ -26,6 +26,19 @@ test('which events fire', () => {
 	expect(fires({ push: null, workflow_dispatch: null }, { event: 'workflow_dispatch' })).toBe(true);
 });
 
+test('globstar directories match root files as well as nested files in push filters', () => {
+	const w = parseWorkflow('on:\n  push:\n    paths: ["**/*.ts"]\njobs:\n  test:\n    runs-on: host\n    steps: []\n');
+	for (const file of ['index.ts', 'src/index.ts', 'src/lib/index.ts']) {
+		expect(matches(['**/*.ts'], file)).toBe(true);
+		expect(fires(w.on, { event: 'push', ref: 'refs/heads/main', files: [file] })).toBe(true);
+	}
+	expect(fires(w.on, { event: 'push', ref: 'refs/heads/main', files: [] })).toBe(false);
+	expect(fires(w.on, { event: 'push', ref: 'refs/heads/main', files: ['index.js'] })).toBe(false);
+	expect(matches(['src/**/*.ts'], 'src/index.ts')).toBe(true);
+	expect(matches(['**/*.ts', '!**/skip.ts'], 'skip.ts')).toBe(false);
+	expect(matches(['**/*.ts', '!**/skip.ts'], 'src/skip.ts')).toBe(false);
+});
+
 test('matrix expansion', () => {
 	expect(expandMatrix({ os: ['a', 'b'], v: [1, 2] })).toHaveLength(4);
 	expect(expandMatrix({ os: ['a', 'b'], v: [1, 2], exclude: [{ os: 'a', v: 2 }] })).toHaveLength(3);

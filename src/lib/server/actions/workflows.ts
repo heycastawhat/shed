@@ -29,7 +29,10 @@ function patternRe(p: string) {
 	let re = '';
 	for (let i = 0; i < p.length; i++) {
 		const ch = p[i];
-		if (ch === '*' && p[i + 1] === '*') (re += '.*'), i++;
+		if (ch === '*' && p[i + 1] === '*') {
+			if (p[i + 2] === '/') (re += '(?:.*/)?'), i += 2;
+			else (re += '.*'), i++;
+		}
 		else if (ch === '*') re += '[^/]*';
 		else if (ch === '?') re += '[^/]';
 		else if (ch === '+') re += '+';
