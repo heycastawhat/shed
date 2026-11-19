@@ -29,7 +29,10 @@ function patternRe(p: string) {
 	let re = '';
 	for (let i = 0; i < p.length; i++) {
 		const ch = p[i];
-		if (ch === '*' && p[i + 1] === '*') (re += '.*'), i++;
+		if (ch === '*' && p[i + 1] === '*') {
+			if (p[i + 2] === '/') (re += '(?:.*/)?'), i += 2;
+			else (re += '.*'), i++;
+		}
 		else if (ch === '*') re += '[^/]*';
 		else if (ch === '?') re += '[^/]';
 		else if (ch === '+') re += '+';
@@ -121,11 +124,11 @@ export function expandMatrix(matrix: unknown): Record<string, unknown>[] {
 	for (const ex of (m.exclude as Record<string, unknown>[] | undefined) ?? []) combos = combos.filter((c) => !Object.entries(ex).every(([k, v]) => same(c[k], v)));
 	const original = new Set(axes.map(([k]) => k));
 	for (const inc of (m.include as Record<string, unknown>[] | undefined) ?? []) {
-		const hits = combos.filter((c) => Object.entries(inc).every(([k, v]) => !original.has(k) || same(c[k], v)));
+		const hits = axes.length ? combos.filter((c) => Object.entries(inc).every(([k, v]) => !original.has(k) || same(c[k], v))) : [];
 		if (hits.length && Object.keys(inc).some((k) => original.has(k) || combos.length)) for (const h of hits) Object.assign(h, Object.fromEntries(Object.entries(inc).filter(([k]) => !original.has(k) || same(h[k], inc[k]))));
 		else combos.push({ ...inc });
 	}
-	return combos.length ? combos : [{}];
+	return axes.length || (Array.isArray(m.include) && m.include.length) ? combos : [{}];
 }
 
 // The only expressions the server resolves, in a job's name and runs-on: `matrix.x`, `vars.X`, `inputs.x` (or `github.event.inputs.x`),

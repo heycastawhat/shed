@@ -66,6 +66,7 @@ export async function migrate(
 type MirrorRow = RepoRow & { mirror_url: string; mirror_interval: number; mirror_updated_at: string | null };
 
 export async function syncMirror(db: Database, root: string, crypt: Crypt, repo: MirrorRow) {
+	if (repo.archived) return;
 	const dir = repoDir(root, repo.id);
 	const before = await refSnapshot(dir);
 	try {

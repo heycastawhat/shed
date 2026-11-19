@@ -70,3 +70,22 @@ test("the fork's branch rules apply: a rebase is a force push", async () => {
 	expect(res).toMatchObject({ status: 403, json: { message: 'feature is a protected branch, so force pushes to it are refused' } });
 	expect((await call(other, 'POST', '/repos/ada/sample/pulls/1/update')).status).toBe(204);
 });
+
+test('fork pushes while the base is archived are included when merging after unarchiving', async () => {
+	const before = (await call(other, 'GET', '/repos/ada/sample/pulls/1')).json;
+	const revisions = (await call(other, 'GET', '/repos/ada/sample/pulls/1/revisions')).json;
+	db.query('update repos set archived = 1 where id = ?').run(getRepo(db, 'ada', 'sample')!.id);
+	expect(await call(other, 'POST', '/repos/ada/sample/pulls/1/update')).toMatchObject({ status: 403, json: { message: 'ada/sample is archived' } });
+	expect((await call(other, 'POST', '/repos/other/sample/contents', { branch: 'feature', message: 'fork moves', files: [{ operation: 'create', path: 'new.txt', content: btoa('new\n') }] })).status).toBe(201);
+	const newest = await sha(forkDir, 'feature');
+	expect(newest).not.toBe(before.head.sha);
+	const tracked = (await call(other, 'GET', '/repos/ada/sample/pulls/1')).json.head.sha;
+	expect((await call(ada, 'POST', '/repos/ada/sample/pulls/1/merge', { Do: 'merge' })).status).toBe(403);
+	expect((await call(ada, 'PATCH', '/repos/ada/sample', { archived: false })).status).toBe(200);
+	expect((await call(ada, 'POST', '/repos/ada/sample/pulls/1/merge', { Do: 'merge' })).status).toBe(204);
+	expect((await git(baseDir, ['merge-base', 'main', newest])).trim()).toBe(newest);
+	expect(await git(baseDir, ['show', 'main:new.txt'])).toBe('new\n');
+	expect(tracked).toBe(newest);
+	expect(await sha(baseDir, 'refs/pull/1/head')).toBe(newest);
+	expect((await call(other, 'GET', '/repos/ada/sample/pulls/1/revisions')).json).toHaveLength(revisions.length + 1);
+});

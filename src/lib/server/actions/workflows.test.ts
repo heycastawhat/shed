@@ -26,11 +26,39 @@ test('which events fire', () => {
 	expect(fires({ push: null, workflow_dispatch: null }, { event: 'workflow_dispatch' })).toBe(true);
 });
 
+test('globstar directories match root files as well as nested files in push filters', () => {
+	const w = parseWorkflow('on:\n  push:\n    paths: ["**/*.ts"]\njobs:\n  test:\n    runs-on: host\n    steps: []\n');
+	for (const file of ['index.ts', 'src/index.ts', 'src/lib/index.ts']) {
+		expect(matches(['**/*.ts'], file)).toBe(true);
+		expect(fires(w.on, { event: 'push', ref: 'refs/heads/main', files: [file] })).toBe(true);
+	}
+	expect(fires(w.on, { event: 'push', ref: 'refs/heads/main', files: [] })).toBe(false);
+	expect(fires(w.on, { event: 'push', ref: 'refs/heads/main', files: ['index.js'] })).toBe(false);
+	expect(matches(['src/**/*.ts'], 'src/index.ts')).toBe(true);
+	expect(matches(['**/*.ts', '!**/skip.ts'], 'skip.ts')).toBe(false);
+	expect(matches(['**/*.ts', '!**/skip.ts'], 'src/skip.ts')).toBe(false);
+});
+
 test('matrix expansion', () => {
 	expect(expandMatrix({ os: ['a', 'b'], v: [1, 2] })).toHaveLength(4);
 	expect(expandMatrix({ os: ['a', 'b'], v: [1, 2], exclude: [{ os: 'a', v: 2 }] })).toHaveLength(3);
 	expect(expandMatrix({ os: ['a'], include: [{ os: 'a', extra: true }, { os: 'z' }] })).toEqual([{ os: 'a', extra: true }, { os: 'z' }]);
 	expect(expandMatrix(undefined)).toEqual([{}]);
+});
+
+test('include-only matrices create a separate job for every entry', () => {
+	const include = [{ os: 'linux' }, { os: 'windows' }];
+	expect(expandMatrix({ include })).toEqual(include);
+	expect(expandMatrix({ include: [{ os: 'linux' }, { os: 'linux' }] })).toEqual([{ os: 'linux' }, { os: 'linux' }]);
+	const w = parseWorkflow('on: workflow_dispatch\njobs:\n  included:\n    runs-on: "${{ matrix.os }}"\n    strategy:\n      matrix:\n        include: [{ os: linux }, { os: windows }]\n    steps: [{ run: echo included }]\n');
+	expect(planJobs(w).map(({ name, runsOn }) => ({ name, runsOn }))).toEqual([
+		{ name: 'included (linux)', runsOn: ['linux'] },
+		{ name: 'included (windows)', runsOn: ['windows'] }
+	]);
+	expect(expandMatrix({ include: [] })).toEqual([{}]);
+	expect(expandMatrix({ os: ['linux', 'windows'], include: [{ extra: true }, { os: 'linux', extra: false }, { os: 'mac' }] })).toEqual([
+		{ os: 'linux', extra: false }, { os: 'windows', extra: true }, { os: 'mac' }
+	]);
 });
 
 test('jobs become single-job workflows', () => {
@@ -58,6 +86,19 @@ jobs:
 	expect(single.jobs.test.strategy.matrix).toEqual({ node: [22] });
 	expect(single.env).toEqual({ A: '1' });
 	expect(single.on).toEqual({ push: null });
+});
+
+test('empty axes or fully excluded matrices do not plan a fallback job', () => {
+	const w = parseWorkflow('on: push\njobs:\n  test:\n    runs-on: host\n    strategy:\n      matrix:\n        os: [linux]\n        exclude:\n          - os: linux\n    steps: []\n');
+	expect(planJobs(w)).toEqual([]);
+	expect(expandMatrix({ os: [] })).toEqual([]);
+	expect(expandMatrix({ include: [] })).toEqual([{}]);
+	expect(expandMatrix({ os: ['linux'], exclude: [{ os: 'linux' }], include: [{ os: 'mac' }] })).toEqual([{ os: 'mac' }]);
+	expect(expandMatrix({})).toEqual([{}]);
+	for (const matrix of [{}, { include: [] }]) {
+		expect(planJobs({ jobs: { test: { 'runs-on': 'host', strategy: { matrix }, steps: [] } } })).toHaveLength(1);
+	}
+	expect(planJobs({ jobs: { test: { 'runs-on': 'host', steps: [] } } })).toHaveLength(1);
 });
 
 test('runs-on resolves matrix, vars, inputs, fromJSON and lists', () => {

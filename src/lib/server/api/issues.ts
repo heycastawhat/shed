@@ -4,7 +4,7 @@ import { access, atLeast } from '../access.js';
 import { toUser, type UserRow } from '../accounts.js';
 import { record } from '../activity.js';
 import type { RepoRow } from '../repos.js';
-import { bool, now, repoOf, slice, userByLogin, userJson, type RepoCtx } from './common.js';
+import { bool, now, threadRepoOf as repoOf, slice, userByLogin, userJson, type RepoCtx } from './common.js';
 import { commentJson, issueJson, labelJson, milestoneJson, type CommentRow, type IssueRow, type LabelRow, type MilestoneRow } from './shapes.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
 import { notify } from './notify.js';
@@ -34,10 +34,13 @@ export function nextNumber(db: Database, repoId: number) {
 export function createIssue(c: Ctx, r: RepoCtx, b: { title: string; body?: string; labels?: number[]; assignees?: string[]; milestone?: number }, isPull = false) {
 	const u = me(c);
 	if (!b.title?.trim()) error(422, 'Give it a title');
+	const milestone = atLeast(r.level, 'write') && b.milestone
+		? (c.db.query<{ id: number }, [number, number]>('select id from milestones where id = ? and repo_id = ?').get(b.milestone, r.row.id) ?? error(422, 'No such milestone')).id
+		: null;
 	const id = c.db.transaction(() => {
 		const number = nextNumber(c.db, r.row.id);
 		const id = Number(
-			c.db.query('insert into issues (repo_id, number, user_id, title, body, is_pull, milestone_id) values (?, ?, ?, ?, ?, ?, ?)').run(r.row.id, number, u.id, b.title.trim(), b.body ?? '', isPull ? 1 : 0, b.milestone || null)
+			c.db.query('insert into issues (repo_id, number, user_id, title, body, is_pull, milestone_id) values (?, ?, ?, ?, ?, ?, ?)').run(r.row.id, number, u.id, b.title.trim(), b.body ?? '', isPull ? 1 : 0, milestone)
 				.lastInsertRowid
 		);
 		// Only people who can write may triage while creating; others' labels and assignees are dropped, as Forgejo does.
@@ -47,7 +50,7 @@ export function createIssue(c: Ctx, r: RepoCtx, b: { title: string; body?: strin
 				const a = userByLogin(c.db, login);
 				if (a) c.db.query('insert or ignore into assignees (issue_id, user_id) values (?, ?)').run(id, a.id);
 			}
-		} else c.db.query('update issues set milestone_id = null where id = ?').run(id);
+		}
 		c.db.query('insert or ignore into subscriptions (user_id, issue_id) values (?, ?)').run(u.id, id);
 		return id;
 	})();
@@ -79,12 +82,13 @@ function listIssues(c: Ctx, r: RepoCtx | null, repoIds: number[]) {
 	}
 	const created = q.get('created_by');
 	if (created) where.push('i.user_id = (select id from users where login = ?)'), args.push(created);
-	const mentioned = q.get('mentioned_by');
-	if (mentioned) where.push("(i.body like '%@' || ? || '%' or exists (select 1 from comments cm where cm.issue_id = i.id and cm.body like '%@' || ? || '%'))"), args.push(mentioned, mentioned);
 	if (bool(q.get('review_requested')) && c.user) where.push('exists (select 1 from review_requests rr where rr.issue_id = i.id and rr.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('assigned')) && c.user) where.push('exists (select 1 from assignees a where a.issue_id = i.id and a.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('created')) && c.user) where.push('i.user_id = ?'), args.push(c.user.id);
-	if (bool(q.get('mentioned')) && c.user) where.push("(i.body like '%@' || ? || '%')"), args.push(c.user.login);
+	for (const login of [q.get('mentioned_by'), bool(q.get('mentioned')) ? c.user?.login : null]) {
+		if (!login) continue;
+		where.push('(mentions_login(i.body, ?) or exists (select 1 from comments cm where cm.issue_id = i.id and mentions_login(cm.body, ?)))'), args.push(login, login);
+	}
 	const text = q.get('q');
 	if (text) where.push("(i.title like '%' || ? || '%' or i.body like '%' || ? || '%')"), args.push(text, text);
 	const sort = { oldest: 'i.created_at asc', recentupdate: 'i.updated_at desc', leastupdate: 'i.updated_at asc', mostcomment: '(select count(*) from comments where issue_id = i.id) desc', newest: 'i.created_at desc' }[

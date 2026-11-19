@@ -1,4 +1,4 @@
-FROM docker.io/oven/bun:1.3 AS build
+FROM docker.io/oven/bun:1.4 AS build
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
@@ -8,7 +8,7 @@ RUN FORGE_SECRET=build-time-placeholder-not-a-real-secret \
 	SHED_OIDC_ISSUER=http://build SHED_OIDC_CLIENT_ID=- SHED_OIDC_CLIENT_SECRET=- SHED_ALLOWED_USERS=user:build bun --bun run build \
 	&& bun build bin/shed-admin.ts --target=bun --outfile build/shed-admin.js
 
-FROM docker.io/oven/bun:1.3
+FROM docker.io/oven/bun:1.4
 ARG AGENTS=claude
 RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client ca-certificates libatomic1 && rm -rf /var/lib/apt/lists/* \
 	&& { command -v node || ln -s "$(command -v bun)" /usr/local/bin/node; }
