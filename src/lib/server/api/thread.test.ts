@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import type { Database } from 'bun:sqlite';
 import { getUser, signIn } from '../accounts.js';
 import { openDb } from '../db.js';
+import { render } from '../markdown.js';
 import { git } from '../git.js';
 import { createRepo, getRepo, repoDir } from '../repos.js';
 import { commitFiles } from '../write.js';
@@ -169,13 +170,26 @@ test('mention filters match whole case-insensitive logins in issue bodies and co
 		['@ada-more', '', false],
 		['@ada_more', '', false],
 		['@ada.dev', '', false],
+		['Thanks @ada.', '', true],
+		['Thanks @ada. Please look', '', true],
+		['@ada..', '', true],
+		['@ada-', '', false],
+		['(@ada)', '', true],
+		['', 'Thanks @ada.', true],
+		['@ada.-dev', '', false],
+		['`@ada`', '', false],
+		['```\n@ada\n```', '', false],
+		['[@ada](https://example.com)', '', false],
+		['@@ada', '', false],
 		['email@ada', '', false],
 		['@adam', '@ada', true],
 		['', '', false]
 	] as const) {
+		expect(render(`${body}\n\n${comment}`).toLowerCase().includes('href="/ada"')).toBe(matches);
 		const issue = await call(other, 'POST', base, { title: 'Mention boundary', body });
 		expect(issue.status).toBe(201);
 		if (comment) expect((await call(other, 'POST', `${base}/${issue.json.number}/comments`, { body: comment })).status).toBe(201);
+		expect(!!db.query('select id from notifications where user_id = ? and issue_id = ?').get(ada, issue.json.id)).toBe(matches);
 		if (matches) expected.push(issue.json.number);
 	}
 	for (const filter of ['mentioned=true', 'mentioned_by=ada', 'mentioned_by=AdA']) {

@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite';
+import { mentions } from './markdown.js';
 
 // Append only: never edit a shipped migration, add a new one. `user_version` records how many have run.
 const MIGRATIONS = [
@@ -490,6 +491,7 @@ const MIGRATIONS = [
 
 export function openDb(path: string) {
 	const db = new Database(path, { create: true, strict: true });
+	db.function('mentions_login', { deterministic: true }, (body: string, login: string) => Number(mentions(body).has(login.toLowerCase())));
 	db.run('pragma journal_mode = wal');
 	db.run('pragma foreign_keys = on');
 	db.run('pragma busy_timeout = 5000');

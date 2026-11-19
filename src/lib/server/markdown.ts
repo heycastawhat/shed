@@ -74,6 +74,7 @@ md.core.ruler.push('shed_refs', (state) => {
 			for (const m of c.content.matchAll(REFS)) {
 				const href = refHref(m, env.repo);
 				if (!href) continue;
+				if (m[3]) env.mentions?.add(m[3].toLowerCase());
 				const text = (s: string) => Object.assign(new state.Token('text', '', 0), { content: s });
 				if (m.index > last) out.push(text(c.content.slice(last, m.index)));
 				const open = new state.Token('link_open', 'a', 1);
@@ -88,7 +89,7 @@ md.core.ruler.push('shed_refs', (state) => {
 	}
 });
 
-type Env = { repo?: string; ref?: string; dir?: string };
+type Env = { repo?: string; ref?: string; dir?: string; mentions?: Set<string> };
 
 function resolve(url: string, env: Env, kind: 'blob' | 'raw') {
 	if (!env.repo || !env.ref || !url || /^([a-z][a-z0-9+.-]*:|\/\/|#|\?)/i.test(url)) return url;
@@ -104,3 +105,9 @@ function resolve(url: string, env: Env, kind: 'blob' | 'raw') {
 }
 
 export const render = (text: string, at?: { repo: string; ref: string; dir: string }) => md.render(text, { ...at });
+
+export function mentions(text: string) {
+	const logins = new Set<string>();
+	md.parse(text, { mentions: logins });
+	return logins;
+}

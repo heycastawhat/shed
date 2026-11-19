@@ -87,8 +87,7 @@ function listIssues(c: Ctx, r: RepoCtx | null, repoIds: number[]) {
 	if (bool(q.get('created')) && c.user) where.push('i.user_id = ?'), args.push(c.user.id);
 	for (const login of [q.get('mentioned_by'), bool(q.get('mentioned')) ? c.user?.login : null]) {
 		if (!login) continue;
-		const pattern = '*[^a-z0-9_`]@' + login.toLowerCase().replace(/[\[*?]/g, (c) => `[${c}]`) + '[^a-z0-9_.-]*';
-		where.push("((' ' || lower(i.body) || ' ') glob ? or exists (select 1 from comments cm where cm.issue_id = i.id and (' ' || lower(cm.body) || ' ') glob ?))"), args.push(pattern, pattern);
+		where.push('(mentions_login(i.body, ?) or exists (select 1 from comments cm where cm.issue_id = i.id and mentions_login(cm.body, ?)))'), args.push(login, login);
 	}
 	const text = q.get('q');
 	if (text) where.push("(i.title like '%' || ? || '%' or i.body like '%' || ? || '%')"), args.push(text, text);

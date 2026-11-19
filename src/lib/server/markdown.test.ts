@@ -1,5 +1,11 @@
 import { expect, test } from 'bun:test';
-import { render } from './markdown.js';
+import { mentions, render } from './markdown.js';
+
+test('mention extraction uses rendered links, including punctuation and dotted logins', () => {
+	for (const text of ['Thanks @ada.', 'Thanks @ada. Please look', '@ada..', '(@ada)', '@ADA']) expect([...mentions(text)]).toEqual(['ada']);
+	for (const text of ['', '@ada-', '`@ada`', '```\n@ada\n```', '[@ada](https://example.com)', '@@ada']) expect([...mentions(text)]).toEqual([]);
+	expect([...mentions('@ada.dev @ada.-dev @ada.dev')]).toEqual(['ada.dev', 'ada.-dev']);
+});
 
 test('escapes raw HTML and unsafe links', () => {
 	const html = render('<script>alert(1)</script>\n\n[x](javascript:alert(1)) <img src=x onerror=alert(1)>');
