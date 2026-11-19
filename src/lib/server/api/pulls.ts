@@ -608,7 +608,6 @@ onPush(async ({ db, root, repo, userId, updates }) => {
 		const heads = db.query<PullRow, [string, number]>(`${SELECT} where i.state = 'open' and p.head = ? and coalesce(p.head_repo_id, i.repo_id) = ?`).all(branch, repo.id);
 		for (const p of heads) {
 			const baseRow = db.query<RepoRow, [number]>('select r.*, u.login as owner from repos r join users u on u.id = r.owner_id where r.id = ?').get(p.repo_id)!;
-			if (baseRow.archived) continue;
 			const r: RepoCtx = { row: baseRow, level: 'admin', dir: repoDir(root, baseRow.id), full: `${baseRow.owner}/${baseRow.name}` };
 			if (!u.after) {
 				event(db, p.id, userId, 'delete_branch', { ref: branch });
