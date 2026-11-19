@@ -154,6 +154,40 @@ test('current-user mention filters include comment mentions and match explicit-l
 	expect((await call(ada, 'GET', `${base}?mentioned=true&limit=1&page=2`)).json).toHaveLength(1);
 });
 
+test('mention filters match whole case-insensitive logins in issue bodies and comments', async () => {
+	await createRepo(db, root, ada, { name: 'mention-boundaries', private: false });
+	const base = '/repos/ada/mention-boundaries/issues';
+	const expected: number[] = [];
+	for (const [body, comment, matches] of [
+		['@adam', '', false],
+		['', '@adam', false],
+		['@ada, please look', '', true],
+		['Please look @ada', '', true],
+		['', 'Please look @ada', true],
+		['@ADA!', '', true],
+		['', '@AdA, please look', true],
+		['@ada-more', '', false],
+		['@ada_more', '', false],
+		['@ada.dev', '', false],
+		['email@ada', '', false],
+		['@adam', '@ada', true],
+		['', '', false]
+	] as const) {
+		const issue = await call(other, 'POST', base, { title: 'Mention boundary', body });
+		expect(issue.status).toBe(201);
+		if (comment) expect((await call(other, 'POST', `${base}/${issue.json.number}/comments`, { body: comment })).status).toBe(201);
+		if (matches) expected.push(issue.json.number);
+	}
+	for (const filter of ['mentioned=true', 'mentioned_by=ada', 'mentioned_by=AdA']) {
+		const res = await call(ada, 'GET', `${base}?${filter}`);
+		expect(res.status).toBe(200);
+		expect(res.json.map((i: { number: number }) => i.number).sort((a: number, b: number) => a - b)).toEqual(expected);
+	}
+	for (const login of ['a?a', 'a*a', 'a[dz]a', 'ada%', 'ada_']) {
+		expect((await call(ada, 'GET', `${base}?mentioned_by=${encodeURIComponent(login)}`)).json).toEqual([]);
+	}
+});
+
 test('issue creation validates milestones within its repo and drops triage fields from readers', async () => {
 	await createRepo(db, root, ada, { name: 'milestone-check', private: false });
 	await createRepo(db, root, ada, { name: 'milestone-other' });
