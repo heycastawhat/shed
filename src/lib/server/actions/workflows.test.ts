@@ -73,6 +73,16 @@ jobs:
 	expect(single.on).toEqual({ push: null });
 });
 
+test('empty or fully excluded matrices do not plan a fallback job', () => {
+	const w = parseWorkflow('on: push\njobs:\n  test:\n    runs-on: host\n    strategy:\n      matrix:\n        os: [linux]\n        exclude:\n          - os: linux\n    steps: []\n');
+	expect(planJobs(w)).toEqual([]);
+	expect(expandMatrix({ os: [] })).toEqual([]);
+	expect(expandMatrix({ include: [] })).toEqual([]);
+	expect(expandMatrix({ os: ['linux'], exclude: [{ os: 'linux' }], include: [{ os: 'mac' }] })).toEqual([{ os: 'mac' }]);
+	expect(expandMatrix({})).toEqual([{}]);
+	expect(planJobs({ jobs: { test: { 'runs-on': 'host', steps: [] } } })).toHaveLength(1);
+});
+
 test('runs-on resolves matrix, vars, inputs, fromJSON and lists', () => {
 	const ctx = { matrix: { os: 'arm', set: ['a', 'b'] }, vars: { RUNNER: 'host', LABELS: '["x","y"]' }, inputs: { pool: 'big' } };
 	expect(runsOn('host', ctx)).toEqual(['host']);
