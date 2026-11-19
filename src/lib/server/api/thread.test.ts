@@ -138,6 +138,26 @@ test('release assets upload and delete', async () => {
 	expect((await call(ada, 'GET', `/repos/ada/sample/releases/${rel.id}`)).json.assets).toEqual([]);
 });
 
+test('issue creation validates milestones within its repo and drops triage fields from readers', async () => {
+	await createRepo(db, root, ada, { name: 'milestone-check', private: false });
+	await createRepo(db, root, ada, { name: 'milestone-other' });
+	const base = '/repos/ada/milestone-check';
+	const own = (await call(ada, 'POST', `${base}/milestones`, { title: 'Own release' })).json;
+	const foreign = (await call(ada, 'POST', '/repos/ada/milestone-other/milestones', { title: 'Foreign release' })).json;
+	for (const milestone of [foreign.id, 999999]) {
+		expect(await call(ada, 'POST', `${base}/issues`, { title: 'Invalid milestone', milestone })).toMatchObject({ status: 422, json: { message: 'No such milestone' } });
+	}
+	expect((await call(ada, 'GET', `${base}/issues`)).json).toEqual([]);
+	const valid = await call(ada, 'POST', `${base}/issues`, { title: 'Valid milestone', milestone: own.id });
+	expect(valid.status).toBe(201);
+	expect(valid.json).toMatchObject({ number: 1, milestone: { id: own.id, title: 'Own release' } });
+	expect((await call(ada, 'POST', `${base}/issues`, { title: 'No milestone' })).json.milestone).toBeNull();
+	expect((await call(ada, 'POST', `${base}/issues`, { title: 'Zero milestone', milestone: 0 })).json.milestone).toBeNull();
+	const reader = await call(other, 'POST', `${base}/issues`, { title: 'Reader issue', milestone: foreign.id });
+	expect(reader.status).toBe(201);
+	expect(reader.json.milestone).toBeNull();
+});
+
 test('archived repos reject every issue mutation and label or milestone write, but remain readable', async () => {
 	const id = await createRepo(db, root, ada, { name: 'archive-check', private: false });
 	const base = '/repos/ada/archive-check';

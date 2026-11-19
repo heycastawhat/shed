@@ -40,10 +40,13 @@ export function nextNumber(db: Database, repoId: number) {
 export function createIssue(c: Ctx, r: RepoCtx, b: { title: string; body?: string; labels?: number[]; assignees?: string[]; milestone?: number }, isPull = false) {
 	const u = me(c);
 	if (!b.title?.trim()) error(422, 'Give it a title');
+	const milestone = atLeast(r.level, 'write') && b.milestone
+		? (c.db.query<{ id: number }, [number, number]>('select id from milestones where id = ? and repo_id = ?').get(b.milestone, r.row.id) ?? error(422, 'No such milestone')).id
+		: null;
 	const id = c.db.transaction(() => {
 		const number = nextNumber(c.db, r.row.id);
 		const id = Number(
-			c.db.query('insert into issues (repo_id, number, user_id, title, body, is_pull, milestone_id) values (?, ?, ?, ?, ?, ?, ?)').run(r.row.id, number, u.id, b.title.trim(), b.body ?? '', isPull ? 1 : 0, b.milestone || null)
+			c.db.query('insert into issues (repo_id, number, user_id, title, body, is_pull, milestone_id) values (?, ?, ?, ?, ?, ?, ?)').run(r.row.id, number, u.id, b.title.trim(), b.body ?? '', isPull ? 1 : 0, milestone)
 				.lastInsertRowid
 		);
 		// Only people who can write may triage while creating; others' labels and assignees are dropped, as Forgejo does.
@@ -53,7 +56,7 @@ export function createIssue(c: Ctx, r: RepoCtx, b: { title: string; body?: strin
 				const a = userByLogin(c.db, login);
 				if (a) c.db.query('insert or ignore into assignees (issue_id, user_id) values (?, ?)').run(id, a.id);
 			}
-		} else c.db.query('update issues set milestone_id = null where id = ?').run(id);
+		}
 		c.db.query('insert or ignore into subscriptions (user_id, issue_id) values (?, ?)').run(u.id, id);
 		return id;
 	})();
