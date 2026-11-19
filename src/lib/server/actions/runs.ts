@@ -124,6 +124,7 @@ export async function trigger(
 		})();
 		const run = db.query<RunRow, [number]>('select * from runs where id = ?').get(id)!;
 		for (const j of db.query<JobRow, [number]>('select * from jobs where run_id = ?').all(id)) setStatus(db, run, j, 'pending', 'Waiting to run');
+		settle(db, id);
 		made.push(id);
 		version++;
 	}

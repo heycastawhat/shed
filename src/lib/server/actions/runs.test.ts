@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { openDb } from '../db.js';
 import { createRepo, repoDir } from '../repos.js';
 import { commitFiles } from '../write.js';
-import { trigger } from './runs.js';
+import { finishJob, trigger } from './runs.js';
 
 const root = await mkdtemp(`${tmpdir()}/shed-runs-`);
 afterAll(() => rm(root, { recursive: true }));
@@ -22,4 +22,20 @@ test('a dispatched run resolves runs-on from repo vars and inputs', async () => 
 		{ job_key: 'a', runs_on: '["host"]' },
 		{ job_key: 'b', runs_on: '["small","arm"]' }
 	]);
+});
+
+test('a dependent of a fully excluded matrix becomes runnable without another job starting', async () => {
+	const db = openDb(':memory:');
+	const dir = await mkdtemp(`${root}/excluded-`);
+	const owner = Number(db.query("insert into users (login) values ('ada')").run().lastInsertRowid);
+	const id = await createRepo(db, dir, owner, { name: 'ci' });
+	const yml = 'on: workflow_dispatch\njobs:\n  excluded:\n    runs-on: host\n    strategy:\n      matrix:\n        os: [linux]\n        exclude: [{ os: linux }]\n    steps: [{ run: x }]\n  dependent:\n    needs: excluded\n    runs-on: host\n    steps: [{ run: x }]\n';
+	const sha = await commitFiles(repoDir(dir, id), {
+		branch: 'main', parent: null, changes: [{ path: '.forgejo/workflows/ci.yml', content: yml }], message: 'ci', author: { name: 'Ada', email: 'ada@example.com' }
+	});
+	const [run] = await trigger(db, dir, id, { event: 'workflow_dispatch', ref: 'refs/heads/main', sha, userId: owner, title: 'ci', payload: {} });
+	expect(db.query('select job_key, status from jobs where run_id = ?').all(run)).toEqual([{ job_key: 'dependent', status: 'waiting' }]);
+	const job = db.query<{ id: number }, [number]>('select id from jobs where run_id = ?').get(run)!;
+	finishJob(db, job.id, 'success');
+	expect(db.query('select status from runs where id = ?').get(run)).toEqual({ status: 'success' });
 });
