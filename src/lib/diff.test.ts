@@ -66,6 +66,27 @@ test('binary files are flagged and have no hunks', async () => {
 	]);
 });
 
+test('patch headers discard tab delimiters without trimming filename spaces', () => {
+	const [file] = parseDiff('diff --git a/hello world.txt b/hello world.txt\n--- a/hello world.txt\t\n+++ b/hello world.txt\t\n@@ -1 +1 @@\n-old\n+new\n');
+	expect([file.from, file.to]).toEqual(['hello world.txt', 'hello world.txt']);
+	expect(parseDiff('diff --git a/space  b/space \n--- a/space \t\n+++ b/space \t\n')[0].to).toBe('space ');
+});
+
+test('quoted diff paths decode tabs, quotes, backslashes and UTF-8 octal bytes', () => {
+	const from = String.raw`"a/\303\251\t\"\\123.txt"`;
+	const to = String.raw`"b/\303\251\t\"\\123.txt"`;
+	const name = 'é\t"\\123.txt';
+	for (const suffix of ['', `\n--- ${from}\n+++ ${to}\n@@ -1 +1 @@\n-a\n+b\n`]) {
+		const [file] = parseDiff(`diff --git ${from} ${to}${suffix}`);
+		expect([file.from, file.to]).toEqual([name, name]);
+	}
+	const [renamed] = parseDiff(String.raw`diff --git "a/old\tname" "b/\303\251\tname"
+similarity index 100%
+rename from "old\tname"
+rename to "\303\251\tname"`);
+	expect([renamed.status, renamed.from, renamed.to]).toEqual(['renamed', 'old\tname', 'é\tname']);
+});
+
 describe('edge cases', async () => {
 	const [notes, sql, mode] = parseDiff(await fixture('edge'));
 

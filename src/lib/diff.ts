@@ -14,6 +14,18 @@ export type FileDiff = {
 
 const strip = (p: string) => (p === '/dev/null' ? p : p.replace(/^[ab]\//, ''));
 
+function pathName(p: string) {
+	if (!p.startsWith('"')) return p.split('\t')[0];
+	const quoted = p.match(/^"((?:[^"\\]|\\.)*)"/)?.[1] ?? '';
+	const escapes: Record<string, string> = { a: '\x07', b: '\b', t: '\t', n: '\n', v: '\v', f: '\f', r: '\r' };
+	const bytes: number[] = [];
+	for (const m of quoted.matchAll(/\\([0-7]{1,3}|.)|[^\\]+/gs)) {
+		if (m[1] && /^[0-7]/.test(m[1])) bytes.push(parseInt(m[1], 8));
+		else bytes.push(...new TextEncoder().encode(m[1] ? escapes[m[1]] ?? m[1] : m[0]));
+	}
+	return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
 export function parseDiff(diff: string): FileDiff[] {
 	const files: FileDiff[] = [];
 	let file: FileDiff | undefined;
@@ -24,8 +36,8 @@ export function parseDiff(diff: string): FileDiff[] {
 	for (const line of diff.split('\n')) {
 		if (line.startsWith('diff --git ')) {
 			// Paths here are ambiguous when they contain spaces; ---/+++ or rename lines override them.
-			const m = line.match(/^diff --git a\/(.*) b\/(.*)$/);
-			file = { from: m?.[1] ?? '', to: m?.[2] ?? '', status: 'modified', binary: false, additions: 0, deletions: 0, hunks: [] };
+			const m = line.match(/^diff --git ("(?:[^"\\]|\\.)*"|a\/.*?) ("(?:[^"\\]|\\.)*"|b\/.*)$/);
+			file = { from: strip(pathName(m?.[1] ?? '')), to: strip(pathName(m?.[2] ?? '')), status: 'modified', binary: false, additions: 0, deletions: 0, hunks: [] };
 			files.push(file);
 			hunk = undefined;
 		} else if (!file) {
@@ -42,12 +54,12 @@ export function parseDiff(diff: string): FileDiff[] {
 			newNo = Number(m?.[2] ?? 0);
 			hunk = { header: line, lines: [] };
 			file.hunks.push(hunk);
-		} else if (line.startsWith('--- ')) file.from = strip(line.slice(4));
-		else if (line.startsWith('+++ ')) file.to = strip(line.slice(4));
+		} else if (line.startsWith('--- ')) file.from = strip(pathName(line.slice(4)));
+		else if (line.startsWith('+++ ')) file.to = strip(pathName(line.slice(4)));
 		else if (line.startsWith('new file mode')) file.status = 'added';
 		else if (line.startsWith('deleted file mode')) file.status = 'deleted';
-		else if (line.startsWith('rename from ')) (file.from = line.slice(12)), (file.status = 'renamed');
-		else if (line.startsWith('rename to ')) file.to = line.slice(10);
+		else if (line.startsWith('rename from ')) (file.from = pathName(line.slice(12))), (file.status = 'renamed');
+		else if (line.startsWith('rename to ')) file.to = pathName(line.slice(10));
 		else if (line.startsWith('Binary files ') || line === 'GIT binary patch') file.binary = true;
 	}
 
