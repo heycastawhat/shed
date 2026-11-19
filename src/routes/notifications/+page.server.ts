@@ -11,7 +11,8 @@ export type Note = {
 	subject: { title: string; type: 'Issue' | 'Pull'; state: string; url: string; html_url: string };
 };
 
-export async function load({ locals, url }) {
+export async function load({ locals, url, depends }) {
+	depends('shed:notifications');
 	if (!locals.user) redirect(303, '/login');
 	const all = url.searchParams.get('tab') === 'all';
 	const page = Math.max(1, Number(url.searchParams.get('page')) || 1);

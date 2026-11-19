@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import { notificationAction } from '#lib/notification-action.js';
 	import Icon from '#lib/components/Icon.svelte';
 	import Pager from '#lib/components/Pager.svelte';
 	import { ago } from '#lib/time.js';
@@ -20,7 +22,7 @@
 		<a href="?tab=all" class:on={data.all}><Icon name="inbox" size={14} />All</a>
 	</div>
 	{#if unread}
-		<form method="POST" action="?/all" use:enhance={keep}>
+		<form method="POST" action={notificationAction(page.url.searchParams, 'all')} use:enhance={keep}>
 			<button><Icon name="check" size={14} />Mark all read</button>
 		</form>
 	{/if}
@@ -34,19 +36,19 @@
 			{#each g.notes as n (n.id)}
 				<li class:unread={n.unread}>
 					<span class="kind {n.subject.state}"><Icon name={icon(n)} size={16} /></span>
-					<a class="title" href="/notifications/{n.id}">
+					<a class="title" href="/notifications/{n.id}" data-sveltekit-reload>
 						<strong>{n.subject.title}</strong>
 						<span class="muted">#{n.number} · {n.subject.type === 'Pull' ? 'Pull request' : 'Issue'} · {ago(n.updated_at)}</span>
 					</a>
 					{#if n.unread}<span class="dot" title="Unread"></span>{/if}
 					{#if n.pinned}<span class="pin" title="Pinned"><Icon name="pin" size={14} /></span>{/if}
 					<div class="tools">
-						<form method="POST" action="?/mark" use:enhance={keep}>
+						<form method="POST" action={notificationAction(page.url.searchParams, 'mark')} use:enhance={keep}>
 							<input type="hidden" name="id" value={n.id} />
 							<input type="hidden" name="to" value={n.unread ? 'read' : 'unread'} />
 							<button title={n.unread ? 'Mark as read' : 'Mark as unread'} aria-label={n.unread ? 'Mark as read' : 'Mark as unread'}><Icon name={n.unread ? 'read' : 'bell'} size={15} /></button>
 						</form>
-						<form method="POST" action="?/mark" use:enhance={keep}>
+						<form method="POST" action={notificationAction(page.url.searchParams, 'mark')} use:enhance={keep}>
 							<input type="hidden" name="id" value={n.id} />
 							<input type="hidden" name="to" value={n.pinned ? 'read' : 'pinned'} />
 							<button title={n.pinned ? 'Unpin' : 'Pin'} aria-label={n.pinned ? 'Unpin' : 'Pin'}><Icon name={n.pinned ? 'unpin' : 'pin'} size={15} /></button>

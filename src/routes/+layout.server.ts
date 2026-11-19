@@ -3,7 +3,8 @@ import { read } from '#lib/server/store.js';
 import { LAYOUTS } from '#lib/prefs.svelte.js';
 import { db } from '#lib/server/shed.js';
 
-export async function load({ locals, cookies }) {
+export async function load({ locals, cookies, depends }) {
+	depends('shed:notifications');
 	const u = locals.user;
 	const user = u ? { ...toUser(u), admin: !!u.admin } : null;
 	const d = await read();
