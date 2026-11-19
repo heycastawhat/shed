@@ -138,6 +138,22 @@ test('release assets upload and delete', async () => {
 	expect((await call(ada, 'GET', `/repos/ada/sample/releases/${rel.id}`)).json.assets).toEqual([]);
 });
 
+test('current-user mention filters include comment mentions and match explicit-login filters', async () => {
+	await createRepo(db, root, ada, { name: 'mention-check', private: false });
+	const base = '/repos/ada/mention-check/issues';
+	expect((await call(ada, 'GET', `${base}?mentioned=true`)).json).toEqual([]);
+	const body = (await call(other, 'POST', base, { title: 'Body mention', body: '@ada look' })).json;
+	const comment = (await call(other, 'POST', base, { title: 'Comment mention' })).json;
+	await call(other, 'POST', base, { title: 'Unrelated', body: '@other look' });
+	expect((await call(other, 'POST', `${base}/${comment.number}/comments`, { body: 'Please check @ada' })).status).toBe(201);
+	expect((await call(other, 'POST', `${base}/${comment.number}/comments`, { body: '@ada again' })).status).toBe(201);
+	const explicit = (await call(ada, 'GET', `${base}?mentioned_by=ada`)).json;
+	const implicit = (await call(ada, 'GET', `${base}?mentioned=true`)).json;
+	expect(implicit.map((i: { number: number }) => i.number).sort()).toEqual([body.number, comment.number].sort());
+	expect(implicit).toEqual(explicit);
+	expect((await call(ada, 'GET', `${base}?mentioned=true&limit=1&page=2`)).json).toHaveLength(1);
+});
+
 test('issue creation validates milestones within its repo and drops triage fields from readers', async () => {
 	await createRepo(db, root, ada, { name: 'milestone-check', private: false });
 	await createRepo(db, root, ada, { name: 'milestone-other' });

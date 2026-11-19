@@ -93,7 +93,7 @@ function listIssues(c: Ctx, r: RepoCtx | null, repoIds: number[]) {
 	if (bool(q.get('review_requested')) && c.user) where.push('exists (select 1 from review_requests rr where rr.issue_id = i.id and rr.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('assigned')) && c.user) where.push('exists (select 1 from assignees a where a.issue_id = i.id and a.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('created')) && c.user) where.push('i.user_id = ?'), args.push(c.user.id);
-	if (bool(q.get('mentioned')) && c.user) where.push("(i.body like '%@' || ? || '%')"), args.push(c.user.login);
+	if (bool(q.get('mentioned')) && c.user) where.push("(i.body like '%@' || ? || '%' or exists (select 1 from comments cm where cm.issue_id = i.id and cm.body like '%@' || ? || '%'))"), args.push(c.user.login, c.user.login);
 	const text = q.get('q');
 	if (text) where.push("(i.title like '%' || ? || '%' or i.body like '%' || ? || '%')"), args.push(text, text);
 	const sort = { oldest: 'i.created_at asc', recentupdate: 'i.updated_at desc', leastupdate: 'i.updated_at asc', mostcomment: '(select count(*) from comments where issue_id = i.id) desc', newest: 'i.created_at desc' }[
