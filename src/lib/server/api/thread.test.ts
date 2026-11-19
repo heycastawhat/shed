@@ -137,3 +137,61 @@ test('release assets upload and delete', async () => {
 	expect((await call(ada, 'DELETE', `/repos/ada/sample/releases/${rel.id}/assets/${asset.id}`)).status).toBe(204);
 	expect((await call(ada, 'GET', `/repos/ada/sample/releases/${rel.id}`)).json.assets).toEqual([]);
 });
+
+test('archived repos reject every issue mutation and label or milestone write, but remain readable', async () => {
+	const id = await createRepo(db, root, ada, { name: 'archive-check', private: false });
+	const base = '/repos/ada/archive-check';
+	const issue = (await call(other, 'POST', `${base}/issues`, { title: 'Author issue' })).json;
+	const path = `${base}/issues/${issue.number}`;
+	expect((await call(other, 'PATCH', path, { title: 'Author edited', body: 'Edited body', state: 'closed' })).status).toBe(200);
+	expect((await call(other, 'PATCH', path, { state: 'open' })).status).toBe(200);
+	const comment = (await call(other, 'POST', `${path}/comments`, { body: 'Original comment' })).json;
+	const commentPath = `${base}/issues/comments/${comment.id}`;
+	const label = (await call(ada, 'POST', `${base}/labels`, { name: 'bug', color: 'ff0000' })).json;
+	const milestone = (await call(ada, 'POST', `${base}/milestones`, { title: 'Release' })).json;
+	expect((await call(ada, 'POST', `${path}/labels`, { labels: [label.id] })).status).toBe(201);
+	expect((await call(other, 'POST', `${path}/reactions`, { content: 'eyes' })).status).toBe(201);
+	expect((await call(other, 'POST', `${commentPath}/reactions`, { content: 'eyes' })).status).toBe(201);
+	db.query('update repos set archived = 1 where id = ?').run(id);
+	const writes: [string, string, unknown?][] = [
+		['POST', `${base}/issues`, { title: 'New issue' }],
+		['PATCH', path, { title: 'Forbidden', milestone: milestone.id }],
+		['DELETE', path],
+		['PUT', `${path}/lock`],
+		['DELETE', `${path}/lock`],
+		['POST', `${path}/pin`],
+		['DELETE', `${path}/pin`],
+		['POST', `${path}/labels`, { labels: [label.id] }],
+		['PUT', `${path}/labels`, { labels: [] }],
+		['DELETE', `${path}/labels/${label.id}`],
+		['DELETE', `${path}/labels`],
+		['POST', `${path}/comments`, { body: 'Forbidden' }],
+		['PATCH', commentPath, { body: 'Forbidden' }],
+		['DELETE', commentPath],
+		['POST', `${path}/reactions`, { content: 'heart' }],
+		['DELETE', `${path}/reactions`, { content: 'eyes' }],
+		['POST', `${commentPath}/reactions`, { content: 'heart' }],
+		['DELETE', `${commentPath}/reactions`, { content: 'eyes' }],
+		['PUT', `${path}/subscriptions/ada`],
+		['DELETE', `${path}/subscriptions/ada`],
+		['POST', `${base}/labels`, { name: 'new', color: 'ffffff' }],
+		['PATCH', `${base}/labels/${label.id}`, { name: 'Changed' }],
+		['DELETE', `${base}/labels/${label.id}`],
+		['POST', `${base}/milestones`, { title: 'New' }],
+		['PATCH', `${base}/milestones/${milestone.id}`, { title: 'Changed' }],
+		['DELETE', `${base}/milestones/${milestone.id}`]
+	];
+	for (const [method, url, body] of writes) {
+		expect(await call(ada, method, url, body)).toMatchObject({ status: 403, json: { message: 'ada/archive-check is archived' } });
+	}
+	expect((await call(other, 'PATCH', path, { body: 'Forbidden author edit' })).status).toBe(403);
+	expect((await call(other, 'PATCH', commentPath, { body: 'Forbidden author edit' })).status).toBe(403);
+	for (const url of [path, `${path}/comments`, `${path}/labels`, `${path}/reactions`, `${commentPath}/reactions`, `${base}/labels`, `${base}/milestones`]) {
+		expect((await call(ada, 'GET', url)).status).toBe(200);
+	}
+	expect((await call(ada, 'GET', path)).json).toMatchObject({ title: 'Author edited', body: 'Edited body', milestone: null });
+	expect((await call(ada, 'GET', commentPath)).json.body).toBe('Original comment');
+	db.query('update repos set archived = 0 where id = ?').run(id);
+	expect((await call(other, 'PATCH', path, { title: 'Writable again' })).status).toBe(200);
+	expect((await call(other, 'PATCH', commentPath, { body: 'Writable again' })).status).toBe(200);
+});

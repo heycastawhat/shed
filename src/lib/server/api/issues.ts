@@ -1,15 +1,21 @@
 import type { Database } from 'bun:sqlite';
 import { error } from '@sveltejs/kit';
-import { access, atLeast } from '../access.js';
+import { access, atLeast, type Level } from '../access.js';
 import { toUser, type UserRow } from '../accounts.js';
 import { record } from '../activity.js';
 import type { RepoRow } from '../repos.js';
-import { bool, now, repoOf, slice, userByLogin, userJson, type RepoCtx } from './common.js';
+import { bool, now, repoOf as findRepo, slice, userByLogin, userJson, type RepoCtx } from './common.js';
 import { commentJson, issueJson, labelJson, milestoneJson, type CommentRow, type IssueRow, type LabelRow, type MilestoneRow } from './shapes.js';
 import { me, page, Paged, route, type Ctx } from './router.js';
 import { notify } from './notify.js';
 
 export const repoRef = (r: RepoCtx) => ({ full: r.full, name: r.row.name, owner: r.row.owner, id: r.row.id });
+
+function repoOf(c: Ctx, need: Level = 'read') {
+	const r = findRepo(c, need);
+	if (c.method !== 'GET' && r.row.archived) error(403, `${r.full} is archived`);
+	return r;
+}
 
 export function issueOf(c: Ctx, r: RepoCtx, number = Number(c.params.index)) {
 	return c.db.query<IssueRow, [number, number]>('select * from issues where repo_id = ? and number = ?').get(r.row.id, number) ?? error(404, `#${number} not found`);
