@@ -70,3 +70,15 @@ test("the fork's branch rules apply: a rebase is a force push", async () => {
 	expect(res).toMatchObject({ status: 403, json: { message: 'feature is a protected branch, so force pushes to it are refused' } });
 	expect((await call(other, 'POST', '/repos/ada/sample/pulls/1/update')).status).toBe(204);
 });
+
+test('archiving the base freezes fork PR updates without freezing writes to the fork', async () => {
+	const before = (await call(other, 'GET', '/repos/ada/sample/pulls/1')).json;
+	const revisions = (await call(other, 'GET', '/repos/ada/sample/pulls/1/revisions')).json;
+	db.query('update repos set archived = 1 where id = ?').run(getRepo(db, 'ada', 'sample')!.id);
+	expect(await call(other, 'POST', '/repos/ada/sample/pulls/1/update')).toMatchObject({ status: 403, json: { message: 'ada/sample is archived' } });
+	expect((await call(other, 'POST', '/repos/other/sample/contents', { branch: 'feature', message: 'fork moves', files: [{ operation: 'create', path: 'new.txt', content: btoa('new\n') }] })).status).toBe(201);
+	expect(await sha(forkDir, 'feature')).not.toBe(before.head.sha);
+	expect(await sha(baseDir, 'refs/pull/1/head')).toBe(before.head.sha);
+	expect((await call(other, 'GET', '/repos/ada/sample/pulls/1')).json.head.sha).toBe(before.head.sha);
+	expect((await call(other, 'GET', '/repos/ada/sample/pulls/1/revisions')).json).toEqual(revisions);
+});

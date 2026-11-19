@@ -20,6 +20,7 @@ export function repoFor(locals: App.Locals, owner: string, name: string, need: L
 		error(404, 'Repository not found');
 	}
 	if (!atLeast(level, need)) error(403, `You need ${need} access to ${owner}/${name}`);
+	if (need !== 'read' && row.archived) error(403, `${owner}/${name} is archived`);
 	return { row, level, dir: repoDir(root, row.id) };
 }
 

@@ -21,6 +21,12 @@ export function repoOf(c: Ctx, need: Level = 'read', evenArchived = false) {
 }
 export type RepoCtx = ReturnType<typeof repoOf>;
 
+export function threadRepoOf(c: Ctx, need: Level = 'read') {
+	const r = repoOf(c, need);
+	if (c.method !== 'GET' && r.row.archived) error(403, `${r.full} is archived`);
+	return r;
+}
+
 export function userRow(db: Database, id: number) {
 	return db.query<UserRow, [number]>('select * from users where id = ?').get(id)!;
 }

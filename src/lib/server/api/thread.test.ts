@@ -5,7 +5,7 @@ import type { Database } from 'bun:sqlite';
 import { getUser, signIn } from '../accounts.js';
 import { openDb } from '../db.js';
 import { git } from '../git.js';
-import { createRepo, repoDir } from '../repos.js';
+import { createRepo, getRepo, repoDir } from '../repos.js';
 import { commitFiles } from '../write.js';
 import { testEnv } from '../test-env.js';
 
@@ -230,4 +230,155 @@ test('archived repos reject every issue mutation and label or milestone write, b
 	db.query('update repos set archived = 0 where id = ?').run(id);
 	expect((await call(other, 'PATCH', path, { title: 'Writable again' })).status).toBe(200);
 	expect((await call(other, 'PATCH', commentPath, { body: 'Writable again' })).status).toBe(200);
+});
+
+test('archived repos reject every pull mutation without changing refs, reviews or conversations', async () => {
+	const id = await createRepo(db, root, ada, { name: 'archive-pulls', private: false });
+	const dir = repoDir(root, id);
+	const base = '/repos/ada/archive-pulls';
+	const main = await commitFiles(dir, { branch: 'main', parent: null, changes: [{ path: 'a.txt', content: 'one\n' }], message: 'base', author });
+	const head = await commitFiles(dir, { branch: 'feature', parent: main, newBranch: true, changes: [{ path: 'a.txt', content: 'one\ntwo\n' }], message: 'feature', author });
+	await commitFiles(dir, { branch: 'next', parent: head, newBranch: true, changes: [{ path: 'b.txt', content: 'new\n' }], message: 'next', author });
+	const opened = await call(other, 'POST', `${base}/pulls`, { base: 'main', head: 'feature', title: 'Reader pull' });
+	expect(opened.status).toBe(201);
+	const p = `${base}/pulls/${opened.json.number}`;
+	expect((await call(other, 'PATCH', p, { title: 'Reader edited' })).status).toBe(200);
+	const review = await call(other, 'POST', `${p}/reviews`, { event: 'PENDING' });
+	expect(review.status).toBe(201);
+	const submitted = await call(ada, 'POST', `${p}/reviews`, { event: 'COMMENT', body: 'Looks good', comments: [{ path: 'a.txt', new_position: 2, body: 'Line comment' }] });
+	expect(submitted.status).toBe(201);
+	const comment = (await call(other, 'GET', `${p}/comments`)).json[0];
+	expect(comment.body).toBe('Line comment');
+	expect((await call(other, 'POST', `${p}/requested_reviewers`, { reviewers: ['ada'] })).status).toBe(201);
+	db.query('update repos set archived = 1 where id = ?').run(id);
+	const snapshot = () => ['issues', 'pulls', 'reviews', 'comments', 'review_requests', 'events', 'revisions'].map((table) => db.query(`select * from ${table}`).all());
+	const state = snapshot();
+	const writes: [string, string, unknown?][] = [
+		['POST', `${base}/pulls`, { base: 'main', head: 'next', title: 'Forbidden new pull' }],
+		['PATCH', p, { title: 'Forbidden edit', draft: true }],
+		['POST', `${p}/reviews`, { event: 'COMMENT', body: 'Forbidden review' }],
+		['POST', `${p}/reviews`, { event: 'PENDING', comments: [{ path: 'a.txt', new_position: 2, body: 'Forbidden line comment' }] }],
+		['POST', `${p}/reviews/${review.json.id}`, { event: 'COMMENT', body: 'Forbidden submit' }],
+		['DELETE', `${p}/reviews/${review.json.id}`],
+		['POST', `${p}/reviews/${submitted.json.id}/dismissals`, { message: 'Forbidden dismissal' }],
+		['POST', `${base}/pulls/comments/${comment.id}/resolve`],
+		['DELETE', `${base}/pulls/comments/${comment.id}/resolve`],
+		['POST', `${p}/requested_reviewers`, { reviewers: ['other'] }],
+		['DELETE', `${p}/requested_reviewers`, { reviewers: ['ada'] }],
+		['POST', `${p}/merge`, { Do: 'merge' }],
+		['POST', `${p}/merge`, { Do: 'merge', merge_when_checks_succeed: true }],
+		['DELETE', `${p}/merge`],
+		['POST', `${p}/update`],
+		['POST', `${p}/update?style=rebase`],
+		['POST', `${base}/issues/${opened.json.number}/comments`, { body: 'Forbidden reply', reply_to: comment.id }],
+		['PATCH', `${base}/issues/comments/${comment.id}`, { body: 'Forbidden comment edit' }],
+		['DELETE', `${base}/issues/comments/${comment.id}`]
+	];
+	const results = [];
+	for (const [method, path, body] of writes) {
+		const res = await call(path.includes('dismissals') || path.endsWith('/merge') ? ada : other, method, path, body);
+		results.push([method, path, res.status, res.json?.message]);
+	}
+	expect(results).toEqual(writes.map(([method, path]) => [method, path, 403, 'ada/archive-pulls is archived']));
+	expect(snapshot()).toEqual(state);
+	const { doMerge, pullOf } = await import('./pulls.js');
+	const r = { row: getRepo(db, 'ada', 'archive-pulls')!, level: 'admin' as const, dir, full: 'ada/archive-pulls' };
+	const c = { db, user: getUser(db, ada), params: { index: String(opened.json.number) } } as never;
+	await expect(doMerge(c, r, pullOf(c, r), { style: 'merge' })).rejects.toMatchObject({ status: 403, body: { message: 'ada/archive-pulls is archived' } });
+	expect((await git(dir, ['rev-parse', 'main'])).trim()).toBe(main);
+	expect((await git(dir, ['rev-parse', 'feature'])).trim()).toBe(head);
+	for (const path of [p, `${base}/pulls`, `${p}/reviews`, `${p}/reviews/${review.json.id}`, `${p}/reviews/${submitted.json.id}/comments`, `${p}/comments`, `${base}/reviewers`, `${p}/files`, `${p}/commits`, `${p}/revisions`]) {
+		expect([path, (await call(other, 'GET', path)).status]).toEqual([path, 200]);
+	}
+	expect((await call(other, 'GET', p)).json).toMatchObject({ title: 'Reader edited', merged: false, draft: false });
+	db.query('update repos set archived = 0 where id = ?').run(id);
+	expect((await call(other, 'PATCH', p, { title: 'Reader can edit again' })).status).toBe(200);
+});
+
+test('the UI open-pull action goes through the archive guard', async () => {
+	const shared = await import('../shed.js');
+	const { internalToken } = await import('./internal.js');
+	const { actions } = await import('../../../routes/[owner]/[repo]/compare/[...spec]/+page.server.js');
+	const userId = signIn(shared.db, { sub: crypto.randomUUID(), preferred_username: 'archive-ui' });
+	const user = getUser(shared.db, userId)!;
+	const id = await createRepo(shared.db, shared.root, userId, { name: 'pulls', private: false });
+	const dir = repoDir(shared.root, id);
+	const main = await commitFiles(dir, { branch: 'main', parent: null, changes: [{ path: 'a.txt', content: 'one\n' }], message: 'base', author });
+	for (const branch of ['feature', 'next']) await commitFiles(dir, { branch, parent: main, newBranch: true, changes: [{ path: 'a.txt', content: `${branch}\n` }], message: branch, author });
+	const open = (branch: string, title = 'UI pull') => {
+		const form = new FormData();
+		form.set('title', title);
+		return actions.open({ locals: { user, token: internalToken(userId) }, params: { owner: user.login, repo: 'pulls', spec: `main...${branch}` }, request: new Request('http://shed/compare', { method: 'POST', body: form }) } as never);
+	};
+	expect(await open('feature', '')).toMatchObject({ status: 400, data: { error: 'Give it a title' } });
+	await expect(open('feature')).rejects.toMatchObject({ status: 303, location: `/${user.login}/pulls/pulls/1` });
+	shared.db.query('update repos set archived = 1 where id = ?').run(id);
+	expect(await open('next')).toMatchObject({ status: 403, data: { action: 'open', error: `${user.login}/pulls is archived` } });
+	expect(shared.db.query('select title from issues where repo_id = ?').all(id)).toEqual([{ title: 'UI pull' }]);
+});
+
+test('archived wiki and project UI writes are forbidden while their pages remain readable', async () => {
+	const shared = await import('../shed.js');
+	const wiki = await import('../../../routes/[owner]/[repo]/wiki/[[page]]/+page.server.js');
+	const projects = await import('../../../routes/[owner]/[repo]/projects/+page.server.js');
+	const project = await import('../../../routes/[owner]/[repo]/projects/[id]/+page.server.js');
+	const userId = signIn(shared.db, { sub: crypto.randomUUID(), preferred_username: 'archive-boards' });
+	const user = getUser(shared.db, userId)!;
+	const id = await createRepo(shared.db, shared.root, userId, { name: 'wiki', private: false });
+	const event = (fields: Record<string, string> = {}) => {
+		const form = new FormData();
+		for (const [k, v] of Object.entries(fields)) form.set(k, v);
+		return { locals: { user }, params: { owner: user.login, repo: 'wiki', page: 'Home', id: '0' }, request: new Request('http://shed/wiki', { method: 'POST', body: form }), url: new URL('http://shed/wiki') } as never;
+	};
+	await expect(wiki.actions.save(event({ title: 'Home', text: 'Original' }))).rejects.toMatchObject({ status: 303 });
+	await expect(projects.actions.create(event({ title: 'Board' }))).rejects.toMatchObject({ status: 303 });
+	const p = shared.db.query<{ id: number }, [number]>('select id from projects where repo_id = ?').get(id)!;
+	shared.db.query('update repos set archived = 1 where id = ?').run(id);
+	for (const [action, form] of [[wiki.actions.save, { title: 'Home', text: 'Forbidden' }], [wiki.actions.delete, {}], [projects.actions.create, { title: 'Forbidden' }], ...Object.values(project.actions).map((action) => [action, {}])] as const) {
+		const e = event(form) as any;
+		e.params.id = String(p.id);
+		await expect(action(e)).rejects.toMatchObject({ status: 403, body: { message: `${user.login}/wiki is archived` } });
+	}
+	expect((await wiki.load(event())).page?.markdown).toBe('Original');
+	expect(projects.load(event()).projects).toHaveLength(1);
+	const e = event() as any;
+	e.params.id = String(p.id);
+	expect(project.load(e).project.title).toBe('Board');
+});
+
+test('archive audit: releases, assets, branch protection, wiki and branch deletion already reject writes', async () => {
+	const id = await createRepo(db, root, ada, { name: 'archive-audit', private: false });
+	const base = '/repos/ada/archive-audit';
+	const dir = repoDir(root, id);
+	const main = await commitFiles(dir, { branch: 'main', parent: null, changes: [{ path: 'a.txt', content: 'one\n' }], message: 'base', author });
+	expect((await call(ada, 'POST', `${base}/branches`, { new_branch_name: 'spare' })).status).toBe(201);
+	const release = await call(ada, 'POST', `${base}/releases`, { tag_name: 'v1' });
+	expect(release.status).toBe(201);
+	const form = new FormData();
+	form.set('attachment', new File(['bytes'], 'a.bin'));
+	const asset = await call(ada, 'POST', `${base}/releases/${release.json.id}/assets`, form);
+	expect(asset.status).toBe(201);
+	expect((await call(ada, 'POST', `${base}/branch_protections`, { rule_name: 'main' })).status).toBe(201);
+	expect((await call(ada, 'POST', `${base}/wiki/new`, { title: 'Home', content: 'Original' })).status).toBe(201);
+	db.query('update repos set archived = 1 where id = ?').run(id);
+	const rel = `${base}/releases/${release.json.id}`;
+	const writes: [string, string, unknown?][] = [
+		['POST', `${base}/releases`, { tag_name: 'v2' }],
+		['PATCH', rel, { name: 'Forbidden' }],
+		['DELETE', rel],
+		['POST', `${rel}/assets`, form],
+		['DELETE', `${rel}/assets/${asset.json.id}`],
+		['POST', `${base}/branch_protections`, { rule_name: 'spare' }],
+		['PATCH', `${base}/branch_protections/main`, { required_approvals: 2 }],
+		['DELETE', `${base}/branch_protections/main`],
+		['POST', `${base}/wiki/new`, { title: 'New', content: 'Forbidden' }],
+		['PATCH', `${base}/wiki/page/Home`, { content: 'Forbidden' }],
+		['DELETE', `${base}/wiki/page/Home`],
+		['DELETE', `${base}/branches/spare`]
+	];
+	for (const [method, path, body] of writes) expect(await call(ada, method, path, body)).toMatchObject({ status: 403, json: { message: 'ada/archive-audit is archived' } });
+	for (const path of [`${base}/releases`, rel, `${base}/branch_protections`, `${base}/wiki/pages`, `${base}/wiki/page/Home`, `${base}/branches`]) expect((await call(other, 'GET', path)).status).toBe(200);
+	expect((await git(dir, ['rev-parse', 'spare'])).trim()).toBe(main);
+	expect((await call(other, 'GET', rel)).json.assets).toHaveLength(1);
+	expect((await call(other, 'GET', `${base}/wiki/page/Home`)).json.content).toBe('Original');
 });

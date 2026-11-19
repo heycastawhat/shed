@@ -9,7 +9,7 @@ import * as browse from '../browse.js';
 import { git, gitTry, spawn } from '../git.js';
 import { afterPush, onPush, refSnapshot } from '../push.js';
 import { repoDir, type RepoRow } from '../repos.js';
-import { now, refSha, repoOf, slice, userByLogin, userJson, userRow, type RepoCtx } from './common.js';
+import { now, refSha, threadRepoOf as repoOf, slice, userByLogin, userJson, userRow, type RepoCtx } from './common.js';
 import { addComment, createIssue, crossReference, event, issueOf, repoRef, touch } from './issues.js';
 import { addNotification, notify } from './notify.js';
 import { checkRefWrite, protectionFor } from './protect.js';
@@ -439,6 +439,7 @@ async function rebaseOnto(dir: string, base: string, head: string, committer: { 
 }
 
 export async function doMerge(c: Ctx, r: RepoCtx, p: PullRow, o: { style: MergeStyle; title?: string; message?: string; deleteBranch?: boolean; force?: boolean }) {
+	if (r.row.archived) error(403, `${r.full} is archived`);
 	const u = me(c);
 	if (p.merged_at) error(405, 'This pull request is already merged');
 	if (p.state !== 'open') error(405, 'This pull request is closed');
@@ -568,6 +569,7 @@ route('POST', '/repos/:owner/:repo/pulls/:index/update', async (c) => {
 // --- auto-merge ---
 
 async function tryAutoMerge(c: Ctx, r: RepoCtx, issueId: number) {
+	if (r.row.archived) return;
 	const p = pullById(c, issueId);
 	if (!p.auto_merge || p.state !== 'open' || p.merged_at) return;
 	const state = overall(latest(c, r.row.id, p.head_sha).map((s) => s.state));
@@ -606,6 +608,7 @@ onPush(async ({ db, root, repo, userId, updates }) => {
 		const heads = db.query<PullRow, [string, number]>(`${SELECT} where i.state = 'open' and p.head = ? and coalesce(p.head_repo_id, i.repo_id) = ?`).all(branch, repo.id);
 		for (const p of heads) {
 			const baseRow = db.query<RepoRow, [number]>('select r.*, u.login as owner from repos r join users u on u.id = r.owner_id where r.id = ?').get(p.repo_id)!;
+			if (baseRow.archived) continue;
 			const r: RepoCtx = { row: baseRow, level: 'admin', dir: repoDir(root, baseRow.id), full: `${baseRow.owner}/${baseRow.name}` };
 			if (!u.after) {
 				event(db, p.id, userId, 'delete_branch', { ref: branch });
