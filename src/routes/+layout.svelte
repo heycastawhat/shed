@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { RESERVED } from '#lib/reserved.js';
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { refreshRestoredNotifications } from '#lib/notification-history.js';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import favicon from '#lib/assets/favicon.svg';
@@ -103,7 +104,7 @@
 	{@html `<style>${themeCss}</style>`}
 </svelte:head>
 
-<svelte:window {onkeydown} onclick={(e) => [menu, pinMenu].forEach((m) => m?.open && !m.contains(e.target as Node) && (m.open = false))} />
+<svelte:window onpageshow={(e) => refreshRestoredNotifications(e, invalidateAll)} {onkeydown} onclick={(e) => [menu, pinMenu].forEach((m) => m?.open && !m.contains(e.target as Node) && (m.open = false))} />
 
 {#snippet account()}
 	<details class="menu" bind:this={menu}>
