@@ -92,7 +92,9 @@ type Env = { repo?: string; ref?: string; dir?: string };
 
 function resolve(url: string, env: Env, kind: 'blob' | 'raw') {
 	if (!env.repo || !env.ref || !url || /^([a-z][a-z0-9+.-]*:|\/\/|#|\?)/i.test(url)) return url;
-	const [path, rest = ''] = url.split(/(?=[?#])/, 2) as [string, string?];
+	const end = url.search(/[?#]/);
+	const path = end < 0 ? url : url.slice(0, end);
+	const rest = end < 0 ? '' : url.slice(end);
 	const parts = (url.startsWith('/') ? [] : (env.dir ?? '').split('/')).filter(Boolean);
 	for (const p of decodeURI(path).split('/')) {
 		if (p === '..') parts.pop();

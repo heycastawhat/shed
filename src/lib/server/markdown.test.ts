@@ -28,6 +28,17 @@ test('headings get anchors and task lists get boxes', () => {
 	expect(html).toContain('<li>plain</li>');
 });
 
+test('relative links and images preserve the full query and fragment suffix', () => {
+	const at = { repo: 'ada/sample', ref: 'main', dir: 'docs' };
+	const html = render('[guide](guide.md?plain=1#install) ![logo](logo.svg?v=2#icon)', at);
+	expect(html).toContain('href="/ada/sample/blob/main/docs/guide.md?plain=1#install"');
+	expect(html).toContain('src="/ada/sample/raw/main/docs/logo.svg?v=2#icon"');
+	expect(render('[guide](guide.md?#install)', at)).toContain('guide.md?#install');
+	expect(render('[guide](guide.md#install?example)', at)).toContain('guide.md#install?example');
+	expect(render('[external](https://example.com/?q=1#install)', at)).toContain('href="https://example.com/?q=1#install"');
+	expect(render('', at)).toBe('');
+});
+
 test('tables and strikethrough', () => {
 	expect(render('| a | b |\n| - | - |\n| 1 | 2 |')).toContain('<table>');
 	expect(render('~~gone~~')).toContain('<s>gone</s>');
