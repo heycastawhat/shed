@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { RESERVED } from '#lib/reserved.js';
 	import { enhance } from '$app/forms';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, invalidate, invalidateAll } from '$app/navigation';
 	import { refreshRestoredNotifications } from '#lib/notification-history.js';
+	import { watchNotifications } from '#lib/notification-stream.js';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import favicon from '#lib/assets/favicon.svg';
@@ -14,6 +15,10 @@
 	import '../app.css';
 
 	let { data, children } = $props();
+	const userId = $derived(data.user?.id);
+	$effect(() => {
+		if (userId) return watchNotifications(new EventSource('/notifications/stream'), () => invalidate('shed:notifications'));
+	});
 	// Seeded from the cookies once; after that the client state is the source of truth.
 	const prefs = untrack(() => new Prefs({ nav: data.nav, collapsed: data.collapsed, layout: data.layout }));
 	setPrefs(prefs);
