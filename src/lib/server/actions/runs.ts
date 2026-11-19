@@ -4,7 +4,7 @@ import YAML from 'yaml';
 import { git } from '../git.js';
 import { onPush } from '../push.js';
 import { repoDir, type RepoRow } from '../repos.js';
-import { fires, inputsOf, parseWorkflow, planJobs, workflowFiles, type Trigger } from './workflows.js';
+import { fires, inputsOf, parseWorkflow, planJobs, workflowFiles, type Trigger, type Workflow } from './workflows.js';
 
 export type RunRow = {
 	id: number;
@@ -78,6 +78,16 @@ async function changedFiles(dir: string, from: string | null, to: string) {
 	return (await git(dir, args).catch(() => '')).split('\n').filter(Boolean);
 }
 
+function dependencyError(w: Workflow) {
+	const keys = new Set(Object.keys(w.jobs ?? {}));
+	for (const [key, job] of Object.entries(w.jobs ?? {})) {
+		for (const need of Array.isArray(job.needs) ? job.needs : job.needs ? [job.needs] : []) {
+			if (!keys.has(String(need))) return `Job '${key}' depends on unknown job '${need}'`;
+		}
+	}
+	return null;
+}
+
 export async function trigger(
 	db: Database,
 	root: string,
@@ -99,7 +109,8 @@ export async function trigger(
 			continue;
 		}
 		if (!fires(w.on, { ...t, files: changed })) continue;
-		const jobs = planJobs(w, { vars, inputs: inputsOf(w, t.payload.inputs) });
+		const invalid = dependencyError(w);
+		const jobs = invalid ? [{ key: '', name: invalid, needs: [], runsOn: [], payload: '{}', always: false }] : planJobs(w, { vars, inputs: inputsOf(w, t.payload.inputs) });
 		if (!jobs.length) continue;
 		const id = db.transaction(() => {
 			const number = db.query<{ n: number }, [number]>('update repos set next_run = next_run + 1 where id = ? returning next_run - 1 as n').get(repoId)!.n;
@@ -110,20 +121,22 @@ export async function trigger(
 					.lastInsertRowid
 			);
 			for (const j of jobs)
-				db.query('insert into jobs (run_id, job_key, name, needs, runs_on, payload, status, uses_always) values (?, ?, ?, ?, ?, ?, ?, ?)').run(
+				db.query('insert into jobs (run_id, job_key, name, needs, runs_on, payload, status, uses_always, result, stopped_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
 					runId,
 					j.key,
 					j.name,
 					JSON.stringify(j.needs),
 					JSON.stringify(j.runsOn),
 					j.payload,
-					j.needs.length ? 'blocked' : 'waiting',
-					+j.always
+					invalid ? 'failure' : j.needs.length ? 'blocked' : 'waiting',
+					+j.always,
+					invalid ? 'failure' : null,
+					invalid ? now() : null
 				);
 			return runId;
 		})();
 		const run = db.query<RunRow, [number]>('select * from runs where id = ?').get(id)!;
-		for (const j of db.query<JobRow, [number]>('select * from jobs where run_id = ?').all(id)) setStatus(db, run, j, 'pending', 'Waiting to run');
+		for (const j of db.query<JobRow, [number]>('select * from jobs where run_id = ?').all(id)) setStatus(db, run, j, invalid ? 'failure' : 'pending', invalid ?? 'Waiting to run');
 		settle(db, id);
 		made.push(id);
 		version++;
@@ -184,6 +197,8 @@ export function rerun(db: Database, runId: number, failedOnly = false) {
 	const run = db.query<RunRow, [number]>('select * from runs where id = ?').get(runId)!;
 	if (!DONE.has(run.status)) throw new Error('This run is still going');
 	const jobs = db.query<JobRow, [number]>('select * from jobs where run_id = ?').all(runId);
+	const invalid = jobs.find((j) => j.job_key === '');
+	if (invalid) throw new Error(invalid.name);
 	const again = new Set(jobs.filter((j) => !failedOnly || j.status === 'failure' || j.status === 'cancelled' || j.status === 'skipped').map((j) => j.job_key));
 	// Jobs downstream of a re-run job run again too.
 	for (let grew = true; grew; ) {
