@@ -202,6 +202,38 @@ test('mention filters match whole case-insensitive logins in issue bodies and co
 	}
 });
 
+test('OIDC logins ending in punctuation render, notify and match both mention filters', async () => {
+	await createRepo(db, root, ada, { name: 'punctuated-mentions', private: false });
+	const base = '/repos/ada/punctuated-mentions/issues';
+	const plain = signIn(db, { sub: 'mention-plain', preferred_username: 'reviewer' });
+	const logins = ['reviewer-', 'reviewer_', 'reviewer.', 'reviewer..'];
+	const users = logins.map((login) => signIn(db, { sub: `mention-${login}`, preferred_username: login }));
+	const issue = await call(other, 'POST', base, { title: 'Punctuated mention in the issue body', body: 'Thanks @reviewer-.' });
+	expect(issue.status).toBe(201);
+	for (const [i, login] of logins.entries()) {
+		const mention = `@${login.toUpperCase()}`;
+		const punctuation = i === 2 ? ',' : '.';
+		const prose = `Thanks ${mention}${punctuation}`;
+		const md = await call(other, 'POST', '/markdown', { Text: prose });
+		expect(md.status).toBe(200);
+		expect(md.text).toBe(`<p>Thanks <a href="/${login}">${mention}</a>${punctuation}</p>\n`);
+		const thread = await call(other, 'POST', base, { title: `Punctuated comment ${login}`, body: `\`${mention}\`` });
+		expect(thread.status).toBe(201);
+		expect((await call(other, 'POST', `${base}/${thread.json.number}/comments`, { body: prose })).status).toBe(201);
+		const filters = ['mentioned=true', `mentioned_by=${login.toUpperCase()}`];
+		const expected = i === 0 ? [thread.json.number, issue.json.number] : [thread.json.number];
+		for (const filter of filters) {
+			const result = await call(users[i], 'GET', `${base}?${filter}`);
+			expect(result.status).toBe(200);
+			expect(result.json.map((row: { number: number }) => row.number)).toEqual(expected);
+		}
+		const recipients = db.query<{ user_id: number }, [number]>('select user_id from notifications where issue_id = ?').all(thread.json.id);
+		expect(recipients).toEqual([{ user_id: users[i] }]);
+	}
+	expect((await call(plain, 'GET', `${base}?mentioned=true`)).json).toEqual([]);
+	expect(db.query('select user_id from notifications where issue_id = ?').all(issue.json.id)).toEqual([{ user_id: users[0] }]);
+});
+
 test('issue creation validates milestones within its repo and drops triage fields from readers', async () => {
 	await createRepo(db, root, ada, { name: 'milestone-check', private: false });
 	await createRepo(db, root, ada, { name: 'milestone-other' });

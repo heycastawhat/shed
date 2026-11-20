@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { lastCommits, readBlob, resolve, tree } from './browse.js';
 import { render } from './markdown.js';
+import { db } from './shed.js';
 import { repoFor } from './shedrepo.js';
 
 const order = { dir: 0, submodule: 0, symlink: 1, file: 1 };
@@ -17,7 +18,7 @@ export async function loadTree(locals: App.Locals, owner: string, name: string, 
 		lastCommits(dir, sha, path, entries.map((e) => e.name)),
 		readme && readBlob(dir, sha, readme.path).then((b) => {
 			const text = new TextDecoder().decode(b);
-			return { name: readme.name, html: /\.txt$|^readme$/i.test(readme.name) ? `<pre>${Bun.escapeHTML(text)}</pre>` : render(text, { repo: `${owner}/${name}`, ref, dir: path }) };
+			return { name: readme.name, html: /\.txt$|^readme$/i.test(readme.name) ? `<pre>${Bun.escapeHTML(text)}</pre>` : render(text, { repo: `${owner}/${name}`, ref, dir: path }, db) };
 		})
 	]);
 	// Pages key last commits by sha; entries carry the sha of the commit that last touched them.

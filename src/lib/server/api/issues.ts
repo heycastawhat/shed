@@ -3,6 +3,7 @@ import { error } from '@sveltejs/kit';
 import { access, atLeast } from '../access.js';
 import { toUser, type UserRow } from '../accounts.js';
 import { record } from '../activity.js';
+import { punctuatedLogins } from '../markdown.js';
 import type { RepoRow } from '../repos.js';
 import { bool, now, threadRepoOf as repoOf, slice, userByLogin, userJson, type RepoCtx } from './common.js';
 import { commentJson, issueJson, labelJson, milestoneJson, type CommentRow, type IssueRow, type LabelRow, type MilestoneRow } from './shapes.js';
@@ -85,9 +86,14 @@ function listIssues(c: Ctx, r: RepoCtx | null, repoIds: number[]) {
 	if (bool(q.get('review_requested')) && c.user) where.push('exists (select 1 from review_requests rr where rr.issue_id = i.id and rr.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('assigned')) && c.user) where.push('exists (select 1 from assignees a where a.issue_id = i.id and a.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('created')) && c.user) where.push('i.user_id = ?'), args.push(c.user.id);
-	for (const login of [q.get('mentioned_by'), bool(q.get('mentioned')) ? c.user?.login : null]) {
-		if (!login) continue;
-		where.push('(mentions_login(i.body, ?) or exists (select 1 from comments cm where cm.issue_id = i.id and mentions_login(cm.body, ?)))'), args.push(login, login);
+	const mentioned = [q.get('mentioned_by'), bool(q.get('mentioned')) ? c.user?.login : null].filter((login): login is string => !!login);
+	if (mentioned.length) {
+		// SQLite callbacks can't query their own connection; pass a snapshot of the accounts that can change parsing.
+		const logins = JSON.stringify(punctuatedLogins(c.db));
+		for (const login of mentioned) {
+			where.push('(mentions_login(i.body, ?, ?) or exists (select 1 from comments cm where cm.issue_id = i.id and mentions_login(cm.body, ?, ?)))');
+			args.push(login, logins, login, logins);
+		}
 	}
 	const text = q.get('q');
 	if (text) where.push("(i.title like '%' || ? || '%' or i.body like '%' || ? || '%')"), args.push(text, text);

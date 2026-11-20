@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { access, atLeast } from '../access.js';
-import { mentions } from '../markdown.js';
+import { databaseMentionLookup, mentions } from '../markdown.js';
 import type { RepoRow } from '../repos.js';
 import { bool, now, type RepoCtx } from './common.js';
 import { mailEnabled, sendMail } from '../mail.js';
@@ -15,7 +15,7 @@ export function notify(c: Ctx, r: RepoCtx, i: IssueRow, what: string, text: stri
 	for (const s of c.db.query<{ user_id: number; subscribed: number }, [number]>('select user_id, subscribed from subscriptions where issue_id = ?').all(i.id)) if (s.subscribed) ids.add(s.user_id);
 	for (const w of c.db.query<{ user_id: number }, [number]>('select user_id from watches where repo_id = ?').all(r.row.id)) ids.add(w.user_id);
 	const muted = new Set(c.db.query<{ user_id: number }, [number]>('select user_id from subscriptions where issue_id = ? and subscribed = 0').all(i.id).map((x) => x.user_id));
-	for (const login of mentions(text)) {
+	for (const login of mentions(text, databaseMentionLookup(c.db))) {
 		const u = c.db.query<{ id: number }, [string]>("select id from users where login = ? and kind = 'user'").get(login);
 		if (u && atLeast(access(c.db, u.id, r.row), 'read')) ids.add(u.id), muted.delete(u.id);
 	}

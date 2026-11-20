@@ -1,3 +1,4 @@
+import type { Database } from 'bun:sqlite';
 import MarkdownIt from 'markdown-it';
 import { RESERVED } from '../reserved.js';
 
@@ -48,12 +49,42 @@ md.core.ruler.push('shed', (state) => {
 // at least one digit and one letter, so ordinary words and numbers stay text). Code, existing links and autolinks are left alone.
 // Numbers aren't checked: `/issues/N` redirects PRs to `/pulls/N` and a missing one is a plain 404.
 const REFS =
-	/(?<![\w&/#@.-])(?:([A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*)?#(\d+)\b|@([A-Za-z0-9](?:[\w.-]*[A-Za-z0-9])?)(?![\w@-]|\.\w)|\b((?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,40})\b(?![\w-]))/g;
+	/(?<![\w&/#@.-])(?:([A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*)?#(\d+)\b|@([A-Za-z0-9][\w.-]*)(?![\w.@-])|\b((?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,40})\b(?![\w-]))/g;
+
+type MentionLookup = (login: string) => string | undefined;
+
+export function punctuatedLogins(db: Database) {
+	return db.query<{ login: string }, []>("select login from users where login glob '*[-_.]' and kind != 'agent' order by login").all().map((user) => user.login);
+}
+
+export function mentionLookup(logins: string[]): MentionLookup {
+	const byLogin = new Map(logins.map((login) => [login.toLowerCase(), login]));
+	const max = logins.reduce((length, login) => Math.max(length, login.length), 0);
+	return (login) => {
+		// Only periods can be sentence punctuation. Prefer the longest registered login that leaves only periods outside the link.
+		const base = login.replace(/(?<!\.)\.+$/, '');
+		for (let end = Math.min(max, login.length); end >= base.length; end--) {
+			const account = byLogin.get(login.slice(0, end).toLowerCase());
+			if (account) return account;
+		}
+	};
+}
+
+export function databaseMentionLookup(db: Database): MentionLookup {
+	let lookup: MentionLookup | undefined;
+	return (login) => (lookup ??= mentionLookup(punctuatedLogins(db)))(login);
+}
+
+function mentionLogin(login: string, lookup?: MentionLookup) {
+	const account = /[-_.]$/.test(login) && lookup?.(login);
+	if (account) return account;
+	const base = login.replace(/(?<!\.)\.+$/, '');
+	if (/[A-Za-z0-9]$/.test(base) && base !== 'agent' && !RESERVED.has(base.toLowerCase())) return base;
+}
 
 function refHref(m: RegExpExecArray, repo?: string) {
-	const [, other, number, login, sha] = m;
+	const [, other, number, , sha] = m;
 	if (number) return other || repo ? `/${other || repo}/issues/${number}` : null;
-	if (login) return login === 'agent' || RESERVED.has(login.toLowerCase()) ? null : `/${login}`;
 	return repo ? `/${repo}/commit/${sha}` : null;
 }
 
@@ -72,15 +103,17 @@ md.core.ruler.push('shed_refs', (state) => {
 			}
 			let last = 0;
 			for (const m of c.content.matchAll(REFS)) {
-				const href = refHref(m, env.repo);
+				const login = m[3] && mentionLogin(m[3], env.lookup);
+				const href = m[3] ? login && `/${login}` : refHref(m, env.repo);
 				if (!href) continue;
-				if (m[3]) env.mentions?.add(m[3].toLowerCase());
+				if (login) env.mentions?.add(login.toLowerCase());
+				const length = login ? login.length + 1 : m[0].length;
 				const text = (s: string) => Object.assign(new state.Token('text', '', 0), { content: s });
 				if (m.index > last) out.push(text(c.content.slice(last, m.index)));
 				const open = new state.Token('link_open', 'a', 1);
 				open.attrSet('href', href);
-				out.push(open, text(m[0]), new state.Token('link_close', 'a', -1));
-				last = m.index + m[0].length;
+				out.push(open, text(m[0].slice(0, length)), new state.Token('link_close', 'a', -1));
+				last = m.index + length;
 			}
 			if (!last) out.push(c);
 			else if (last < c.content.length) out.push(Object.assign(new state.Token('text', '', 0), { content: c.content.slice(last) }));
@@ -89,7 +122,7 @@ md.core.ruler.push('shed_refs', (state) => {
 	}
 });
 
-type Env = { repo?: string; ref?: string; dir?: string; mentions?: Set<string> };
+type Env = { repo?: string; ref?: string; dir?: string; lookup?: MentionLookup; mentions?: Set<string> };
 
 function resolve(url: string, env: Env, kind: 'blob' | 'raw') {
 	if (!env.repo || !env.ref || !url || /^([a-z][a-z0-9+.-]*:|\/\/|#|\?)/i.test(url)) return url;
@@ -104,10 +137,11 @@ function resolve(url: string, env: Env, kind: 'blob' | 'raw') {
 	return `/${env.repo}/${kind}/${encodeURIComponent(env.ref)}/${parts.map(encodeURIComponent).join('/')}${rest}`;
 }
 
-export const render = (text: string, at?: { repo: string; ref: string; dir: string }) => md.render(text, { ...at });
+export const render = (text: string, at?: { repo: string; ref: string; dir: string }, db?: Database) =>
+	md.render(text, { ...at, lookup: db && databaseMentionLookup(db) });
 
-export function mentions(text: string) {
+export function mentions(text: string, lookup?: MentionLookup) {
 	const logins = new Set<string>();
-	md.parse(text, { mentions: logins });
+	md.parse(text, { lookup, mentions: logins });
 	return logins;
 }
