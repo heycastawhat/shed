@@ -8,7 +8,7 @@ import { me, route } from './router.js';
 route('GET', '/repos/:owner/:repo/wiki/pages', async (c) => wikiPages(repoOf(c).dir));
 route('GET', '/repos/:owner/:repo/wiki/page/:name', async (c) => {
 	const r = repoOf(c);
-	const { page } = await wikiPage(r.dir, r.full, c.params.name);
+	const { page } = await wikiPage(c.db, r.dir, r.full, c.params.name);
 	if (!page) error(404, 'No such page');
 	return { title: page.title, sub_url: page.name, content: wikiLinks(page.markdown), content_base64: Buffer.from(page.markdown).toString('base64'), last_commit: page.updated };
 });

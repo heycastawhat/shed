@@ -514,7 +514,7 @@ route('POST', '/markdown', async (c) => {
 	const b = await c.body<{ Text?: string; Context?: string }>();
 	const ctx = (b.Context ?? '').replace(c.origin, '').replace(/^\/+/, '');
 	const m = ctx.match(/^([^/]+\/[^/]+)(?:\/src\/branch\/([^/]+)\/?(.*))?$/);
-	const html = render(b.Text ?? '', m?.[2] ? { repo: m[1], ref: decodeURIComponent(m[2]), dir: m[3] ?? '' } : m ? { repo: m[1], ref: '', dir: '' } : undefined);
+	const html = render(b.Text ?? '', m?.[2] ? { repo: m[1], ref: decodeURIComponent(m[2]), dir: m[3] ?? '' } : m ? { repo: m[1], ref: '', dir: '' } : undefined, c.db);
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 });
 

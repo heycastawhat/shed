@@ -3,6 +3,7 @@ import { error } from '@sveltejs/kit';
 import { access, atLeast } from '../access.js';
 import { toUser, type UserRow } from '../accounts.js';
 import { record } from '../activity.js';
+import { punctuatedLogins } from '../markdown.js';
 import type { RepoRow } from '../repos.js';
 import { bool, now, threadRepoOf as repoOf, slice, userByLogin, userJson, type RepoCtx } from './common.js';
 import { commentJson, issueJson, labelJson, milestoneJson, type CommentRow, type IssueRow, type LabelRow, type MilestoneRow } from './shapes.js';
@@ -85,9 +86,14 @@ function listIssues(c: Ctx, r: RepoCtx | null, repoIds: number[]) {
 	if (bool(q.get('review_requested')) && c.user) where.push('exists (select 1 from review_requests rr where rr.issue_id = i.id and rr.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('assigned')) && c.user) where.push('exists (select 1 from assignees a where a.issue_id = i.id and a.user_id = ?)'), args.push(c.user.id);
 	if (bool(q.get('created')) && c.user) where.push('i.user_id = ?'), args.push(c.user.id);
-	for (const login of [q.get('mentioned_by'), bool(q.get('mentioned')) ? c.user?.login : null]) {
-		if (!login) continue;
-		where.push('(mentions_login(i.body, ?) or exists (select 1 from comments cm where cm.issue_id = i.id and mentions_login(cm.body, ?)))'), args.push(login, login);
+	const mentioned = [q.get('mentioned_by'), bool(q.get('mentioned')) ? c.user?.login : null].filter((login): login is string => !!login);
+	if (mentioned.length) {
+		// SQLite callbacks can't query their own connection; pass a snapshot of the accounts that can change parsing.
+		const logins = JSON.stringify(punctuatedLogins(c.db));
+		for (const login of mentioned) {
+			where.push('(mentions_login(i.body, ?, ?) or exists (select 1 from comments cm where cm.issue_id = i.id and mentions_login(cm.body, ?, ?)))');
+			args.push(login, logins, login, logins);
+		}
 	}
 	const text = q.get('q');
 	if (text) where.push("(i.title like '%' || ? || '%' or i.body like '%' || ? || '%')"), args.push(text, text);
@@ -178,11 +184,16 @@ export async function editIssue(c: Ctx, r: RepoCtx, i: IssueRow, b: { title?: st
 	}
 	if (triage && (b.due_date !== undefined || b.unset_due_date)) c.db.query('update issues set due_on = ? where id = ?').run(b.unset_due_date ? null : (b.due_date ?? null), i.id);
 	touch(c.db, i.id);
-	return c.db.query<IssueRow, [number]>('select * from issues where id = ?').get(i.id)!;
+	const edited = c.db.query<IssueRow, [number]>('select * from issues where id = ?').get(i.id)!;
+	if (b.body !== undefined && b.body !== i.body && edited.body === b.body) {
+		notify(c, r, edited, edited.is_pull ? 'edited the pull request description' : 'edited the issue description', edited.body, i.body);
+	}
+	return edited;
 }
 route('PATCH', '/repos/:owner/:repo/issues/:index', async (c) => {
 	const r = repoOf(c);
-	return issueJson(c.db, c.origin, repoRef(r), await editIssue(c, r, issueOf(c, r), await c.body()));
+	const body = await c.body<Parameters<typeof editIssue>[3]>();
+	return issueJson(c.db, c.origin, repoRef(r), await editIssue(c, r, issueOf(c, r), body));
 });
 route('DELETE', '/repos/:owner/:repo/issues/:index', (c) => {
 	const r = repoOf(c, 'admin');
@@ -281,10 +292,13 @@ route('GET', '/repos/:owner/:repo/issues/comments/:id', (c) => {
 });
 route('PATCH', '/repos/:owner/:repo/issues/comments/:id', async (c) => {
 	const r = repoOf(c);
+	const body = (await c.body<{ body: string }>()).body ?? '';
 	const x = commentOf(c, r);
 	if (x.user_id !== me(c).id && !atLeast(r.level, 'admin')) error(403, "You can only edit your own comments");
-	const body = (await c.body<{ body: string }>()).body ?? '';
 	c.db.query("update comments set body = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where id = ?").run(body, x.id);
+	if (body !== x.body && (!x.review_id || !c.db.query("select 1 from reviews where id = ? and state = 'PENDING'").get(x.review_id))) {
+		notify(c, r, issueOf(c, r, x.number), 'edited a comment', body, x.body);
+	}
 	return commentJson(c.db, c.origin, r.full, x.number, { ...x, body });
 });
 route('DELETE', '/repos/:owner/:repo/issues/comments/:id', (c) => {

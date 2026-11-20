@@ -4,6 +4,7 @@ import { git } from '#lib/server/git.js';
 import { commitFromForm, editable, treeUrl } from '#lib/server/edit.js';
 import { highlightLines, languageFor } from '#lib/server/highlight.js';
 import { render } from '#lib/server/markdown.js';
+import { db } from '#lib/server/shed.js';
 import { repoFor } from '#lib/server/shedrepo.js';
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|ico|bmp)$/i;
@@ -32,7 +33,7 @@ export async function load({ locals, params, url }) {
 	const text = new TextDecoder().decode(bytes);
 	const lines = text.replace(/\n$/, '').split('\n');
 	if (/\.(md|markdown)$/i.test(name) && !url.searchParams.has('plain'))
-		return { ...meta, lines: lines.length, kind: 'markdown' as const, html: render(text, { repo, ref: params.ref, dir: params.path.split('/').slice(0, -1).join('/') }) };
+		return { ...meta, lines: lines.length, kind: 'markdown' as const, html: render(text, { repo, ref: params.ref, dir: params.path.split('/').slice(0, -1).join('/') }, db) };
 	const html = await highlightLines(lines, bytes.length > MAX_HIGHLIGHT ? 'text' : languageFor(name));
 	return { ...meta, lines: lines.length, kind: 'code' as const, html };
 }

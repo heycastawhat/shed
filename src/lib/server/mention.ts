@@ -5,6 +5,8 @@ import { sign } from '#lib/sign.js';
 import { status } from '#lib/agent-status.js';
 import { api, request, requirePush, type Issue, type Pull, type Repo, type User } from './forgejo.js';
 import { userToken } from './auth.js';
+import { databaseMentionLookup } from './markdown.js';
+import { db } from './shed.js';
 import { hostsFor, hostWithProject, projection, shell, startTask } from './t3.js';
 import { read, update, type Mention } from './store.js';
 
@@ -44,14 +46,16 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 // Called after a comment posted through forge. `@agent` starts a T3 task for the commenter on their own host and says so in a reply.
 // The comment is already posted, so a problem comes back as a successful result carrying an error, which clears the composer and shows the error.
 export async function mention(token: string | undefined, origin: string, where: Where, body: string, line?: Line) {
-	if (!token || !mentionsAgent(body)) return;
+	const lookup = databaseMentionLookup(db);
+	const account = (login: string) => !!lookup(login);
+	if (!token || !mentionsAgent(body, account)) return;
 	const repo = `${where.owner}/${where.repo}`;
 	try {
 		await requirePush(token, repo);
 		const [me, issue] = await Promise.all([api<User>(token, '/user'), api<Issue>(token, `/repos/${repo}/issues/${where.index}`)]);
 		const host = await hostWithProject(me.id, where.repo);
 		if (!host) return { action: 'comment', error: `@agent needs one of your T3 Code hosts (Settings → Agents) to have a project called "${where.repo}"`, posted: true };
-		const ask = withoutMention(body);
+		const ask = withoutMention(body, account);
 		let text: string, baseRef: string, pushTo: string;
 		if (issue.pull_request) {
 			const pull = await api<Pull>(token, `/repos/${repo}/pulls/${where.index}`);

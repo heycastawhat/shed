@@ -22,3 +22,11 @@ test('withoutMention drops the mention and keeps code', () => {
 	expect(withoutMention('please @agent rename it')).toBe('please rename it');
 	expect(withoutMention('@agents stay')).toBe('@agents stay');
 });
+
+test('a dotted account mention does not invoke or get stripped as @agent', () => {
+	const account = (login: string) => login === 'agent.' || login === 'agent..';
+	expect(mentionsAgent('please ask @agent..', account)).toBe(false);
+	expect(mentionsAgent('@agent please ask @agent..', account)).toBe(true);
+	expect(mentionsAgent('please ask @agent.-dev')).toBe(false);
+	expect(withoutMention('@agent please ask @agent..', account)).toBe('please ask @agent..');
+});

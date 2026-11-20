@@ -32,7 +32,7 @@ export async function apiPage<T>(token: string | undefined, path: string) {
 
 // For a file in the repo, pass `at` (its ref and folder) so relative links and images resolve to its blob/raw pages.
 export async function renderMarkdown(_token: string | undefined, text: string, repo: string, at?: { ref: string; dir: string }) {
-	return render(text, at ? { repo, ...at } : { repo, ref: '', dir: '' });
+	return render(text, at ? { repo, ...at } : { repo, ref: '', dir: '' }, db);
 }
 
 // A thread is resolved when its comments are (Shed resolves whole threads; any comment in it names the thread).

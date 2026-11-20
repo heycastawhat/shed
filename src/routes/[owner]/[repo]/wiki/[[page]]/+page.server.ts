@@ -1,11 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { repoFor } from '#lib/server/shedrepo.js';
+import { db } from '#lib/server/shed.js';
 import { saveWikiPage, wikiPage } from '#lib/server/wiki.js';
 
 export async function load({ locals, params, url }) {
 	const { dir } = repoFor(locals, params.owner, params.repo);
 	const name = params.page ?? 'Home';
-	return { ...(await wikiPage(dir, `${params.owner}/${params.repo}`, name)), name, editing: url.searchParams.has('edit'), creating: url.searchParams.has('new') };
+	return { ...(await wikiPage(db, dir, `${params.owner}/${params.repo}`, name)), name, editing: url.searchParams.has('edit'), creating: url.searchParams.has('new') };
 }
 
 export const actions = {

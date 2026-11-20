@@ -1,3 +1,4 @@
+import type { Database } from 'bun:sqlite';
 import { error } from '@sveltejs/kit';
 import { existsSync } from 'node:fs';
 import { git, gitTry, initBare } from './git.js';
@@ -29,7 +30,7 @@ export async function wikiPages(repoDir: string) {
 // [[Page]] and [[Text|Page]] become links to the page; other relative links and images resolve inside the wiki.
 export const wikiLinks = (md: string) => md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, a: string, b?: string) => `[${a}](${encodeURIComponent((b ?? a).trim().replaceAll(' ', '-'))})`);
 
-export async function wikiPage(repoDir: string, repo: string, name: string) {
+export async function wikiPage(db: Database, repoDir: string, repo: string, name: string) {
 	const dir = wikiDir(repoDir);
 	const pages = await wikiPages(repoDir);
 	const sha = await head(dir);
@@ -37,7 +38,7 @@ export async function wikiPage(repoDir: string, repo: string, name: string) {
 	const md = sha ? await gitTry(dir, ['cat-file', 'blob', `${sha}:${path}`]) : null;
 	if (md === null) return { pages, page: null };
 	const [when, by] = (await git(dir, ['log', '-1', '--format=%cI%x00%an', sha!, '--', path])).trim().split('\0');
-	const html = render(wikiLinks(md), { repo, ref: '', dir: '' })
+	const html = render(wikiLinks(md), { repo, ref: '', dir: '' }, db)
 		.replace(/href="(?![a-z][a-z0-9+.-]*:|\/|#)([^"]+)"/gi, `href="/${repo}/wiki/$1"`)
 		.replace(/src="(?![a-z][a-z0-9+.-]*:|\/)([^"]+)"/gi, `src="/${repo}/wiki/raw/$1"`);
 	return { pages, page: { title: title(path), name: path.replace(/\.md$/, ''), html, markdown: md, updated: { by, at: when } } };
@@ -60,4 +61,3 @@ export async function saveWikiPage(repoDir: string, o: { name: string; from?: st
 		author: o.author
 	});
 }
-
