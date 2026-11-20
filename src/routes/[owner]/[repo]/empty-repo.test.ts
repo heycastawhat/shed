@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import { createToken, signIn, startSession } from '#lib/server/accounts.js';
 import { openDb } from '#lib/server/db.js';
 import { testEnv } from '#lib/server/test-env.js';
@@ -16,7 +17,15 @@ let cookie: string;
 function startServer(root: string) {
 	return Bun.spawn([process.execPath, '-e', `
 		import { createServer } from 'vite';
-		const server = await createServer({ logLevel: 'error', server: { host: '127.0.0.1', port: 0, ws: false } });
+		import { sveltekit } from '@sveltejs/kit/vite';
+		const root = process.env.SHED_DATA;
+		const server = await createServer({
+			configFile: false,
+			cacheDir: root + '/vite-cache',
+			plugins: [sveltekit({ outDir: root + '/svelte-kit', env: { dir: root } })],
+			logLevel: 'error',
+			server: { host: '127.0.0.1', port: 0, ws: false }
+		});
 		await server.listen();
 		console.log(server.resolvedUrls.local[0]);
 	`], {
@@ -28,6 +37,7 @@ function startServer(root: string) {
 
 beforeAll(async () => {
 	root = await mkdtemp(`${tmpdir()}/shed-empty-repo-`);
+	await symlink(resolve('node_modules'), `${root}/node_modules`, 'junction');
 	const db = openDb(`${root}/shed.db`);
 	const user = signIn(db, { sub: '1', preferred_username: 'ada' });
 	cookie = `shed_session=${startSession(db, user, 'test')}`;
