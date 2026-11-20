@@ -118,6 +118,69 @@ test('notifications: one thread can be read back', async () => {
 	expect((await call(ada, 'GET', `/notifications/threads/${n.id}`)).status).toBe(404);
 });
 
+test('only newly mentioned readers are notified when an issue body or comment is edited', async () => {
+	const repo = await createRepo(db, root, ada, { name: 'edit-mentions' });
+	const base = '/repos/ada/edit-mentions';
+	const recipients = ['body-reader.', 'comment-reader_'].map((login) => signIn(db, { sub: login, preferred_username: login }));
+	const outsider = signIn(db, { sub: 'no-access', preferred_username: 'no-access' });
+	for (const id of [...recipients, other]) db.query("insert into collaborators (repo_id, user_id, permission) values (?, ?, 'read')").run(repo, id);
+	const issue = await call(ada, 'POST', `${base}/issues`, { title: 'Edit mentions', body: 'Before' });
+	expect(issue.status).toBe(201);
+	const thread = `${base}/issues/${issue.json.number}`;
+	const comment = await call(ada, 'POST', `${thread}/comments`, { body: 'Before' });
+	expect(comment.status).toBe(201);
+	expect((await call(other, 'PUT', `${base}/subscription`)).status).toBe(200);
+	db.query('insert into subscriptions (user_id, issue_id, subscribed) values (?, ?, 0)').run(recipients[1], issue.json.id);
+
+	const edits = [
+		[thread, 'body-reader.'],
+		[`${base}/issues/comments/${comment.json.id}`, 'comment-reader_']
+	];
+	for (const [i, [path, login]] of edits.entries()) {
+		const user = recipients[i];
+		expect((await call(user, 'GET', '/notifications')).json).toEqual([]);
+		expect((await call(ada, 'PATCH', path, { body: `After: @${login}, @ada, @no-access, \`@other\`` })).status).toBe(200);
+		const notes = (await call(user, 'GET', '/notifications')).json;
+		expect(notes).toHaveLength(1);
+		expect(notes[0].subject.title).toBe('Edit mentions');
+		expect((await call(user, 'PATCH', `/notifications/threads/${notes[0].id}`)).json.unread).toBe(false);
+		expect((await call(ada, 'PATCH', path, { body: `Reworded: @${login.toUpperCase()}` })).status).toBe(200);
+		expect((await call(user, 'GET', '/notifications')).json).toEqual([]);
+		expect((await call(user, 'GET', '/notifications?all=true')).json).toHaveLength(1);
+	}
+	const notified = db.query<{ user_id: number }, [number]>('select user_id from notifications where issue_id = ? order by user_id').all(issue.json.id);
+	expect(notified.map(({ user_id }) => user_id)).toEqual(recipients);
+	expect((await call(outsider, 'GET', '/notifications')).json).toEqual([]);
+});
+
+test('pull description and published review comment edits notify without leaking pending reviews', async () => {
+	const base = '/repos/ada/sample';
+	const logins = ['pull-reader-', 'draft-reader.', 'review-reader_'];
+	const users = logins.map((login) => signIn(db, { sub: login, preferred_username: login }));
+	for (const id of users) db.query("insert into collaborators (repo_id, user_id, permission) select id, ?, 'read' from repos where name = 'sample' and fork_of is null").run(id);
+	const pull = await call(ada, 'POST', `${base}/pulls`, { title: 'Review edit mentions', head: 'feature/x' });
+	expect(pull.status).toBe(201);
+	const path = `${base}/pulls/${pull.json.number}`;
+	expect((await call(ada, 'PATCH', path, { body: '@pull-reader-' })).status).toBe(200);
+	expect((await call(users[0], 'GET', '/notifications')).json).toHaveLength(1);
+
+	const draft = await call(ada, 'POST', `${path}/reviews`, { event: 'PENDING', comments: [{ path: 'a.txt', new_position: 2, body: 'Before' }] });
+	expect(draft.status).toBe(201);
+	const review = `${path}/reviews/${draft.json.id}`;
+	const comments = await call(ada, 'GET', `${review}/comments`);
+	expect(comments.json).toHaveLength(1);
+	const comment = `${base}/issues/comments/${comments.json[0].id}`;
+	expect((await call(ada, 'PATCH', comment, { body: '@draft-reader.' })).status).toBe(200);
+	expect((await call(users[1], 'GET', '/notifications')).json).toEqual([]);
+	expect((await call(ada, 'POST', review, { event: 'COMMENT', body: 'Published' })).status).toBe(201);
+	const notes = (await call(users[1], 'GET', '/notifications')).json;
+	expect(notes).toHaveLength(1);
+	expect((await call(users[1], 'PATCH', `/notifications/threads/${notes[0].id}`)).json.unread).toBe(false);
+	expect((await call(ada, 'PATCH', comment, { body: '@draft-reader., @review-reader_' })).status).toBe(200);
+	expect((await call(users[1], 'GET', '/notifications')).json).toEqual([]);
+	expect((await call(users[2], 'GET', '/notifications')).json).toHaveLength(1);
+});
+
 test('search: users by kind, and code on default branches', async () => {
 	expect((await call(ada, 'GET', '/users/search?q=oth')).json.data.map((u: { login: string }) => u.login)).toEqual(['other']);
 	expect((await call(ada, 'GET', '/users/search?kind=org')).json.data).toEqual([]);

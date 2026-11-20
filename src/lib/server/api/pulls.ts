@@ -10,7 +10,7 @@ import { git, gitTry, spawn } from '../git.js';
 import { afterPush, onPush, refSnapshot } from '../push.js';
 import { repoDir, type RepoRow } from '../repos.js';
 import { now, refSha, threadRepoOf as repoOf, slice, userByLogin, userJson, userRow, type RepoCtx } from './common.js';
-import { addComment, createIssue, crossReference, event, issueOf, repoRef, touch } from './issues.js';
+import { addComment, createIssue, crossReference, editIssue, event, issueOf, repoRef, touch } from './issues.js';
 import { addNotification, notify } from './notify.js';
 import { checkRefWrite, protectionFor } from './protect.js';
 import { commitsJson } from './repos.js';
@@ -201,9 +201,8 @@ route('GET', '/repos/:owner/:repo/pulls/:index/revisions', (c) => {
 
 route('PATCH', '/repos/:owner/:repo/pulls/:index', async (c) => {
 	const r = repoOf(c);
-	const p = pullOf(c, r);
 	const b = await c.body<{ title?: string; body?: string; state?: string; base?: string; draft?: boolean; assignees?: string[]; milestone?: number; labels?: number[] }>();
-	const { editIssue } = await import('./issues.js');
+	const p = pullOf(c, r);
 	await editIssue(c, r, p, b);
 	if (b.base && b.base !== p.base) {
 		if (!atLeast(r.level, 'write')) error(403, 'Changing the base needs write access');
@@ -309,7 +308,8 @@ async function submitReview(c: Ctx, r: RepoCtx, p: PullRow, b: { event?: string;
 		c.db.query('insert or ignore into subscriptions (user_id, issue_id) values (?, ?)').run(u.id, p.id);
 		const op = { APPROVED: 'approve_pull_request', REQUEST_CHANGES: 'reject_pull_request', COMMENT: 'comment_pull' }[state]!;
 		record(c.db, { userId: u.id, repoId: r.row.id, op, content: JSON.stringify([String(p.number), (b.body ?? '').split('\n')[0]]) });
-		notify(c, r, p, 'reviewed', [b.body ?? '', ...(b.comments ?? []).map((x) => x.body)].join('\n'));
+		const comments = c.db.query<{ body: string }, [number]>('select body from comments where review_id = ? order by id').all(id);
+		notify(c, r, p, 'reviewed', [b.body ?? '', ...comments.map((x) => x.body)].join('\n'));
 		await tryAutoMerge(c, r, p.id);
 	}
 	return reviewJson(c.db, c.db.query<ReviewRow, [number]>('select * from reviews where id = ?').get(id)!, p.head_sha);

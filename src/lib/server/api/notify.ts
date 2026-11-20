@@ -8,14 +8,22 @@ import { me, page, Paged, route, type Ctx } from './router.js';
 import type { IssueRow } from './shapes.js';
 
 // Who hears about activity on an issue or PR: its subscribers (author, commenters, assignees), people watching the repo, and anyone
-// @mentioned who can read it. Never the person who did it.
-export function notify(c: Ctx, r: RepoCtx, i: IssueRow, what: string, text: string) {
+// @mentioned who can read it. Edits only notify newly mentioned users. Never notify the person who did it.
+export function notify(c: Ctx, r: RepoCtx, i: IssueRow, what: string, text: string, previous?: string) {
 	const actor = c.user?.id;
 	const ids = new Set<number>();
-	for (const s of c.db.query<{ user_id: number; subscribed: number }, [number]>('select user_id, subscribed from subscriptions where issue_id = ?').all(i.id)) if (s.subscribed) ids.add(s.user_id);
-	for (const w of c.db.query<{ user_id: number }, [number]>('select user_id from watches where repo_id = ?').all(r.row.id)) ids.add(w.user_id);
-	const muted = new Set(c.db.query<{ user_id: number }, [number]>('select user_id from subscriptions where issue_id = ? and subscribed = 0').all(i.id).map((x) => x.user_id));
-	for (const login of mentions(text, databaseMentionLookup(c.db))) {
+	const muted = new Set<number>();
+	if (previous === undefined) {
+		for (const s of c.db.query<{ user_id: number; subscribed: number }, [number]>('select user_id, subscribed from subscriptions where issue_id = ?').all(i.id)) {
+			if (s.subscribed) ids.add(s.user_id);
+			else muted.add(s.user_id);
+		}
+		for (const w of c.db.query<{ user_id: number }, [number]>('select user_id from watches where repo_id = ?').all(r.row.id)) ids.add(w.user_id);
+	}
+	const lookup = databaseMentionLookup(c.db);
+	const logins = mentions(text, lookup);
+	if (previous && logins.size) for (const login of mentions(previous, lookup)) logins.delete(login);
+	for (const login of logins) {
 		const u = c.db.query<{ id: number }, [string]>("select id from users where login = ? and kind = 'user'").get(login);
 		if (u && atLeast(access(c.db, u.id, r.row), 'read')) ids.add(u.id), muted.delete(u.id);
 	}
