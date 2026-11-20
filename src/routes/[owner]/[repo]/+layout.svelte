@@ -98,7 +98,7 @@
 	</nav>
 </div>
 
-{#if data.repo.empty && section !== 'settings'}
+{#if data.repo.empty && page.route.id === '/[owner]/[repo]'}
 	<section class="empty">
 		<h2>This repository is empty</h2>
 		<p class="muted">Push an existing project to it:</p>
@@ -114,7 +114,7 @@ git push -u origin {data.repo.default_branch}</pre>
 	</section>
 {:else}
 	{@render children()}
-	{#if section === 'code'}<FileFinder repo={data.repo.full_name} ref={data.ref} />{/if}
+	{#if section === 'code' && !data.repo.empty}<FileFinder repo={data.repo.full_name} ref={data.ref} />{/if}
 {/if}
 
 <style>
