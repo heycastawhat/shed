@@ -70,7 +70,7 @@
 		{#each data.run.jobs as j (j.id)}
 			<a href="{base}?job={j.id}" class:on={j.id === data.job?.id} data-sveltekit-replacestate>
 				{@render badge(j.status)}
-				<span class="name">{j.name}</span>
+				<span class="name" title={j.name}>{j.name}</span>
 				<span class="muted small">{took(j.started_at, j.completed_at)}</span>
 			</a>
 		{/each}
@@ -161,6 +161,7 @@
 	}
 	nav a {
 		display: flex;
+		min-width: 0;
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.45rem 0.6rem;
