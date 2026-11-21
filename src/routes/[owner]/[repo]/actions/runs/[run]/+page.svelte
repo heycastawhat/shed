@@ -194,9 +194,13 @@
 	.small {
 		font-size: 0.82rem;
 	}
+	.job {
+		min-width: 0;
+	}
 	h3 {
 		margin: 0 0 0.6rem;
 		font-size: 1rem;
+		overflow-wrap: anywhere;
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.6rem;
