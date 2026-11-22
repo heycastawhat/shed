@@ -11,9 +11,11 @@ export type Note = {
 	subject: { title: string; type: 'Issue' | 'Pull'; state: string; url: string; html_url: string };
 };
 
-export async function load({ locals, url, depends }) {
+export async function load({ locals, url, depends, setHeaders }) {
 	depends('shed:notifications');
 	if (!locals.user) redirect(303, '/login');
+	// With bfcache off, Back can otherwise replay stale unread state from the HTTP cache.
+	setHeaders({ 'cache-control': 'private, no-store' });
 	const all = url.searchParams.get('tab') === 'all';
 	const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
 	const { items, total } = await apiPage<Note>(locals.token, `/notifications?${all ? 'all=true&' : ''}limit=50&page=${page}`);
